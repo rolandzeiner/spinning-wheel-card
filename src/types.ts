@@ -178,6 +178,12 @@ export type HubColor = "theme" | "black" | "white";
 export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   type: string;
   name?: string;
+  /** Override the auto-detected display language for this card (any
+   *  ISO-639-1 code). When unset, the card follows
+   *  hass.locale.language → hass.language → navigator.language → "en".
+   *  Unsupported codes fall through to English just like the auto-detect
+   *  path. */
+  language?: string;
   /** How many segments the wheel is divided into (4–24). Default 8. */
   segments?: number;
   /** Deceleration preset. Default "medium". */

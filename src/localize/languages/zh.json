@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "卡片标题",
+    "language": "语言",
+    "language_auto": "自动(HA 语言)",
     "segments": "扇区数量",
     "friction": "摩擦力",
     "theme": "颜色主题",
@@ -28,6 +30,7 @@
     "text_orientation": "标签方向",
     "sound": "点击音效",
     "show_status": "显示状态行",
+    "language_helper": "为此卡片覆盖自动检测的显示语言。自动会跟随你的 HA 个人资料(以浏览器语言作为后备)。",
     "segments_helper": "转盘划分的扇区数量。范围 4 到 24。",
     "friction_helper": "旋转或释放后转盘减速的快慢。",
     "theme_helper": "当“颜色”为空时使用的内置色板。自定义“颜色”始终优先。",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "配置无效",
     "name_type": "name 必须是字符串",
+    "language_type": "language 必须是字符串",
     "segments_range": "segments 必须是 4 到 24 之间的整数",
     "friction_value": "friction 必须是以下之一:low、medium、high",
     "labels_type": "labels 必须是字符串数组",

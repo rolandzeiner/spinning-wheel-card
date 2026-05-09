@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "カードのタイトル",
+    "language": "言語",
+    "language_auto": "自動 (HA の言語)",
     "segments": "セグメント数",
     "friction": "摩擦",
     "theme": "カラーテーマ",
@@ -28,6 +30,7 @@
     "text_orientation": "ラベルの向き",
     "sound": "クリック音",
     "show_status": "ステータス行を表示",
+    "language_helper": "このカードに対して、自動検出された表示言語を上書きします。自動は HA プロフィール (ブラウザ言語をフォールバック) に従います。",
     "segments_helper": "ホイールを分割するセグメントの数。4 から 24 まで。",
     "friction_helper": "回転や手放し後にホイールが減速する速さ。",
     "theme_helper": "カラーが空の場合に使用される組み込みパレット。カスタム カラーは常に優先されます。",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "設定が無効です",
     "name_type": "name は文字列である必要があります",
+    "language_type": "language は文字列である必要があります",
     "segments_range": "segments は 4 から 24 の整数である必要があります",
     "friction_value": "friction は low、medium、high のいずれかである必要があります",
     "labels_type": "labels は文字列の配列である必要があります",

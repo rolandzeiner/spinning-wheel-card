@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Título do cartão",
+    "language": "Idioma",
+    "language_auto": "Automático (idioma do HA)",
     "segments": "Segmentos",
     "friction": "Atrito",
     "theme": "Tema de cor",
@@ -28,6 +30,7 @@
     "text_orientation": "Orientação dos rótulos",
     "sound": "Som do clique",
     "show_status": "Mostrar linha de estado",
+    "language_helper": "Substitui o idioma de exibição detetado automaticamente para este cartão. Automático segue o seu perfil HA (com o idioma do navegador como recurso).",
     "segments_helper": "Em quantas fatias a roda é dividida. De 4 a 24.",
     "friction_helper": "Velocidade com que a roda desacelera após um giro ou solta.",
     "theme_helper": "Paleta de cores integrada usada quando Cores está vazio. Cores personalizadas têm sempre prioridade.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Configuração inválida",
     "name_type": "name deve ser uma string",
+    "language_type": "language deve ser uma string",
     "segments_range": "segments deve ser um inteiro entre 4 e 24",
     "friction_value": "friction deve ser um de: low, medium, high",
     "labels_type": "labels deve ser um array de strings",

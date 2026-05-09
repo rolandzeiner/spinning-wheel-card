@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Titre de la carte",
+    "language": "Langue",
+    "language_auto": "Automatique (langue HA)",
     "segments": "Segments",
     "friction": "Frottement",
     "theme": "Thème de couleur",
@@ -28,6 +30,7 @@
     "text_orientation": "Orientation des étiquettes",
     "sound": "Son du clic",
     "show_status": "Afficher la ligne d'état",
+    "language_helper": "Remplace la langue d'affichage détectée automatiquement pour cette carte. Automatique suit votre profil HA (avec la langue du navigateur en repli).",
     "segments_helper": "Nombre de tranches en lesquelles la roue est divisée. De 4 à 24.",
     "friction_helper": "Vitesse à laquelle la roue ralentit après une rotation ou un lâcher.",
     "theme_helper": "Palette de couleurs intégrée utilisée lorsque Couleurs est vide. Couleurs personnalisées prend toujours le dessus.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Configuration invalide",
     "name_type": "name doit être une chaîne de caractères",
+    "language_type": "language doit être une chaîne de caractères",
     "segments_range": "segments doit être un entier compris entre 4 et 24",
     "friction_value": "friction doit valoir low, medium ou high",
     "labels_type": "labels doit être un tableau de chaînes de caractères",

@@ -230,13 +230,21 @@ export class SpinningWheelCard extends LitElement {
   public setConfig(config: SpinningWheelCardConfig): void {
     // setConfig may run before hass is set (HA's lifecycle order isn't
     // guaranteed); use navigator language as a fallback so error text
-    // is still localised for the user.
-    const lang = this._lang();
+    // is still localised for the user. Prefer the INCOMING config's
+    // language over the current one so an edit that also flips the
+    // language gets its error reported in the new language.
+    const lang =
+      (config?.language as string | undefined) ??
+      this.config?.language ??
+      resolveLang(this.hass);
     if (!config || typeof config !== "object") {
       throw new Error(localize("errors.invalid_config", lang));
     }
     if (config.name !== undefined && typeof config.name !== "string") {
       throw new Error(localize("errors.name_type", lang));
+    }
+    if (config.language !== undefined && typeof config.language !== "string") {
+      throw new Error(localize("errors.language_type", lang));
     }
     if (config.segments !== undefined) {
       if (
@@ -368,10 +376,12 @@ export class SpinningWheelCard extends LitElement {
     this._result = null;
   }
 
-  /** Reactive language source. Delegates to `resolveLang` in the
-   *  localize module so the chain stays consistent between card + editor. */
+  /** Reactive language source. An explicit per-card `language` override
+   *  (when set) wins over the HA-wide auto-detect chain so a user can
+   *  e.g. run HA in German but render a single card in French. Falls
+   *  through to `resolveLang(hass)` when unset. */
   private _lang(): string {
-    return resolveLang(this.hass);
+    return this.config?.language ?? resolveLang(this.hass);
   }
 
   private _hubText(): string {
