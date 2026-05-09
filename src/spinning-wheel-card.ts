@@ -740,14 +740,31 @@ export class SpinningWheelCard extends LitElement {
 
       // ha-icon resolves the path asynchronously — its updateComplete
       // resolves before the SVG is in the shadow root in some flows.
-      // Poll for ~500 ms (30 frames at 60 fps) before giving up.
+      // Poll for ~500 ms (30 frames at 60 fps) before giving up. Three
+      // places to check, in priority order:
+      //   1. The nested <ha-svg-icon>'s .path property (modern HA — the
+      //      fastest, no shadow-DOM walk).
+      //   2. The nested <ha-svg-icon>'s shadow root <path d="…"> (same
+      //      thing but read from the rendered SVG).
+      //   3. ha-icon's own shadow root <path> (legacy iron-icon flow).
       let path: string | null = null;
       for (let attempt = 0; attempt < 30 && !path; attempt++) {
         if (probe.updateComplete) {
-          try { await probe.updateComplete; } catch { /* ignore */ }
+          try {
+            await probe.updateComplete;
+          } catch {
+            /* ignore */
+          }
         }
+        const svgIcon = probe.shadowRoot?.querySelector("ha-svg-icon") as
+          | (HTMLElement & { path?: string })
+          | null
+          | undefined;
         path =
-          probe.shadowRoot?.querySelector("path")?.getAttribute("d") ?? null;
+          svgIcon?.path ??
+          svgIcon?.shadowRoot?.querySelector("path")?.getAttribute("d") ??
+          probe.shadowRoot?.querySelector("path")?.getAttribute("d") ??
+          null;
         if (!path) {
           await new Promise<void>((r) => requestAnimationFrame(() => r()));
         }
