@@ -38,7 +38,7 @@
     "theme_pastel": "Pastel — tons doux et peu saturés",
     "theme_pride": "Pride — drapeau arc-en-ciel à 6 bandes",
     "theme_neon": "Néon — couleurs vives et éclatantes",
-    "labels_helper": "Séparées par des virgules ou des sauts de ligne. Jusqu'à une par segment ; si vous en donnez moins, elles sont répétées autour de la roue (ex. « A, B » sur 8 segments → A B A B A B A B). Laissez vide pour 1..N.",
+    "labels_helper": "Séparées par des virgules ou des sauts de ligne. Jusqu'à une par segment ; si vous en donnez moins, elles sont répétées autour de la roue (ex. « A, B » sur 8 segments → A B A B A B A B). Les icônes MDI fonctionnent aussi — tapez « mdi:home » et l'icône remplace le texte. Laissez vide pour 1..N.",
     "weights_helper": "Tailles relatives séparées par des virgules (seul le rapport compte). Même règle de répétition que les étiquettes — « 3, 1 » sur 4 segments donne grand, petit, grand, petit. Laissez vide pour des tranches égales.",
     "colors_helper": "Couleurs CSS séparées par des virgules ou des sauts de ligne (hex, rgb, hsl, nommées). Affectées aux étiquettes UNIQUES dans l'ordre de leur première apparition — les segments partageant une étiquette partagent toujours la même couleur. Longueur jusqu'à `segments` ; seuls les N premiers (= nombre d'étiquettes uniques) sont réellement utilisés. Laissez vide pour la palette intégrée.",
     "label_colors_helper": "Couleurs CSS séparées par des virgules ou des sauts de ligne pour le texte des étiquettes. Même mappage par étiquette unique que Couleurs — seuls les N premiers (= nombre d'étiquettes uniques) sont utilisés. Laissez vide pour du gris foncé sur tous les segments.",
