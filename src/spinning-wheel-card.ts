@@ -1791,10 +1791,11 @@ export class SpinningWheelCard extends LitElement {
     ctx.strokeStyle = theme.hubStroke;
     ctx.stroke();
 
-    // Hub text — auto-shrinks. Hidden in half mode (hub centred on
-    // the cut line; half the label area is off-canvas).
+    // Hub text auto-shrinks. Hidden in selector mode — the centre
+    // "SPIN" prompt no longer matches the drag-to-pick gesture.
+    // Half-circle keeps it visible (just paints over the cut line).
     const hubText = this._hubText();
-    if (hubText && !halfMode) {
+    if (hubText && !this._isSelectorMode()) {
       ctx.save();
       const baseSize = Math.max(7, Math.round(size * 0.038));
       const minSize = Math.max(6, Math.round(baseSize * 0.55));

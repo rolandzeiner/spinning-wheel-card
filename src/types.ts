@@ -277,13 +277,14 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  (admin only — `input_text/create` is admin-gated upstream). */
   result_entity?: string;
   /** Render only the upper half of the disc (pointer top, hub on the
-   *  cut line, hub text hidden). Physics are unchanged; only the painted
-   *  geometry differs. Default false. */
+   *  cut line). Physics are unchanged; only the painted geometry
+   *  differs. Default false. */
   half_circle?: boolean;
-  /** Manual picker mode — disables click-to-spin and the momentum loop.
-   *  Drag rotates 1:1; on release the segment under the indicator snaps
-   *  to centre and its action fires. Space / Enter re-fires the current
-   *  selection. Default false. */
+  /** Manual picker mode — disables click-to-spin and the momentum loop;
+   *  hides the hub text (the centre prompt no longer matches the drag-
+   *  to-pick gesture). Drag rotates 1:1; on release the segment under
+   *  the indicator snaps to centre and its action fires. Space / Enter
+   *  re-fires the current selection. Default false. */
   selector_mode?: boolean;
 }
 

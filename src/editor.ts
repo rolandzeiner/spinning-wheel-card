@@ -21,7 +21,6 @@ import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 // `binding_<i>_<suffix>` keys. Both shapes are stripped in _onFormChanged
 // before config-changed fires so they never reach saved YAML.
 type EditorData = SpinningWheelCardConfig & {
-  labels_csv?: string;
   weights_csv?: string;
   colors_csv?: string;
   label_colors_csv?: string;
@@ -129,7 +128,6 @@ export class SpinningWheelCardEditor
     type: "spinning-wheel-card",
   };
   // CSV verbatim — preserves the trailing comma the user is about to type.
-  @state() private _labelsText = "";
   @state() private _weightsText = "";
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
@@ -150,7 +148,6 @@ export class SpinningWheelCardEditor
 
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
-    this._labelsText = (config.labels ?? []).join(", ");
     this._weightsText = (config.weights ?? []).join(", ");
     this._colorsText = (config.colors ?? []).join(", ");
     this._labelColorsText = (config.label_colors ?? []).join(", ");
@@ -318,8 +315,18 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
             {
-              name: "labels_csv",
-              selector: { text: { multiline: true } },
+              name: "labels",
+              // Chip-style selector — type a label, press Enter, X to
+              // remove. `options: []` + `custom_value: true` lets every
+              // entry be user-typed (no fixed dropdown). MDI icon
+              // strings (`mdi:home`) round-trip as bare text.
+              selector: {
+                select: {
+                  multiple: true,
+                  custom_value: true,
+                  options: [],
+                },
+              },
             } satisfies HaFormSchema,
             {
               name: "text_orientation",
@@ -549,7 +556,7 @@ export class SpinningWheelCardEditor
     ["segments", { label: "editor.segments", helper: "editor.segments_helper" }],
     ["friction", { label: "editor.friction", helper: "editor.friction_helper" }],
     ["theme", { label: "editor.theme", helper: "editor.theme_helper" }],
-    ["labels_csv", { label: "editor.labels", helper: "editor.labels_helper" }],
+    ["labels", { label: "editor.labels", helper: "editor.labels_helper" }],
     ["weights_csv", { label: "editor.weights", helper: "editor.weights_helper" }],
     ["colors_csv", { label: "editor.colors", helper: "editor.colors_helper" }],
     ["label_colors_csv", { label: "editor.label_colors", helper: "editor.label_colors_helper" }],
@@ -617,13 +624,11 @@ export class SpinningWheelCardEditor
     const next: EditorData = { ...ev.detail.value };
     const proj = this._lastProjection;
 
-    // 1. CSV synthetics.
-    const labelsCsv = (next.labels_csv as string | undefined) ?? "";
+    // 1. CSV synthetics (Advanced section).
     const weightsCsv = (next.weights_csv as string | undefined) ?? "";
     const colorsCsvNext = (next.colors_csv as string | undefined) ?? "";
     const labelColorsCsvNext =
       (next.label_colors_csv as string | undefined) ?? "";
-    delete next.labels_csv;
     delete next.weights_csv;
     delete next.colors_csv;
     delete next.label_colors_csv;
@@ -640,13 +645,20 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // 3. Labels.
+    // 3. Labels — chip selector emits string[] directly. Trim each chip
+    // and drop empties (paste of a trailing comma can leave one), clamp
+    // to the wheel's segment count.
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
-    const parsedLabels = parseStringList(labelsCsv);
-    if (parsedLabels.length === 0) {
-      delete next.labels;
+    const rawLabels = next.labels;
+    if (Array.isArray(rawLabels)) {
+      const cleaned = rawLabels
+        .filter((l): l is string => typeof l === "string")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      if (cleaned.length === 0) delete next.labels;
+      else next.labels = cleaned.slice(0, segments);
     } else {
-      next.labels = parsedLabels.slice(0, segments);
+      delete next.labels;
     }
 
     // 3b. Weights: CSV edit > bindings edit > unchanged.
@@ -839,7 +851,6 @@ export class SpinningWheelCardEditor
 
     // 8. Cache CSV verbatim; regenerate when the binding side authored
     // the change so the next render's CSV view stays in sync.
-    this._labelsText = labelsCsv;
     this._weightsText = weightsCsvChanged
       ? weightsCsv
       : (next.weights ?? []).join(", ");
@@ -867,7 +878,6 @@ export class SpinningWheelCardEditor
       actions: (this._config.actions ?? []).filter(
         (a): a is string => typeof a === "string",
       ),
-      labels_csv: this._labelsText,
       weights_csv: this._weightsText,
       colors_csv: this._colorsText,
       label_colors_csv: this._labelColorsText,
