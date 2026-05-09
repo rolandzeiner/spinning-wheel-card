@@ -949,17 +949,31 @@ export class SpinningWheelCardEditor
     return /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i.test(s);
   }
 
-  /** Append a chip to the labels list. Trims, drops empties, dedupes
-   *  the trailing duplicate (rapid double-click on Add), caps at the
-   *  configured segment count (`_onFormChanged` matches this slice). */
+  /** Append a chip to the labels list. Trims, dedupes (the unique-label
+   *  binding makes a duplicate redundant on the wheel), caps at
+   *  `segments`. Text labels are inserted BEFORE any existing icon
+   *  chips so the chips area reads "text first, icons after"; icons
+   *  always append at the end. Existing labels are not reshuffled. */
   private _addLabel(value: string): void {
     const trimmed = value.trim();
     if (!trimmed) return;
     const segments = this._config.segments ?? STATIC_DEFAULTS.segments;
     const current = this._config.labels ?? [];
     if (current.length >= segments) return;
-    if (current[current.length - 1] === trimmed) return;
-    const next = [...current, trimmed];
+    if (current.includes(trimmed)) return;
+    const isIcon = this._isIconLabel(trimmed);
+    let insertAt: number;
+    if (isIcon) {
+      insertAt = current.length;
+    } else {
+      const firstIcon = current.findIndex((l) => this._isIconLabel(l));
+      insertAt = firstIcon >= 0 ? firstIcon : current.length;
+    }
+    const next = [
+      ...current.slice(0, insertAt),
+      trimmed,
+      ...current.slice(insertAt),
+    ];
     this._config = { ...this._config, labels: next };
     fireEvent(this, "config-changed", { config: this._config });
   }
