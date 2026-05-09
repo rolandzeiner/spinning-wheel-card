@@ -162,9 +162,30 @@ export type Theme = "default" | "pastel" | "pride" | "neon";
  *  - `white`: solid white hub + indicator with black hub text. */
 export type HubColor = "theme" | "black" | "white";
 
+/** Single item in a HA `todo.*` entity's list. The fields below are the
+ *  ones the wheel touches; the WS reply carries more (uid, due, etc.)
+ *  that we deliberately ignore. */
+export interface TodoItem {
+  /** Free-text label the user typed in HA. Becomes a wheel segment label. */
+  summary: string;
+  /** "needs_action" = open / "completed" = done. Wheel only renders open. */
+  status?: "needs_action" | "completed";
+  /** UID is opaque-string in HA's todo schema — we don't read it but
+   *  declaring the field keeps strict-mode `noUncheckedIndexedAccess`
+   *  happy when the WS reply is destructured. */
+  uid?: string;
+}
+
 export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   type: string;
   name?: string;
+  /** Optional HA `todo.*` entity_id. When set, the wheel's segments are
+   *  filled with the entity's *open* (needs_action) item summaries
+   *  fetched via `todo/item/list`, and `segments` is auto-derived from
+   *  the item count (clamped 4..24). The static `labels` array is
+   *  ignored while a todo_entity is active — todo wins. Refetch fires
+   *  whenever the entity's `state` (open-count) changes. */
+  todo_entity?: string;
   /** Override the auto-detected display language for this card (any
    *  ISO-639-1 code). When unset, the card follows
    *  hass.locale.language → hass.language → navigator.language → "en".

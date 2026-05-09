@@ -5,7 +5,8 @@
   "status": {
     "spinning": "旋转中…",
     "result": "结果:{value}",
-    "idle": "点击旋转 · 拖动投掷"
+    "idle": "点击旋转 · 拖动投掷",
+    "todo_empty": "待办事项列表中没有未完成的项目"
   },
   "hub": {
     "default_text": "旋转"
@@ -18,6 +19,7 @@
     "name": "卡片标题",
     "language": "语言",
     "language_auto": "自动(HA 语言)",
+    "todo_entity": "待办事项列表(可选)",
     "segments": "扇区数量",
     "friction": "摩擦力",
     "theme": "颜色主题",
@@ -31,6 +33,7 @@
     "sound": "点击音效",
     "show_status": "显示状态行",
     "language_helper": "为此卡片覆盖自动检测的显示语言。自动会跟随你的 HA 个人资料(以浏览器语言作为后备)。",
+    "todo_entity_helper": "可选。设置后,转盘的段落将填充此待办事项列表中的未完成项目(最多 24 个)。选定列表时,将忽略段落数和标签。",
     "segments_helper": "转盘划分的扇区数量。范围 4 到 24。",
     "friction_helper": "旋转或释放后转盘减速的快慢。",
     "theme_helper": "当“颜色”为空时使用的内置色板。自定义“颜色”始终优先。",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation 必须是 \"tangent\" 或 \"radial\"",
     "theme_value": "theme 必须是以下之一:default、pastel、pride、neon",
     "hub_color_value": "hub_color 必须是以下之一:theme、black、white",
-    "show_status_type": "show_status 必须是布尔值"
+    "show_status_type": "show_status 必须是布尔值",
+    "todo_entity_type": "todo_entity 必须是字符串",
+    "todo_entity_invalid": "todo_entity 必须是 todo.* 实体 ID"
   }
 }

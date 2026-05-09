@@ -5,7 +5,8 @@
   "status": {
     "spinning": "回転中…",
     "result": "結果: {value}",
-    "idle": "クリックで回転 · ドラッグで投げる"
+    "idle": "クリックで回転 · ドラッグで投げる",
+    "todo_empty": "ToDo リストに未完了の項目はありません"
   },
   "hub": {
     "default_text": "回す"
@@ -18,6 +19,7 @@
     "name": "カードのタイトル",
     "language": "言語",
     "language_auto": "自動 (HA の言語)",
+    "todo_entity": "ToDo リスト (任意)",
     "segments": "セグメント数",
     "friction": "摩擦",
     "theme": "カラーテーマ",
@@ -31,6 +33,7 @@
     "sound": "クリック音",
     "show_status": "ステータス行を表示",
     "language_helper": "このカードに対して、自動検出された表示言語を上書きします。自動は HA プロフィール (ブラウザ言語をフォールバック) に従います。",
+    "todo_entity_helper": "任意。設定すると、ホイールのセグメントはこの ToDo リストの未完了項目で埋められます (最大 24 個)。リストを選択している間、セグメント数とラベルは無視されます。",
     "segments_helper": "ホイールを分割するセグメントの数。4 から 24 まで。",
     "friction_helper": "回転や手放し後にホイールが減速する速さ。",
     "theme_helper": "カラーが空の場合に使用される組み込みパレット。カスタム カラーは常に優先されます。",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation は \"tangent\" または \"radial\" である必要があります",
     "theme_value": "theme は default、pastel、pride、neon のいずれかである必要があります",
     "hub_color_value": "hub_color は theme、black、white のいずれかである必要があります",
-    "show_status_type": "show_status はブール値である必要があります"
+    "show_status_type": "show_status はブール値である必要があります",
+    "todo_entity_type": "todo_entity は文字列である必要があります",
+    "todo_entity_invalid": "todo_entity は todo.* の entity_id である必要があります"
   }
 }

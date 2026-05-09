@@ -5,7 +5,8 @@
   "status": {
     "spinning": "A girar…",
     "result": "Resultado: {value}",
-    "idle": "Clique para girar · arraste para lançar"
+    "idle": "Clique para girar · arraste para lançar",
+    "todo_empty": "Nenhum item aberto na lista de tarefas"
   },
   "hub": {
     "default_text": "GIRAR"
@@ -18,6 +19,7 @@
     "name": "Título do cartão",
     "language": "Idioma",
     "language_auto": "Automático (idioma do HA)",
+    "todo_entity": "Lista de tarefas (opcional)",
     "segments": "Segmentos",
     "friction": "Atrito",
     "theme": "Tema de cor",
@@ -31,6 +33,7 @@
     "sound": "Som do clique",
     "show_status": "Mostrar linha de estado",
     "language_helper": "Substitui o idioma de exibição detetado automaticamente para este cartão. Automático segue o seu perfil HA (com o idioma do navegador como recurso).",
+    "todo_entity_helper": "Opcional. Quando definido, os segmentos da roda são preenchidos com os itens abertos desta lista (máx 24). Segmentos e rótulos são ignorados enquanto uma lista estiver selecionada.",
     "segments_helper": "Em quantas fatias a roda é dividida. De 4 a 24.",
     "friction_helper": "Velocidade com que a roda desacelera após um giro ou solta.",
     "theme_helper": "Paleta de cores integrada usada quando Cores está vazio. Cores personalizadas têm sempre prioridade.",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation deve ser \"tangent\" ou \"radial\"",
     "theme_value": "theme deve ser um de: default, pastel, pride, neon",
     "hub_color_value": "hub_color deve ser um de: theme, black, white",
-    "show_status_type": "show_status deve ser um booleano"
+    "show_status_type": "show_status deve ser um booleano",
+    "todo_entity_type": "todo_entity deve ser uma string",
+    "todo_entity_invalid": "todo_entity deve ser um entity_id todo.*"
   }
 }

@@ -5,7 +5,8 @@
   "status": {
     "spinning": "Girando…",
     "result": "Resultado: {value}",
-    "idle": "Haz clic para girar · arrastra para lanzar"
+    "idle": "Haz clic para girar · arrastra para lanzar",
+    "todo_empty": "No hay elementos pendientes en la lista de tareas"
   },
   "hub": {
     "default_text": "GIRAR"
@@ -18,6 +19,7 @@
     "name": "Título de la tarjeta",
     "language": "Idioma",
     "language_auto": "Automático (idioma de HA)",
+    "todo_entity": "Lista de tareas (opcional)",
     "segments": "Segmentos",
     "friction": "Fricción",
     "theme": "Tema de color",
@@ -31,6 +33,7 @@
     "sound": "Sonido del clic",
     "show_status": "Mostrar línea de estado",
     "language_helper": "Sobrescribe el idioma de visualización detectado automáticamente para esta tarjeta. Automático sigue tu perfil de HA (con el idioma del navegador como respaldo).",
+    "todo_entity_helper": "Opcional. Cuando se establece, los segmentos de la rueda se rellenan con los elementos pendientes de esta lista (máx 24). Segmentos y etiquetas se ignoran mientras una lista esté seleccionada.",
     "segments_helper": "En cuántas porciones se divide la ruleta. De 4 a 24.",
     "friction_helper": "Con qué rapidez la ruleta desacelera tras un giro o suelta.",
     "theme_helper": "Paleta integrada usada cuando Colores está vacío. Colores personalizados siempre prevalece.",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation debe ser \"tangent\" o \"radial\"",
     "theme_value": "theme debe ser uno de: default, pastel, pride, neon",
     "hub_color_value": "hub_color debe ser uno de: theme, black, white",
-    "show_status_type": "show_status debe ser un booleano"
+    "show_status_type": "show_status debe ser un booleano",
+    "todo_entity_type": "todo_entity debe ser una cadena",
+    "todo_entity_invalid": "todo_entity debe ser un entity_id todo.*"
   }
 }

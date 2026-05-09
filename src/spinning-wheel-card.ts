@@ -12,6 +12,7 @@ import type {
   SpinningWheelCardConfig,
   TextOrientation,
   Theme,
+  TodoItem,
 } from "./types";
 import { localize, resolveLang } from "./localize/localize";
 
@@ -175,6 +176,18 @@ export class SpinningWheelCard extends LitElement {
   private _size = DEFAULT_SIZE;
   private _resizeObserver: ResizeObserver | null = null;
 
+  // ── Todo-list integration ──────────────────────────────────────────
+  // Cached open items from the configured todo entity. null = not yet
+  // fetched (or no todo_entity). Empty array = fetched, list is empty.
+  @state() private _todoItems: ReadonlyArray<TodoItem> | null = null;
+  // Last seen `state` (count) for the todo entity — refetch when it
+  // changes. Storing the raw state string (HA reports counts as
+  // numeric strings) avoids a callWS on every hass-property update.
+  private _todoLastEntityState: string | null = null;
+  // True while a callWS is in flight, prevents duplicate fetches when
+  // hass updates burst (e.g. theme + state changing in the same tick).
+  private _todoLoading = false;
+
   public setConfig(config: SpinningWheelCardConfig): void {
     // Prefer the incoming language so an edit that flips language AND
     // introduces an error reports the error in the new language.
@@ -315,6 +328,23 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.show_status_type", lang));
     }
+    if (config.todo_entity !== undefined) {
+      if (typeof config.todo_entity !== "string") {
+        throw new Error(localize("errors.todo_entity_type", lang));
+      }
+      if (config.todo_entity !== "" && !/^todo\.[a-z0-9_]+$/.test(config.todo_entity)) {
+        throw new Error(localize("errors.todo_entity_invalid", lang));
+      }
+    }
+    // Detect a swap (or unset) of the todo_entity so we re-fetch — and
+    // drop stale items from the old entity — instead of rendering them
+    // briefly until the next state change.
+    const prevTodo = this.config.todo_entity ?? null;
+    const nextTodo = config.todo_entity ?? null;
+    if (prevTodo !== nextTodo) {
+      this._todoItems = null;
+      this._todoLastEntityState = null;
+    }
     this.config = { ...config };
     this._result = null;
   }
@@ -352,7 +382,23 @@ export class SpinningWheelCard extends LitElement {
     return { columns: 6, rows: "auto", min_columns: 4, min_rows: 5 };
   }
 
+  /** Effective open-item summaries when a todo_entity is wired AND
+   *  fetched at least once with ≥1 open items. Otherwise null — callers
+   *  fall through to the static `labels` config / "1..N" default. */
+  private _todoLabels(): ReadonlyArray<string> | null {
+    if (!this.config.todo_entity) return null;
+    if (!this._todoItems || this._todoItems.length === 0) return null;
+    return this._todoItems.map((i) => i.summary);
+  }
+
   private _segments(): number {
+    const todo = this._todoLabels();
+    if (todo) {
+      // Auto-derive from open-item count, clamp to the wheel's 4..24
+      // window. < 4 items still render on a 4-segment wheel with the
+      // existing label-cycling rule covering the gap.
+      return Math.max(4, Math.min(24, todo.length));
+    }
     return this.config.segments ?? 8;
   }
   private _frictionFactor(): number {
@@ -362,11 +408,52 @@ export class SpinningWheelCard extends LitElement {
    *  empty / missing → "1".."N". */
   private _expandedLabels(): ReadonlyArray<string> {
     const n = this._segments();
-    const src = this.config.labels;
+    // Todo entity wins over the static labels config when both are set.
+    const todo = this._todoLabels();
+    const src = todo ?? this.config.labels;
     if (!src || src.length === 0) {
       return Array.from({ length: n }, (_, i) => String(i + 1));
     }
     return Array.from({ length: n }, (_, i) => src[i % src.length] ?? "");
+  }
+
+  /** Fetch open items from the configured todo entity via the
+   *  `todo/item/list` WS endpoint. Filters to `needs_action`, dedups
+   *  duplicate summaries (otherwise the same-label-same-colour rule
+   *  would collapse the wheel visually) but only emits a console
+   *  warning for the dedup so the user can fix the source. Re-runs
+   *  whenever the entity's state count changes. */
+  private async _fetchTodoItems(): Promise<void> {
+    const entity = this.config.todo_entity;
+    if (!entity || !this.hass?.callWS) return;
+    if (this._todoLoading) return;
+    this._todoLoading = true;
+    try {
+      const reply = (await this.hass.callWS({
+        type: "todo/item/list",
+        entity_id: entity,
+      })) as { items?: ReadonlyArray<TodoItem> } | undefined;
+      const all = reply?.items ?? [];
+      const open = all.filter((i) => (i.status ?? "needs_action") === "needs_action");
+      // Dedup by summary so the same-label-same-colour wheel rule doesn't
+      // visually collapse two segments into one. Order-preserving.
+      const seen = new Set<string>();
+      const unique: TodoItem[] = [];
+      for (const item of open) {
+        const key = item.summary ?? "";
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        unique.push(item);
+      }
+      this._todoItems = unique;
+      this._result = null;
+      this._draw();
+    } catch (err) {
+      console.warn("[spinning-wheel-card] todo/item/list failed:", err);
+      this._todoItems = [];
+    } finally {
+      this._todoLoading = false;
+    }
   }
   /** Resolve the active fallback palette: explicit `theme` if set,
    *  otherwise the built-in rainbow. Always overridden by `colors`
@@ -1374,7 +1461,10 @@ export class SpinningWheelCard extends LitElement {
   private _prevTheme: string | undefined = undefined;
 
   protected override updated(changed: PropertyValues): void {
-    let needsDraw = changed.has("config") || changed.has("_result");
+    let needsDraw =
+      changed.has("config") ||
+      changed.has("_result") ||
+      changed.has("_todoItems");
     if (changed.has("hass") && this.hass) {
       const dark = this.hass.themes?.darkMode;
       const themeName = (this.hass.themes as { theme?: string } | undefined)
@@ -1385,16 +1475,40 @@ export class SpinningWheelCard extends LitElement {
         needsDraw = true;
       }
     }
+    // Todo refetch trigger. Watch the todo entity's `state` (HA reports
+    // the open-item count there) and refetch when it changes — covers
+    // adds, removes, completions, undos. Also fires the first time we
+    // see hass after setConfig.
+    if (this.config.todo_entity) {
+      const entity = this.hass?.states?.[this.config.todo_entity];
+      const stateNow = entity?.state ?? null;
+      if (stateNow !== this._todoLastEntityState) {
+        this._todoLastEntityState = stateNow;
+        if (stateNow !== null) void this._fetchTodoItems();
+      }
+    }
     if (needsDraw) this._draw();
   }
 
   protected override render(): TemplateResult {
     const lang = this._lang();
+    // When the user wired a todo_entity but the list is empty (or the
+    // entity hasn't reported a count yet), say so in the status line
+    // instead of letting the wheel render placeholder 1..N labels
+    // silently. Once items arrive the normal idle / spinning / result
+    // states take over.
+    const todoEmpty =
+      !!this.config.todo_entity &&
+      (this._todoItems === null || this._todoItems.length === 0) &&
+      !this._spinning &&
+      this._result === null;
     const status = this._spinning
       ? localize("status.spinning", lang)
       : this._result !== null
         ? localize("status.result", lang, { value: this._result })
-        : localize("status.idle", lang);
+        : todoEmpty
+          ? localize("status.todo_empty", lang)
+          : localize("status.idle", lang);
     const header = this.config.name ?? localize("common.default_name", lang);
 
     return html`

@@ -5,7 +5,8 @@
   "status": {
     "spinning": "Spinning…",
     "result": "Result: {value}",
-    "idle": "Click to spin · drag to throw"
+    "idle": "Click to spin · drag to throw",
+    "todo_empty": "No open items in the todo list"
   },
   "hub": {
     "default_text": "SPIN"
@@ -18,6 +19,7 @@
     "name": "Card title",
     "language": "Language",
     "language_auto": "Auto (HA language)",
+    "todo_entity": "Todo list (optional)",
     "segments": "Segments",
     "friction": "Friction",
     "theme": "Colour theme",
@@ -31,6 +33,7 @@
     "sound": "Click sound",
     "show_status": "Show status line",
     "language_helper": "Override the auto-detected display language for this card. Auto follows your HA profile (or browser language as a fallback).",
+    "todo_entity_helper": "Optional. When set, the wheel's segments are filled with the open items of this todo list (max 24). Segments and Labels are ignored while a todo list is selected.",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
     "friction_helper": "How quickly the wheel decelerates after a spin or release.",
     "theme_helper": "Built-in colour palette used when Colours is empty. Custom Colours always overrides this.",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\"",
     "theme_value": "theme must be one of: default, pastel, pride, neon",
     "hub_color_value": "hub_color must be one of: theme, black, white",
-    "show_status_type": "show_status must be a boolean"
+    "show_status_type": "show_status must be a boolean",
+    "todo_entity_type": "todo_entity must be a string",
+    "todo_entity_invalid": "todo_entity must be a todo.* entity_id"
   }
 }

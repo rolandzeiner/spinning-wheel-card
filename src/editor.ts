@@ -113,6 +113,10 @@ export class SpinningWheelCardEditor
         },
       },
       {
+        name: "todo_entity",
+        selector: { entity: { domain: "todo" } },
+      },
+      {
         name: "segments",
         selector: { number: { min: 4, max: 24, step: 1, mode: "slider" } },
       },
@@ -227,6 +231,8 @@ export class SpinningWheelCardEditor
         return localize("editor.name", lang);
       case "language":
         return localize("editor.language", lang);
+      case "todo_entity":
+        return localize("editor.todo_entity", lang);
       case "segments":
         return localize("editor.segments", lang);
       case "friction":
@@ -262,6 +268,8 @@ export class SpinningWheelCardEditor
       switch (field.name) {
         case "language":
           return "editor.language_helper";
+        case "todo_entity":
+          return "editor.todo_entity_helper";
         case "segments":
           return "editor.segments_helper";
         case "friction":
@@ -366,6 +374,12 @@ export class SpinningWheelCardEditor
     if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
     // "auto" is the editor sentinel — strip so saved YAML stays clean.
     if (next.language === "auto") delete next.language;
+    // Empty entity selector emits "" — drop so the saved YAML stays
+    // minimal (and so setConfig's regex check doesn't see an empty
+    // string and complain).
+    if (next.todo_entity === "" || next.todo_entity == null) {
+      delete next.todo_entity;
+    }
 
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;

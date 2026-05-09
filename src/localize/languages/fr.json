@@ -5,7 +5,8 @@
   "status": {
     "spinning": "Tourne…",
     "result": "Résultat : {value}",
-    "idle": "Cliquez pour tourner · glissez pour lancer"
+    "idle": "Cliquez pour tourner · glissez pour lancer",
+    "todo_empty": "Aucun élément ouvert dans la liste de tâches"
   },
   "hub": {
     "default_text": "TOURNER"
@@ -18,6 +19,7 @@
     "name": "Titre de la carte",
     "language": "Langue",
     "language_auto": "Automatique (langue HA)",
+    "todo_entity": "Liste de tâches (facultatif)",
     "segments": "Segments",
     "friction": "Frottement",
     "theme": "Thème de couleur",
@@ -31,6 +33,7 @@
     "sound": "Son du clic",
     "show_status": "Afficher la ligne d'état",
     "language_helper": "Remplace la langue d'affichage détectée automatiquement pour cette carte. Automatique suit votre profil HA (avec la langue du navigateur en repli).",
+    "todo_entity_helper": "Optionnel. Lorsque défini, les segments de la roue sont remplis avec les éléments ouverts de cette liste de tâches (max 24). Segments et étiquettes sont ignorés tant qu'une liste est sélectionnée.",
     "segments_helper": "Nombre de tranches en lesquelles la roue est divisée. De 4 à 24.",
     "friction_helper": "Vitesse à laquelle la roue ralentit après une rotation ou un lâcher.",
     "theme_helper": "Palette de couleurs intégrée utilisée lorsque Couleurs est vide. Couleurs personnalisées prend toujours le dessus.",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation doit valoir \"tangent\" ou \"radial\"",
     "theme_value": "theme doit valoir default, pastel, pride ou neon",
     "hub_color_value": "hub_color doit valoir theme, black ou white",
-    "show_status_type": "show_status doit être un booléen"
+    "show_status_type": "show_status doit être un booléen",
+    "todo_entity_type": "todo_entity doit être une chaîne",
+    "todo_entity_invalid": "todo_entity doit être un entity_id todo.*"
   }
 }

@@ -5,7 +5,8 @@
   "status": {
     "spinning": "Dreht …",
     "result": "Ergebnis: {value}",
-    "idle": "Klicken zum Drehen · Ziehen zum Werfen"
+    "idle": "Klicken zum Drehen · Ziehen zum Werfen",
+    "todo_empty": "Keine offenen Einträge in der Todo-Liste"
   },
   "hub": {
     "default_text": "DREH"
@@ -18,6 +19,7 @@
     "name": "Kartentitel",
     "language": "Sprache",
     "language_auto": "Automatisch (HA-Sprache)",
+    "todo_entity": "Todo-Liste (optional)",
     "segments": "Segmente",
     "friction": "Reibung",
     "theme": "Farbthema",
@@ -31,6 +33,7 @@
     "sound": "Klickgeräusch",
     "show_status": "Statuszeile anzeigen",
     "language_helper": "Überschreibt die automatisch erkannte Anzeigesprache für diese Karte. Automatisch folgt deinem HA-Profil (mit Browsersprache als Fallback).",
+    "todo_entity_helper": "Optional. Wenn gesetzt, werden die Segmente des Rades mit den offenen Einträgen dieser Todo-Liste befüllt (max. 24). Segmente und Beschriftungen werden ignoriert, solange eine Todo-Liste ausgewählt ist.",
     "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
     "friction_helper": "Wie schnell das Rad nach einer Drehung abbremst.",
     "theme_helper": "Eingebaute Farbpalette, die verwendet wird, wenn Farben leer ist. Benutzerdefinierte Farben überschreiben dies immer.",
@@ -79,6 +82,8 @@
     "text_orientation_value": "text_orientation muss \"tangent\" oder \"radial\" sein",
     "theme_value": "theme muss default, pastel, pride oder neon sein",
     "hub_color_value": "hub_color muss theme, black oder white sein",
-    "show_status_type": "show_status muss ein Boolean sein"
+    "show_status_type": "show_status muss ein Boolean sein",
+    "todo_entity_type": "todo_entity muss eine Zeichenkette sein",
+    "todo_entity_invalid": "todo_entity muss eine todo.* entity_id sein"
   }
 }
