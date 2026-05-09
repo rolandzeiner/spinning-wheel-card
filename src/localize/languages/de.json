@@ -38,6 +38,9 @@
     "actions": "Aktionen",
     "disable_confirm_actions": "Bestätigungsdialog deaktivieren",
     "disable_boost": "Klick-Boost deaktivieren",
+    "result_entity": "Ergebnis-Helfer",
+    "result_entity_create": "Dedizierten Helfer erstellen",
+    "result_entity_default_name": "Glücksrad-Ergebnis",
     "general": "Allgemein",
     "bindings": "Segment-Bindungen",
     "binding_color": "Füllfarbe",
@@ -69,6 +72,7 @@
     "actions_helper": "Skript-Entitäten als Mehrfachauswahl, die bei Gewinn ausgelöst werden — der Index entspricht dem Slot der eindeutigen Labels. Änderungen hier ERSETZEN alle String-Einträge; vollständige Lovelace-Aktionsobjekte aus YAML werden ans Ende angehängt. Für sichere Einzelbearbeitung bitte oben „Segment-Bindungen“ verwenden.",
     "disable_confirm_actions_helper": "Aus (Standard) — die Karte fragt vor dem Ausführen einer Aktion nach. Ein — Aktionen werden ohne Nachfrage ausgeführt. Mit Bedacht verwenden: ein zufälliger Dreh kann echte Automationen auslösen.",
     "disable_boost_helper": "Aus (Standard) — Klicks während sich das Rad dreht erzeugen einen weiteren Impuls; mehrere Klicks können das Rad damit auf hoher Drehzahl halten. Ein — Klicks während der Drehung werden ignoriert. Hilfreich, wenn Kinder gerne weiterklicken und du möchtest, dass das Rad natürlich ausläuft. Ziehen-und-Werfen bleibt unverändert.",
+    "result_entity_helper": "Optionaler `input_text.*`-Helfer, der nach jedem Dreh die gewinnende Beschriftung erhält. Löst Automationen über `platform: state, entity_id: …` aus. Admin? Mit „Dedizierten Helfer erstellen\" unten einen frischen Helfer anlegen. Sonst einen vorhandenen Helfer wählen — Hinweis: jeder Dreh überschreibt seinen Wert.",
     "advanced_helper": "Rohdaten zum Einfügen aus YAML, für CSS-Schlüsselwörter, var(--…) oder vollständige Lovelace-Aktionsobjekte. Bearbeitung einer Zeile oben in „Segment-Bindungen“ hält diese Werte automatisch synchron.",
     "friction_low": "Niedrig — lange, gemächliche Drehungen",
     "friction_medium": "Mittel — klassisch",
@@ -106,6 +110,8 @@
     "actions_length": "actions-Länge ({len}) darf segments ({segments}) nicht überschreiten",
     "actions_string": "String-Einträge in actions müssen eine script.*-Entitäts-ID sein (erhalten: {value})",
     "disable_confirm_actions_type": "disable_confirm_actions muss ein Boolean sein",
-    "disable_boost_type": "disable_boost muss ein Boolean sein"
+    "disable_boost_type": "disable_boost muss ein Boolean sein",
+    "result_entity_type": "result_entity muss eine Zeichenkette sein",
+    "result_entity_invalid": "result_entity muss eine input_text.* entity_id sein"
   }
 }

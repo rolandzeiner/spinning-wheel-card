@@ -1,4 +1,4 @@
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import type { TemplateResult, CSSResultGroup, PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
@@ -552,6 +552,10 @@ export class SpinningWheelCardEditor
           { name: "show_status", selector: { boolean: {} } },
           { name: "sound", selector: { boolean: {} } },
           { name: "disable_boost", selector: { boolean: {} } },
+          {
+            name: "result_entity",
+            selector: { entity: { domain: "input_text" } },
+          },
         ],
       },
     ];
@@ -656,6 +660,8 @@ export class SpinningWheelCardEditor
         return localize("editor.disable_confirm_actions", lang);
       case "disable_boost":
         return localize("editor.disable_boost", lang);
+      case "result_entity":
+        return localize("editor.result_entity", lang);
       default:
         return field.name;
     }
@@ -702,6 +708,8 @@ export class SpinningWheelCardEditor
           return "editor.disable_confirm_actions_helper";
         case "disable_boost":
           return "editor.disable_boost_helper";
+        case "result_entity":
+          return "editor.result_entity_helper";
         case "raw_arrays":
           return "editor.advanced_helper";
         default:
@@ -954,6 +962,12 @@ export class SpinningWheelCardEditor
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
     }
+    // Same strip for result_entity — empty entity selector emits ""
+    // and would trip setConfig's regex check (which is also why we
+    // can't pass "" through to the dashboard).
+    if (next.result_entity === "" || next.result_entity == null) {
+      delete next.result_entity;
+    }
 
     // ── 8. Cache CSV verbatim where applicable; regenerate when the
     //       binding side authored the change so the next render's CSV
@@ -1031,6 +1045,15 @@ export class SpinningWheelCardEditor
       labelColorsCsv: this._labelColorsText,
       weightsCsv: this._weightsText,
     };
+    // The "Create dedicated helper" button is admin-only — `input_text/
+    // create` is wrapped in `require_admin` upstream. Hidden when a
+    // helper is already wired (no point), or when the user isn't
+    // admin (the WS call would 4xx anyway). Lives in the same
+    // custom-Lit slot as the footer hint — single bespoke widget
+    // alongside ha-form, per the skill's "ha-form + targeted custom
+    // template" pattern.
+    const showCreateHelper =
+      !this._config.result_entity && this.hass?.user?.is_admin === true;
     return html`
       <div class="editor">
         <ha-form
@@ -1041,9 +1064,59 @@ export class SpinningWheelCardEditor
           .computeHelper=${this._computeHelper}
           @value-changed=${this._onFormChanged}
         ></ha-form>
+        ${showCreateHelper
+          ? html`
+              <div class="create-helper-row">
+                <button
+                  type="button"
+                  class="create-helper-btn"
+                  @click=${this._createResultHelper}
+                >
+                  ${localize("editor.result_entity_create", lang)}
+                </button>
+              </div>
+            `
+          : nothing}
         <div class="editor-hint">${localize("editor.footer_hint", lang)}</div>
       </div>
     `;
+  }
+
+  /** Admin-only WS call to create a dedicated `input_text` helper for
+   *  this card. Auto-names "Spinning Wheel Result" (HA generates the
+   *  slug `spinning_wheel_result`, auto-incrementing on collision so
+   *  multi-instance dashboards Just Work); reply.id is the slug, full
+   *  entity_id is `input_text.<slug>`. The post-call `_config` mutation
+   *  has to happen BEFORE the config-changed event — the dashboard
+   *  catches the event to persist storage but does NOT re-invoke
+   *  setConfig on the live editor element (the `_config` lifecycle
+   *  gotcha in ha-lovelace-card SKILL.md). */
+  private async _createResultHelper(): Promise<void> {
+    if (!this.hass?.callWS) return;
+    try {
+      const reply = await this.hass.callWS<{
+        id: string;
+        name: string;
+      }>({
+        type: "input_text/create",
+        name: localize(
+          "editor.result_entity_default_name",
+          this._lang(),
+        ),
+        max: 255,
+        icon: "mdi:dharmachakra",
+      });
+      if (reply?.id) {
+        const entityId = `input_text.${reply.id}`;
+        this._config = { ...this._config, result_entity: entityId };
+        fireEvent(this, "config-changed", { config: this._config });
+      }
+    } catch (err) {
+      console.warn(
+        "[spinning-wheel-card editor] input_text/create failed:",
+        err,
+      );
+    }
   }
 
   static override styles: CSSResultGroup = editorStyles;

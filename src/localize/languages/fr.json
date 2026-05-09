@@ -38,6 +38,9 @@
     "actions": "Actions",
     "disable_confirm_actions": "Désactiver la demande de confirmation",
     "disable_boost": "Désactiver le boost au clic",
+    "result_entity": "Helper de résultat",
+    "result_entity_create": "Créer un helper dédié",
+    "result_entity_default_name": "Résultat de la roue",
     "general": "Général",
     "bindings": "Liaisons des segments",
     "binding_color": "Couleur de remplissage",
@@ -69,6 +72,7 @@
     "actions_helper": "Sélection multiple d'entités scripts à déclencher à la victoire — l'index correspond aux libellés uniques dans l'ordre. Modifier ici REMPLACE toutes les entrées chaîne ; les objets ActionConfig complets définis en YAML sont ajoutés à la fin. Pour une édition par ligne en sécurité, utilisez « Liaisons des segments » ci-dessus.",
     "disable_confirm_actions_helper": "Désactivé (par défaut) — la carte demande avant d'exécuter l'action du segment gagnant. Activé — les actions s'exécutent sans demande. À utiliser avec prudence : un tour casuel peut déclencher de véritables automatisations.",
     "disable_boost_helper": "Désactivé (par défaut) — cliquer pendant que la roue tourne ajoute une nouvelle impulsion ; une rafale de clics peut maintenir la roue en mouvement. Activé — les clics pendant un tour sont ignorés. Utile lorsque les enfants ont tendance à cliquer en continu et que vous voulez que la rotation s'arrête naturellement. Le glisser-lancer reste inchangé.",
+    "result_entity_helper": "Helper `input_text.*` optionnel qui recevra le libellé gagnant après chaque tour. Déclenche des automatisations via `platform: state, entity_id: …`. Admin ? Cliquez sur « Créer un helper dédié » ci-dessous pour en créer un. Sinon, choisissez un helper existant — attention : chaque tour écrase sa valeur.",
     "advanced_helper": "Tableaux bruts pour coller depuis YAML, mots-clés CSS, var(--…) ou objets Lovelace ActionConfig complets. Modifier une ligne dans « Liaisons des segments » ci-dessus garde ces valeurs synchronisées.",
     "friction_low": "Faible — rotations longues et tranquilles",
     "friction_medium": "Moyen — classique",
@@ -106,6 +110,8 @@
     "actions_length": "la longueur de actions ({len}) ne doit pas dépasser segments ({segments})",
     "actions_string": "les entrées chaîne de actions doivent être un entity_id script.* (reçu : {value})",
     "disable_confirm_actions_type": "disable_confirm_actions doit être un booléen",
-    "disable_boost_type": "disable_boost doit être un booléen"
+    "disable_boost_type": "disable_boost doit être un booléen",
+    "result_entity_type": "result_entity doit être une chaîne",
+    "result_entity_invalid": "result_entity doit être un entity_id input_text.*"
   }
 }

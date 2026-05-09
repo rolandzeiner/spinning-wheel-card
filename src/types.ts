@@ -32,6 +32,13 @@ export interface HomeAssistant {
     serviceData?: Record<string, unknown>,
     target?: HassServiceTarget,
   ): Promise<T>;
+  /** Active HA user — populated by the frontend on every connection.
+   *  The card only reads `is_admin` (admin-only WS calls like
+   *  `input_text/create` need to be gated client-side so non-admins
+   *  don't see a button that's going to fail). Real shape carries
+   *  more fields (`is_owner`, `name`, etc.); we narrow to what we
+   *  use. */
+  user?: { is_admin?: boolean; is_owner?: boolean; name?: string };
 }
 
 /** Standard HA service-call target. Mirrors `home-assistant-js-websocket`'s
@@ -331,6 +338,15 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  matches the original click-to-spin/click-to-boost UX). Drag-to-
    *  throw is unaffected. */
   disable_boost?: boolean;
+  /** Optional `input_text.*` entity_id to write the winning segment
+   *  label into after every spin. Lets HA automations trigger on
+   *  `platform: state, entity_id: input_text.…` and gives the user a
+   *  visible "last result" widget without extra plumbing. Editor's
+   *  Create button auto-creates a dedicated helper named "Spinning
+   *  Wheel Result" (admin only — `input_text/create` is admin-gated
+   *  upstream); non-admins must pick an existing helper. Empty /
+   *  unset = no entity write. */
+  result_entity?: string;
 }
 
 export type TextOrientation = "tangent" | "radial";

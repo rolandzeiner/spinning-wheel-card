@@ -38,6 +38,9 @@
     "actions": "Actions",
     "disable_confirm_actions": "Disable confirmation prompt",
     "disable_boost": "Disable click-to-boost",
+    "result_entity": "Result helper",
+    "result_entity_create": "Create dedicated helper",
+    "result_entity_default_name": "Spinning Wheel Result",
     "general": "General",
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",
@@ -69,6 +72,7 @@
     "actions_helper": "Multi-pick script entities to fire on win, indexed in order to the unique-label slots. Multi-edits here REPLACE every string entry; full ActionConfig objects set in YAML are appended at the end. For per-row safety, use Segment bindings above.",
     "disable_confirm_actions_helper": "Off (default) — the card asks before running a winning segment's action. On — actions fire silently. Use with care: a casual spin can run real automations.",
     "disable_boost_helper": "Off (default) — clicking while the wheel is already spinning adds another impulse, so a flurry of clicks can keep it going. On — clicks during a spin are ignored. Useful when kids tend to keep clicking and you want the spin to settle naturally. Drag-to-throw is unaffected either way.",
+    "result_entity_helper": "Optional `input_text.*` helper to receive the winning label after every spin. Triggers automations on `platform: state, entity_id: …`. Admin? Click \"Create dedicated helper\" below to make a fresh one. Otherwise pick an existing helper — heads up, every spin overwrites it.",
     "advanced_helper": "Raw arrays for paste-from-YAML, CSS keywords, var(--…), or full Lovelace ActionConfig objects. Editing a row in Segment bindings above keeps these in sync.",
     "friction_low": "Low — long, lazy spins",
     "friction_medium": "Medium — classic",
@@ -106,6 +110,8 @@
     "actions_length": "actions length ({len}) must not exceed segments ({segments})",
     "actions_string": "actions string entries must be a script.* entity_id (got: {value})",
     "disable_confirm_actions_type": "disable_confirm_actions must be a boolean",
-    "disable_boost_type": "disable_boost must be a boolean"
+    "disable_boost_type": "disable_boost must be a boolean",
+    "result_entity_type": "result_entity must be a string",
+    "result_entity_invalid": "result_entity must be an input_text.* entity_id"
   }
 }

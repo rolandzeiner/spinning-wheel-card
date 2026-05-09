@@ -38,6 +38,46 @@ export const editorStyles = css`
     color: var(--secondary-text-color);
     line-height: 1.4;
   }
+
+  /* "Create dedicated helper" button — admin-only, rendered below
+     ha-form when no result_entity is wired. Native <button> styled
+     with HA theme tokens; <mwc-button> is being phased out and ha-form
+     has no native button-in-schema slot, so this is the documented
+     path. Skill ref: ha-lovelace-card SKILL.md § "@material/mwc-* is
+     being phased out of HA's frontend". */
+  .create-helper-row {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .create-helper-btn {
+    appearance: none;
+    cursor: pointer;
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+    border: 0;
+    border-radius: var(--ha-border-radius-md, 8px);
+    padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+    font-size: var(--ha-font-size-s, 12px);
+    font-weight: 500;
+    line-height: 1.2;
+    transition:
+      background-color 0.16s ease,
+      transform 0.08s ease;
+  }
+  .create-helper-btn:hover {
+    background: color-mix(
+      in srgb,
+      var(--primary-color) 88%,
+      black
+    );
+  }
+  .create-helper-btn:active {
+    transform: translateY(1px);
+  }
+  .create-helper-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
   .toggle-row {
     display: flex;
     align-items: center;

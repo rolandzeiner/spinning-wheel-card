@@ -335,6 +335,17 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.disable_boost_type", lang));
     }
+    if (config.result_entity !== undefined) {
+      if (typeof config.result_entity !== "string") {
+        throw new Error(localize("errors.result_entity_type", lang));
+      }
+      if (
+        config.result_entity !== "" &&
+        !/^input_text\.[a-z0-9_]+$/.test(config.result_entity)
+      ) {
+        throw new Error(localize("errors.result_entity_invalid", lang));
+      }
+    }
     // Detect a swap (or unset) of the todo_entity so we re-fetch — and
     // drop stale items from the old entity — instead of rendering them
     // briefly until the next state change.
@@ -1186,6 +1197,12 @@ export class SpinningWheelCard extends LitElement {
     const labels = this._expandedLabels();
     const idx = this._segmentIndexUnderPointer();
     this._result = labels[idx] ?? null;
+    // Push the result into the configured `input_text.*` helper BEFORE
+    // dispatching the per-segment action — automations triggered on
+    // the entity state-change should see the new value by the time
+    // they run. Fire-and-forget; failures are logged, never raised
+    // (a deleted helper shouldn't break the action chain).
+    void this._writeResultToEntity(this._result);
     // Fire the winning segment's configured action, if any. Same-label-
     // same-action mapping has already happened in _segmentActions; this
     // is purely an indexed lookup. Confirmation (window.confirm) blocks
@@ -1193,6 +1210,34 @@ export class SpinningWheelCard extends LitElement {
     const actions = this._segmentActions();
     const action = actions[idx];
     if (action) void this._dispatchAction(action);
+  }
+
+  /** Write the winning label to the configured `result_entity` helper.
+   *  No-ops when the config / hass / callService isn't ready, or when
+   *  the result is null (defensive — `_announceResult` always sets a
+   *  value before calling, but the guard makes the helper safe to
+   *  call from unrelated paths in the future). Truncates to 255 chars
+   *  to match HA's MAX_LENGTH_STATE_STATE; longer labels (e.g. todo
+   *  summaries) would otherwise be rejected by the input_text guard. */
+  private async _writeResultToEntity(
+    result: string | null,
+  ): Promise<void> {
+    if (!result) return;
+    const entity = this.config.result_entity;
+    if (!entity) return;
+    if (!this.hass?.callService) return;
+    const value = result.length > 255 ? result.slice(0, 255) : result;
+    try {
+      await this.hass.callService("input_text", "set_value", {
+        entity_id: entity,
+        value,
+      });
+    } catch (err) {
+      console.warn(
+        "[spinning-wheel-card] input_text.set_value failed:",
+        err,
+      );
+    }
   }
 
   // ── Audio (peg clicks) ──────────────────────────────────────────────

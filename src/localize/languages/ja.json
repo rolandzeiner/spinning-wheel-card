@@ -38,6 +38,9 @@
     "actions": "アクション",
     "disable_confirm_actions": "確認ダイアログを無効にする",
     "disable_boost": "クリックでの加速を無効にする",
+    "result_entity": "結果ヘルパー",
+    "result_entity_create": "専用ヘルパーを作成",
+    "result_entity_default_name": "ルーレットの結果",
     "general": "全般",
     "bindings": "セグメント割り当て",
     "binding_color": "塗りつぶし色",
@@ -69,6 +72,7 @@
     "actions_helper": "勝利時に実行するスクリプトエンティティの複数選択 — インデックスはユニークラベルの順序に対応します。ここでの編集はすべての文字列エントリを置き換えます。YAML で設定された完全な Lovelace ActionConfig オブジェクトは末尾に追加されます。安全な行ごとの編集には上の「セグメント割り当て」を使ってください。",
     "disable_confirm_actions_helper": "オフ(既定)— カードは勝ったセグメントのアクションを実行する前に確認を求めます。オン — アクションは確認なしで実行されます。何気なく回しただけで本当の自動化が走る可能性があるため、注意して使用してください。",
     "disable_boost_helper": "オフ(既定)— 回転中にクリックすると追加のインパルスが加わり、連続クリックで回転を維持できます。オン — 回転中のクリックは無視されます。子供が連続クリックしがちで、回転を自然に止めたい場合に便利です。ドラッグでの投擲には影響しません。",
+    "result_entity_helper": "回転終了後に勝利したラベルを書き込む任意の `input_text.*` ヘルパー。`platform: state, entity_id: …` で自動化を起動できます。管理者の場合は下の「専用ヘルパーを作成」で新しいヘルパーを作成できます。それ以外の場合は既存のヘルパーを選択してください — 注意:回転ごとに値が上書きされます。",
     "advanced_helper": "YAML からの貼り付け、CSS キーワード、var(--…)、または完全な Lovelace ActionConfig オブジェクト用の生データ。上の「セグメント割り当て」で行を編集するとこれらの値も自動的に同期します。",
     "friction_low": "弱 — 長くゆったり回る",
     "friction_medium": "中 — クラシック",
@@ -106,6 +110,8 @@
     "actions_length": "actions の長さ ({len}) は segments ({segments}) を超えてはいけません",
     "actions_string": "actions の文字列要素は script.* のエンティティ ID である必要があります(受信値:{value})",
     "disable_confirm_actions_type": "disable_confirm_actions は真偽値でなければなりません",
-    "disable_boost_type": "disable_boost は真偽値でなければなりません"
+    "disable_boost_type": "disable_boost は真偽値でなければなりません",
+    "result_entity_type": "result_entity は文字列でなければなりません",
+    "result_entity_invalid": "result_entity は input_text.* のエンティティ ID である必要があります"
   }
 }

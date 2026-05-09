@@ -38,6 +38,9 @@
     "actions": "Ações",
     "disable_confirm_actions": "Desativar diálogo de confirmação",
     "disable_boost": "Desativar o impulso ao clicar",
+    "result_entity": "Helper de resultado",
+    "result_entity_create": "Criar helper dedicado",
+    "result_entity_default_name": "Resultado da roda",
     "general": "Geral",
     "bindings": "Vínculos dos segmentos",
     "binding_color": "Cor de preenchimento",
@@ -69,6 +72,7 @@
     "actions_helper": "Seleção múltipla de entidades script a disparar ao vencer — o índice corresponde ao slot do rótulo único. Editar aqui SUBSTITUI todas as entradas de string; objetos ActionConfig completos definidos em YAML são acrescentados ao fim. Para edição segura por linha, use “Vínculos dos segmentos” acima.",
     "disable_confirm_actions_helper": "Desligado (padrão) — o cartão pergunta antes de executar a ação do segmento vencedor. Ligado — as ações são executadas sem pergunta. Use com cuidado: um giro casual pode disparar automações reais.",
     "disable_boost_helper": "Desligado (padrão) — clicar enquanto a roda gira adiciona outro impulso; uma rajada de cliques pode mantê-la em movimento. Ligado — cliques durante o giro são ignorados. Útil quando crianças tendem a clicar sem parar e você quer que a rotação se acalme naturalmente. Arrastar para lançar não é afetado.",
+    "result_entity_helper": "Helper `input_text.*` opcional que recebe o rótulo vencedor após cada giro. Aciona automações com `platform: state, entity_id: …`. Admin? Clique em \"Criar helper dedicado\" abaixo para criar um novo. Caso contrário, escolha um helper existente — atenção: cada giro sobrescreve o valor.",
     "advanced_helper": "Arrays brutos para colar de YAML, palavras-chave CSS, var(--…) ou objetos Lovelace ActionConfig completos. Editar uma linha em “Vínculos dos segmentos” mantém estes valores sincronizados.",
     "friction_low": "Baixo — giros longos e tranquilos",
     "friction_medium": "Médio — clássico",
@@ -106,6 +110,8 @@
     "actions_length": "o comprimento de actions ({len}) não pode exceder segments ({segments})",
     "actions_string": "entradas string em actions devem ser um entity_id script.* (recebido: {value})",
     "disable_confirm_actions_type": "disable_confirm_actions deve ser um booleano",
-    "disable_boost_type": "disable_boost deve ser um booleano"
+    "disable_boost_type": "disable_boost deve ser um booleano",
+    "result_entity_type": "result_entity deve ser uma string",
+    "result_entity_invalid": "result_entity deve ser um entity_id input_text.*"
   }
 }
