@@ -23,6 +23,7 @@ import type {
   LovelaceCardEditor,
   SpinningWheelCardConfig,
   TextOrientation,
+  Theme,
 } from "./types";
 import { localize, resolveLang } from "./localize/localize";
 
@@ -116,6 +117,46 @@ const SEGMENT_COLORS: ReadonlyArray<string> = [
   "#e63946", "#f4a261", "#e9c46a", "#a8dadc",
   "#457b9d", "#1d3557", "#9b5de5", "#06d6a0",
 ];
+
+/** Soft pastel palette (8 colours) — low-saturation, light value. Reads
+ *  well with the default dark-grey label text. */
+const PASTEL_PALETTE: ReadonlyArray<string> = [
+  "#FFB3BA", "#FFDFBA", "#FDFD96", "#B5EAD7",
+  "#BAE1FF", "#C7CEEA", "#E0BBE4", "#FFC8DD",
+];
+
+/** Pride flag — Gilbert Baker / 1979 simplified six-stripe rainbow
+ *  (red / orange / yellow / green / indigo / violet). Cycles for
+ *  segments > 6. Hex values are the "official" Pride flag swatches. */
+const PRIDE_PALETTE: ReadonlyArray<string> = [
+  "#E40303", // red
+  "#FF8C00", // orange
+  "#FFED00", // yellow
+  "#008026", // green
+  "#004DFF", // indigo
+  "#750787", // violet
+];
+
+/** Neon palette (8 colours) — vivid, fully-saturated tones. Pair with
+ *  white `label_colors` for the strongest contrast on the saturated
+ *  fills, otherwise the dark-grey default still reads at AA. */
+const NEON_PALETTE: ReadonlyArray<string> = [
+  "#FF14A6", // hot pink
+  "#FF6700", // orange
+  "#FFFF00", // yellow
+  "#39FF14", // green
+  "#00FFFF", // cyan
+  "#1F51FF", // electric blue
+  "#BF00FF", // purple
+  "#FF00FF", // magenta
+];
+
+const THEME_PALETTES: Record<Theme, ReadonlyArray<string>> = {
+  default: SEGMENT_COLORS,
+  pastel: PASTEL_PALETTE,
+  pride: PRIDE_PALETTE,
+  neon: NEON_PALETTE,
+};
 
 // Fallback label-text colour when the user hasn't supplied label_colors.
 // Dark grey reads well against most of the default segment palette and
@@ -289,6 +330,12 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.text_orientation_value", lang));
     }
+    if (
+      config.theme !== undefined &&
+      !["default", "pastel", "pride", "neon"].includes(config.theme)
+    ) {
+      throw new Error(localize("errors.theme_value", lang));
+    }
     // Default `name` is set in render() rather than here, so the display
     // header stays reactive to language changes.
     this.config = { ...config };
@@ -343,13 +390,20 @@ export class SpinningWheelCard extends LitElement {
     }
     return Array.from({ length: n }, (_, i) => src[i % src.length] ?? "");
   }
+  /** Resolve the active fallback palette: explicit `theme` if set,
+   *  otherwise the built-in rainbow. Always overridden by `colors`
+   *  when supplied. */
+  private _themePalette(): ReadonlyArray<string> {
+    return THEME_PALETTES[this.config.theme ?? "default"];
+  }
+
   /** Per-segment fill colour, derived so that any two segments sharing the
    *  same label also share a colour. Walks the labels in order; each new
-   *  unique label takes the next colour from the palette (user-supplied
-   *  `colors`, or the built-in rainbow). The palette cycles if there
-   *  are more unique labels than colours. */
+   *  unique label takes the next colour from the palette. Resolution
+   *  order: user-supplied `colors` → `theme` preset → default rainbow.
+   *  The palette cycles if there are more unique labels than colours. */
    private _segmentColors(): ReadonlyArray<string> {
-     return this._mapPaletteToLabels(this.config.colors, SEGMENT_COLORS);
+     return this._mapPaletteToLabels(this.config.colors, this._themePalette());
    }
 
   /** Per-segment label-text colour. Same unique-label-mapping rule as

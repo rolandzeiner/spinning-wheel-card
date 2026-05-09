@@ -18,6 +18,7 @@
     "name": "Card title",
     "segments": "Segments",
     "friction": "Friction",
+    "theme": "Color theme",
     "labels": "Labels",
     "weights": "Weights",
     "colors": "Colors",
@@ -27,6 +28,11 @@
     "sound": "Click sound",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
     "friction_helper": "How quickly the wheel decelerates after a spin or release.",
+    "theme_helper": "Built-in colour palette used when Colors is empty. Custom Colors always overrides this.",
+    "theme_default": "Default — built-in 8-colour palette",
+    "theme_pastel": "Pastel — soft, low-saturation tones",
+    "theme_pride": "Pride — 6-stripe rainbow flag",
+    "theme_neon": "Neon — bright, vivid colours",
     "labels_helper": "Comma- or newline-separated. Up to one per segment; if you give fewer they cycle around the wheel (e.g. \"A, B\" on 8 segments → A B A B A B A B). Leave empty for 1..N.",
     "weights_helper": "Comma-separated relative sizes (only the ratio matters). Same cycling rule as labels — \"3, 1\" on 4 segments produces big, small, big, small. Leave empty for equal slices.",
     "colors_helper": "Comma- or newline-separated CSS colours (hex, rgb, hsl, named). Mapped to UNIQUE labels in order of first appearance — segments sharing a label always share a colour. Length up to `segments`; only the first N (= unique label count) are actually used. Leave empty for the built-in palette.",
@@ -59,6 +65,7 @@
     "label_colors_length": "label_colors length ({len}) must not exceed segments ({segments})",
     "hub_text_type": "hub_text must be a string",
     "sound_type": "sound must be a boolean",
-    "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\""
+    "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\"",
+    "theme_value": "theme must be one of: default, pastel, pride, neon"
   }
 }

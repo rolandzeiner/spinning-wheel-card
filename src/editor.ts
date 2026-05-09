@@ -39,6 +39,7 @@ const STATIC_DEFAULTS = {
   friction: "medium" as const,
   text_orientation: "tangent" as const,
   sound: true,
+  theme: "default" as const,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split a comma- or newline-separated text field into trimmed,
@@ -122,6 +123,32 @@ export class SpinningWheelCardEditor
         },
       },
       {
+        name: "theme",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              {
+                value: "default",
+                label: localize("editor.theme_default", lang),
+              },
+              {
+                value: "pastel",
+                label: localize("editor.theme_pastel", lang),
+              },
+              {
+                value: "pride",
+                label: localize("editor.theme_pride", lang),
+              },
+              {
+                value: "neon",
+                label: localize("editor.theme_neon", lang),
+              },
+            ],
+          },
+        },
+      },
+      {
         name: "labels_csv",
         selector: { text: { multiline: true } },
       },
@@ -169,6 +196,8 @@ export class SpinningWheelCardEditor
         return localize("editor.segments", lang);
       case "friction":
         return localize("editor.friction", lang);
+      case "theme":
+        return localize("editor.theme", lang);
       case "labels_csv":
         return localize("editor.labels", lang);
       case "weights_csv":
@@ -196,6 +225,8 @@ export class SpinningWheelCardEditor
           return "editor.segments_helper";
         case "friction":
           return "editor.friction_helper";
+        case "theme":
+          return "editor.theme_helper";
         case "labels_csv":
           return "editor.labels_helper";
         case "weights_csv":
@@ -296,6 +327,7 @@ export class SpinningWheelCardEditor
       delete next.text_orientation;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
+    if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
 
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;
