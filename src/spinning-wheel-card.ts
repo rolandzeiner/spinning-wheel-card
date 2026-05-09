@@ -545,6 +545,11 @@ export class SpinningWheelCard extends LitElement {
     this._dragAccumulated = 0;
     this._velocitySamples = [];
     this._lastTickSeg = -1;
+    // Drop the icon-path cache too; HA may have re-registered its icon
+    // sources between disconnects (theme reload, frontend update). The
+    // first redraw after reconnect re-resolves what's actually needed.
+    this._iconCache.clear();
+    this._iconLoading.clear();
   }
 
   private _clampSize(w: number): number {
@@ -684,6 +689,106 @@ export class SpinningWheelCard extends LitElement {
       ctx.restore();
       angle += aw;
     }
+  }
+
+  // ── MDI / HA icon support ───────────────────────────────────────────
+  // When a label looks like `mdi:foo` or `hass:foo` we render the icon
+  // instead of the text. The path data is borrowed at runtime from a
+  // hidden `<ha-icon>` element (which HA already loads as part of its
+  // frontend). We extract the SVG `d` attribute, cache it, and render
+  // via Path2D on the canvas — no @mdi/js bundle, no DOM overlay over
+  // the wheel. Tinting follows the same labelColors[i] as text.
+
+  /** path | null = looked up but not found | undefined = not yet looked up. */
+  private _iconCache = new Map<string, string | null>();
+  /** in-flight loads, prevents N redundant DOM queries per redraw. */
+  private _iconLoading = new Set<string>();
+
+  /** True if the label text refers to an HA icon (mdi: / hass: / iif:
+   *  custom-namespace icons registered by other integrations). */
+  private _looksLikeIcon(label: string): boolean {
+    return /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i.test(label);
+  }
+
+  /** Synchronous lookup — returns the icon's SVG `d` string when ready,
+   *  null when HA reports the icon is missing, or undefined when the
+   *  load is still in flight (caller renders a placeholder + wait for
+   *  the next `_draw`, which this helper schedules on completion). */
+  private _getIconPath(name: string): string | null | undefined {
+    const cached = this._iconCache.get(name);
+    if (cached !== undefined) return cached;
+    if (!this._iconLoading.has(name)) {
+      this._iconLoading.add(name);
+      void this._loadIcon(name);
+    }
+    return undefined;
+  }
+
+  private async _loadIcon(name: string): Promise<void> {
+    try {
+      const probe = document.createElement("ha-icon") as HTMLElement & {
+        icon?: string;
+        updateComplete?: Promise<unknown>;
+      };
+      probe.icon = name;
+      probe.style.position = "absolute";
+      probe.style.left = "-9999px";
+      probe.style.top = "-9999px";
+      probe.style.width = "24px";
+      probe.style.height = "24px";
+      document.body.appendChild(probe);
+
+      // ha-icon resolves the path asynchronously — its updateComplete
+      // resolves before the SVG is in the shadow root in some flows.
+      // Poll for ~500 ms (30 frames at 60 fps) before giving up.
+      let path: string | null = null;
+      for (let attempt = 0; attempt < 30 && !path; attempt++) {
+        if (probe.updateComplete) {
+          try { await probe.updateComplete; } catch { /* ignore */ }
+        }
+        path =
+          probe.shadowRoot?.querySelector("path")?.getAttribute("d") ?? null;
+        if (!path) {
+          await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        }
+      }
+      probe.remove();
+      this._iconCache.set(name, path);
+    } catch {
+      this._iconCache.set(name, null);
+    } finally {
+      this._iconLoading.delete(name);
+      // Trigger a redraw now that the icon is ready (or known-missing).
+      // Skip if the card was disconnected mid-load.
+      if (this.isConnected) this._draw();
+    }
+  }
+
+  /** Render an MDI/HA icon path centred at the given segment angle and
+   *  radius. The path's 24×24 viewBox is scaled to `iconPx` and rotated
+   *  to match the active orientation. Caller passes the resolved fill
+   *  colour. */
+  private _drawSegmentIcon(
+    ctx: CanvasRenderingContext2D,
+    pathStr: string,
+    midAngle: number,
+    radius: number,
+    iconPx: number,
+    fillColor: string,
+    orientation: TextOrientation,
+  ): void {
+    ctx.save();
+    ctx.rotate(midAngle);
+    ctx.translate(radius, 0);
+    // Same orientation rule as the text path — π/2 for tangent, π for
+    // radial — so icons line up with text labels in mixed-content wheels.
+    ctx.rotate(orientation === "radial" ? Math.PI : Math.PI / 2);
+    const scale = iconPx / 24;
+    ctx.scale(scale, scale);
+    ctx.translate(-12, -12);
+    ctx.fillStyle = fillColor;
+    ctx.fill(new Path2D(pathStr));
+    ctx.restore();
   }
 
   /** Relative luminance per WCAG (sRGB). Used to pick black or white
@@ -1237,27 +1342,79 @@ export class SpinningWheelCard extends LitElement {
       // Tiny segments (below ~15° ≈ 4 % of wheel) suppress their label
       // since there is no readable space inside.
       if (arc > 0.26) {
+        const text = labels[i] ?? "";
+        const fillColor = labelColors[i] ?? "#1a1a1a";
+        const midAngle = start + arc / 2;
+        const labelRadius = radius * 0.66;
+
+        // If the label looks like an HA icon name (e.g. `mdi:home`,
+        // `hass:account`), render the icon path instead of literal text.
+        // While the icon is loading we render a non-committal placeholder
+        // text; once cached, the next redraw shows the icon.
+        if (this._looksLikeIcon(text)) {
+          const path = this._getIconPath(text);
+          if (typeof path === "string") {
+            // ~1.5× the text font size — icons read smaller per pixel
+            // than letters of the same height.
+            const iconPx = Math.round(labelFontPx * 1.5);
+            this._drawSegmentIcon(
+              ctx,
+              path,
+              midAngle,
+              labelRadius,
+              iconPx,
+              fillColor,
+              orientation,
+            );
+          } else if (path === null) {
+            // Icon name doesn't resolve in HA's registry — fall back to
+            // the literal text so the user can spot a typo.
+            ctx.save();
+            ctx.fillStyle = fillColor;
+            ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
+            const display =
+              text.length > maxChars
+                ? text.slice(0, maxChars - 1) + "…"
+                : text;
+            if (orientation === "radial") {
+              ctx.rotate(midAngle);
+              ctx.translate(labelRadius, 0);
+              ctx.rotate(Math.PI);
+              ctx.fillText(display, 0, 0);
+            } else {
+              this._drawArchedText(ctx, display, midAngle, labelRadius);
+            }
+            ctx.restore();
+          }
+          // path === undefined → still loading; skip render this frame.
+          // The async load will trigger _draw() again when ready.
+          cursor += arc;
+          continue;
+        }
+
         ctx.save();
-        ctx.fillStyle = labelColors[i] ?? "#1a1a1a";
+        ctx.fillStyle = fillColor;
         ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const text = labels[i] ?? "";
         // Width budget: smaller segments → fewer chars before truncation.
         const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
         const display =
           text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
         if (orientation === "radial") {
           // Radial — straight text reading along the spoke.
-          ctx.rotate(start + arc / 2);
-          ctx.translate(radius * 0.66, 0);
+          ctx.rotate(midAngle);
+          ctx.translate(labelRadius, 0);
           ctx.rotate(Math.PI);
           ctx.fillText(display, 0, 0);
         } else {
           // Tangent — bend the text along the segment's arc so each
           // glyph is rotated to be locally tangent. Reads as a curved
           // word that follows the slice's outer edge.
-          this._drawArchedText(ctx, display, start + arc / 2, radius * 0.66);
+          this._drawArchedText(ctx, display, midAngle, labelRadius);
         }
         ctx.restore();
       }

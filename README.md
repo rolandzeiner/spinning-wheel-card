@@ -66,7 +66,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `segments` | integer 4–24 | `8` | How many slices the wheel is divided into. |
 | `friction` | `low` / `medium` / `high` | `medium` | Deceleration preset — see [Friction presets](#friction-presets). |
 | `theme` | `default` / `pastel` / `pride` / `neon` | `default` | Built-in colour palette used when `colors` is empty. **Always overridden by an explicit `colors` array** — see [Theme presets](#theme-presets). |
-| `labels` | string[] (1..segments) | `1` … `N` | Per-segment labels. **Shorter arrays cycle** around the wheel — `[Yes, No]` on 8 segments → `Yes No Yes No Yes No Yes No`. |
+| `labels` | string[] (1..segments) | `1` … `N` | Per-segment labels. **Shorter arrays cycle** around the wheel — `[Yes, No]` on 8 segments → `Yes No Yes No Yes No Yes No`. **MDI icons** are supported by entering `mdi:icon-name` (or `hass:icon-name`) — the icon renders in place of text, tinted with the segment's `label_colors` value. Icon paths are borrowed from HA's frontend at runtime (no extra bundle weight). |
 | `weights` | number[] (1..segments) | all equal | Relative segment widths (only the ratio matters). Same cycling rule as `labels` — `[3, 1]` on 4 segments → big, small, big, small. |
 | `colors` | string[] (1..segments) | active `theme` palette | CSS colours (hex, `rgb()`, `hsl()`, `var(--…)`, named). Mapped to **unique labels in order of first appearance** — segments sharing a label always share a colour. Overrides `theme`. |
 | `label_colors` | string[] (1..segments) | dark grey | CSS colours for the segment label text. Same unique-label mapping as `colors`. |
@@ -165,6 +165,24 @@ theme: neon
 label_colors: ["#ffffff"]
 hub_text: GO!
 ```
+
+**Icon wheel** — labels are MDI icons instead of text:
+
+```yaml
+type: custom:spinning-wheel-card
+segments: 6
+labels:
+  - mdi:pizza
+  - mdi:hamburger
+  - mdi:noodles
+  - mdi:taco
+  - mdi:food-croissant
+  - mdi:silverware-fork-knife
+hub_text: ""
+```
+
+Any `mdi:` (or `hass:`) prefix is detected and rendered as the icon
+shape; mixing icons and text on the same wheel is fine.
 
 ## Controls
 

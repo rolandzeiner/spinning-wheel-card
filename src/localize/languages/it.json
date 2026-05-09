@@ -38,7 +38,7 @@
     "theme_pastel": "Pastello — toni morbidi e poco saturi",
     "theme_pride": "Pride — bandiera arcobaleno a 6 strisce",
     "theme_neon": "Neon — colori vivaci e brillanti",
-    "labels_helper": "Separate da virgola o nuova riga. Fino a una per segmento; se ne fornisci meno vengono ripetute attorno alla ruota (es. \"A, B\" su 8 segmenti → A B A B A B A B). Lascia vuoto per 1..N.",
+    "labels_helper": "Separate da virgola o nuova riga. Fino a una per segmento; se ne fornisci meno vengono ripetute attorno alla ruota (es. \"A, B\" su 8 segmenti → A B A B A B A B). Funzionano anche le icone MDI — scrivi \"mdi:home\" e l'icona viene disegnata al posto del testo. Lascia vuoto per 1..N.",
     "weights_helper": "Dimensioni relative separate da virgola (conta solo il rapporto). Stessa regola di ripetizione delle etichette — \"3, 1\" su 4 segmenti produce grande, piccolo, grande, piccolo. Lascia vuoto per fette uguali.",
     "colors_helper": "Colori CSS separati da virgola o nuova riga (hex, rgb, hsl, nominati). Mappati alle etichette UNICHE in ordine di prima apparizione — i segmenti che condividono un'etichetta condividono sempre lo stesso colore. Lunghezza fino a `segments`; vengono effettivamente usati solo i primi N (= numero di etichette uniche). Lascia vuoto per la tavolozza incorporata.",
     "label_colors_helper": "Colori CSS separati da virgola o nuova riga per il testo delle etichette. Stessa mappatura per etichetta unica di Colori — vengono usati solo i primi N (= numero di etichette uniche). Lascia vuoto per grigio scuro su ogni segmento.",

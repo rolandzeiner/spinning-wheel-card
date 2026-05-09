@@ -38,7 +38,7 @@
     "theme_pastel": "Pastel — soft, low-saturation tones",
     "theme_pride": "Pride — 6-stripe rainbow flag",
     "theme_neon": "Neon — bright, vivid colours",
-    "labels_helper": "Comma- or newline-separated. Up to one per segment; if you give fewer they cycle around the wheel (e.g. \"A, B\" on 8 segments → A B A B A B A B). Leave empty for 1..N.",
+    "labels_helper": "Comma- or newline-separated. Up to one per segment; if you give fewer they cycle around the wheel (e.g. \"A, B\" on 8 segments → A B A B A B A B). MDI icons work too — type \"mdi:home\" and the icon renders in place of text. Leave empty for 1..N.",
     "weights_helper": "Comma-separated relative sizes (only the ratio matters). Same cycling rule as labels — \"3, 1\" on 4 segments produces big, small, big, small. Leave empty for equal slices.",
     "colors_helper": "Comma- or newline-separated CSS colours (hex, rgb, hsl, named). Mapped to UNIQUE labels in order of first appearance — segments sharing a label always share a colour. Length up to `segments`; only the first N (= unique label count) are actually used. Leave empty for the built-in palette.",
     "label_colors_helper": "Comma- or newline-separated CSS colours for the segment label text. Same unique-label mapping as Colors — only the first N (= unique label count) are used. Leave empty for dark grey on every segment.",

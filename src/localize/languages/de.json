@@ -38,7 +38,7 @@
     "theme_pastel": "Pastell — weich, niedrig gesättigt",
     "theme_pride": "Pride — 6-Streifen-Regenbogenflagge",
     "theme_neon": "Neon — leuchtend, lebhafte Farben",
-    "labels_helper": "Komma- oder zeilengetrennt. Maximal eine pro Segment; bei weniger Beschriftungen werden sie rund um das Rad wiederholt (z. B. „A, B“ bei 8 Segmenten → A B A B A B A B). Leer lassen für 1..N.",
+    "labels_helper": "Komma- oder zeilengetrennt. Maximal eine pro Segment; bei weniger Beschriftungen werden sie rund um das Rad wiederholt (z. B. „A, B“ bei 8 Segmenten → A B A B A B A B). MDI-Icons funktionieren auch — gib „mdi:home“ ein und das Icon wird statt Text gezeichnet. Leer lassen für 1..N.",
     "weights_helper": "Kommagetrennte relative Größen (nur das Verhältnis zählt). Gleiche Wiederholungsregel wie Beschriftungen — „3, 1“ bei 4 Segmenten ergibt groß, klein, groß, klein. Leer lassen für gleichgroße Stücke.",
     "colors_helper": "Komma- oder zeilengetrennte CSS-Farben (Hex, rgb, hsl, benannt). Werden in Reihenfolge des ersten Auftretens auf einzigartige Beschriftungen abgebildet — Segmente mit gleicher Beschriftung haben immer dieselbe Farbe. Länge bis zu `segments`; tatsächlich verwendet werden nur die ersten N (= Anzahl einzigartiger Beschriftungen). Leer lassen für die Standardpalette.",
     "label_colors_helper": "Komma- oder zeilengetrennte CSS-Farben für die Beschriftungstexte. Gleiche Abbildung auf einzigartige Beschriftungen wie bei Farben — verwendet werden nur die ersten N (= Anzahl einzigartiger Beschriftungen). Leer lassen für dunkelgrauen Text auf allen Segmenten.",

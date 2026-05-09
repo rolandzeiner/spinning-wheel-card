@@ -38,7 +38,7 @@
     "theme_pastel": "Pastel — tons suaves e pouco saturados",
     "theme_pride": "Pride — bandeira arco-íris de 6 faixas",
     "theme_neon": "Néon — cores vivas e brilhantes",
-    "labels_helper": "Separados por vírgula ou nova linha. Até um por segmento; se forem menos, repetem-se ao redor da roda (ex.: \"A, B\" em 8 segmentos → A B A B A B A B). Deixe vazio para 1..N.",
+    "labels_helper": "Separados por vírgula ou nova linha. Até um por segmento; se forem menos, repetem-se ao redor da roda (ex.: \"A, B\" em 8 segmentos → A B A B A B A B). Os ícones MDI também funcionam — escreva \"mdi:home\" e o ícone é desenhado em vez do texto. Deixe vazio para 1..N.",
     "weights_helper": "Tamanhos relativos separados por vírgula (apenas a proporção importa). Mesma regra de repetição dos rótulos — \"3, 1\" em 4 segmentos produz grande, pequeno, grande, pequeno. Deixe vazio para fatias iguais.",
     "colors_helper": "Cores CSS separadas por vírgula ou nova linha (hex, rgb, hsl, com nome). Atribuídas aos rótulos ÚNICOS na ordem da primeira ocorrência — segmentos que partilham um rótulo partilham sempre a cor. Comprimento até `segments`; só os primeiros N (= número de rótulos únicos) são realmente usados. Deixe vazio para a paleta integrada.",
     "label_colors_helper": "Cores CSS separadas por vírgula ou nova linha para o texto dos rótulos. Mesma atribuição por rótulo único de Cores — só os primeiros N (= número de rótulos únicos) são usados. Deixe vazio para cinza-escuro em todos os segmentos.",
