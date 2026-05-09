@@ -393,7 +393,6 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
           ]),
-      { name: "disable_confirm_actions", selector: { boolean: {} } },
       // Bindings panel — one expandable per unique label, dynamically
       // generated each render so adding/renaming labels reshapes the
       // form. flatten:true on every layer so binding_<i>_<suffix> keys
@@ -432,6 +431,12 @@ export class SpinningWheelCardEditor
           },
         ],
       },
+      // `disable_confirm_actions` lives at the very bottom — it's a
+      // safety toggle that only matters once the user has wired
+      // actions in the Bindings panel above (or the Advanced raw
+      // `actions` array). Placing it last keeps the top of the form
+      // focused on what's edited most often.
+      { name: "disable_confirm_actions", selector: { boolean: {} } },
     ];
   }
 
