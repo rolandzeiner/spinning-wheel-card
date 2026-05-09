@@ -37,6 +37,7 @@
     "show_status": "Afficher la ligne d'état",
     "actions": "Actions",
     "disable_confirm_actions": "Désactiver la demande de confirmation",
+    "disable_boost": "Désactiver le boost au clic",
     "general": "Général",
     "bindings": "Liaisons des segments",
     "binding_color": "Couleur de remplissage",
@@ -67,6 +68,7 @@
     "show_status_helper": "Afficher la ligne de texte sous la roue (« Tourne… » / « Résultat : X » / l'invite d'inactivité). Désactivez pour un rendu plus minimaliste.",
     "actions_helper": "Sélection multiple d'entités scripts à déclencher à la victoire — l'index correspond aux libellés uniques dans l'ordre. Modifier ici REMPLACE toutes les entrées chaîne ; les objets ActionConfig complets définis en YAML sont ajoutés à la fin. Pour une édition par ligne en sécurité, utilisez « Liaisons des segments » ci-dessus.",
     "disable_confirm_actions_helper": "Désactivé (par défaut) — la carte demande avant d'exécuter l'action du segment gagnant. Activé — les actions s'exécutent sans demande. À utiliser avec prudence : un tour casuel peut déclencher de véritables automatisations.",
+    "disable_boost_helper": "Désactivé (par défaut) — cliquer pendant que la roue tourne ajoute une nouvelle impulsion ; une rafale de clics peut maintenir la roue en mouvement. Activé — les clics pendant un tour sont ignorés. Utile lorsque les enfants ont tendance à cliquer en continu et que vous voulez que la rotation s'arrête naturellement. Le glisser-lancer reste inchangé.",
     "advanced_helper": "Tableaux bruts pour coller depuis YAML, mots-clés CSS, var(--…) ou objets Lovelace ActionConfig complets. Modifier une ligne dans « Liaisons des segments » ci-dessus garde ces valeurs synchronisées.",
     "friction_low": "Faible — rotations longues et tranquilles",
     "friction_medium": "Moyen — classique",
@@ -103,6 +105,7 @@
     "actions_type": "actions doit être un tableau d'IDs d'entités script.*, d'objets d'action ou d'entrées null",
     "actions_length": "la longueur de actions ({len}) ne doit pas dépasser segments ({segments})",
     "actions_string": "les entrées chaîne de actions doivent être un entity_id script.* (reçu : {value})",
-    "disable_confirm_actions_type": "disable_confirm_actions doit être un booléen"
+    "disable_confirm_actions_type": "disable_confirm_actions doit être un booléen",
+    "disable_boost_type": "disable_boost doit être un booléen"
   }
 }

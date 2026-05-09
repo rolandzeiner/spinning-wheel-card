@@ -37,6 +37,7 @@
     "show_status": "显示状态行",
     "actions": "动作",
     "disable_confirm_actions": "禁用确认对话框",
+    "disable_boost": "禁用点击加速",
     "general": "常规",
     "bindings": "扇区绑定",
     "binding_color": "填充颜色",
@@ -67,6 +68,7 @@
     "show_status_helper": "在转盘下方显示文字行(“旋转中…” / “结果:X” / 空闲提示)。关闭可获得更简洁的外观。",
     "actions_helper": "多选脚本实体作为获胜时触发的动作 — 索引按唯一标签顺序对应槽位。在此编辑会替换所有字符串条目;在 YAML 中设置的完整 Lovelace ActionConfig 对象会追加在末尾。若想按行安全编辑,请使用上方“扇区绑定”。",
     "disable_confirm_actions_helper": "关闭(默认)— 在执行获胜扇区的动作前会先询问确认。开启 — 动作会直接触发,不再询问。请谨慎使用:随手一转可能会触发真实的自动化。",
+    "disable_boost_helper": "关闭(默认)— 在转盘旋转时点击会再增加一次冲量,连续点击可以让它持续旋转。开启 — 旋转期间的点击会被忽略。当孩子喜欢不停点击,而你希望旋转自然停下时很有用。拖动投掷不受影响。",
     "advanced_helper": "用于从 YAML 粘贴的原始数组,支持 CSS 关键字、var(--…) 或完整的 Lovelace ActionConfig 对象。在上方“扇区绑定”中编辑某一行会自动保持这些值同步。",
     "friction_low": "低 — 长时间缓慢旋转",
     "friction_medium": "中 — 经典",
@@ -103,6 +105,7 @@
     "actions_type": "actions 必须是 script.* 实体 ID、动作对象或 null 条目的数组",
     "actions_length": "actions 的长度({len})不得超过 segments({segments})",
     "actions_string": "actions 中的字符串条目必须是 script.* 实体 ID(实际:{value})",
-    "disable_confirm_actions_type": "disable_confirm_actions 必须为布尔值"
+    "disable_confirm_actions_type": "disable_confirm_actions 必须为布尔值",
+    "disable_boost_type": "disable_boost 必须为布尔值"
   }
 }

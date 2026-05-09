@@ -37,6 +37,7 @@
     "show_status": "Show status line",
     "actions": "Actions",
     "disable_confirm_actions": "Disable confirmation prompt",
+    "disable_boost": "Disable click-to-boost",
     "general": "General",
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",
@@ -67,6 +68,7 @@
     "show_status_helper": "Show the text line beneath the wheel (\"Spinning…\" / \"Result: X\" / the click-to-spin idle hint). Off for a more minimal look.",
     "actions_helper": "Multi-pick script entities to fire on win, indexed in order to the unique-label slots. Multi-edits here REPLACE every string entry; full ActionConfig objects set in YAML are appended at the end. For per-row safety, use Segment bindings above.",
     "disable_confirm_actions_helper": "Off (default) — the card asks before running a winning segment's action. On — actions fire silently. Use with care: a casual spin can run real automations.",
+    "disable_boost_helper": "Off (default) — clicking while the wheel is already spinning adds another impulse, so a flurry of clicks can keep it going. On — clicks during a spin are ignored. Useful when kids tend to keep clicking and you want the spin to settle naturally. Drag-to-throw is unaffected either way.",
     "advanced_helper": "Raw arrays for paste-from-YAML, CSS keywords, var(--…), or full Lovelace ActionConfig objects. Editing a row in Segment bindings above keeps these in sync.",
     "friction_low": "Low — long, lazy spins",
     "friction_medium": "Medium — classic",
@@ -103,6 +105,7 @@
     "actions_type": "actions must be an array of script.* entity IDs, action objects, or null entries",
     "actions_length": "actions length ({len}) must not exceed segments ({segments})",
     "actions_string": "actions string entries must be a script.* entity_id (got: {value})",
-    "disable_confirm_actions_type": "disable_confirm_actions must be a boolean"
+    "disable_confirm_actions_type": "disable_confirm_actions must be a boolean",
+    "disable_boost_type": "disable_boost must be a boolean"
   }
 }

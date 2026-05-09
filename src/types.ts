@@ -323,6 +323,14 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  (= confirm, safer). Per-action `confirmation: false` opts a single
    *  action out without disabling confirmation globally. */
   disable_confirm_actions?: boolean;
+  /** Disable the click-to-boost behaviour: when `true`, clicks (or
+   *  Space/Enter keystrokes) while the wheel is spinning are ignored
+   *  instead of adding a fresh impulse. Useful for kid-friendly
+   *  dashboards where rapid clicking would otherwise keep the wheel
+   *  in motion indefinitely. Default `false` (boost-on-click enabled,
+   *  matches the original click-to-spin/click-to-boost UX). Drag-to-
+   *  throw is unaffected. */
+  disable_boost?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

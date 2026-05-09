@@ -329,6 +329,12 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.disable_confirm_actions_type", lang));
     }
+    if (
+      config.disable_boost !== undefined &&
+      typeof config.disable_boost !== "boolean"
+    ) {
+      throw new Error(localize("errors.disable_boost_type", lang));
+    }
     // Detect a swap (or unset) of the todo_entity so we re-fetch — and
     // drop stale items from the old entity — instead of rendering them
     // briefly until the next state change.
@@ -1419,24 +1425,32 @@ export class SpinningWheelCard extends LitElement {
       // Click without drag.
       const wasSpinning =
         Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
-      const mag =
-        CLICK_IMPULSE_MIN +
-        Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
-      if (wasSpinning) {
-        // BOOST: add impulse in the wheel's current direction. Cap at
-        // MAX_VELOCITY so repeated clicks don't compound past the
-        // sane upper bound.
-        const sign = this._omega >= 0 ? 1 : -1;
-        const next = this._omega + sign * mag;
-        this._omega = Math.max(
-          -MAX_VELOCITY_RAD_PER_S,
-          Math.min(MAX_VELOCITY_RAD_PER_S, next),
-        );
+      // Boost-on-click is opt-out via `disable_boost` — kid-friendly
+      // dashboards can quiet the "click to add another impulse" feel
+      // so the spin settles naturally even under rapid clicking.
+      // Drag-to-throw is unaffected (different code path).
+      if (wasSpinning && this.config.disable_boost === true) {
+        // No-op: ignore the click while the wheel is in motion.
       } else {
-        // Fresh start from rest — random direction.
-        const sign = Math.random() < 0.5 ? -1 : 1;
-        this._omega = sign * mag;
-        this._result = null;
+        const mag =
+          CLICK_IMPULSE_MIN +
+          Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
+        if (wasSpinning) {
+          // BOOST: add impulse in the wheel's current direction. Cap
+          // at MAX_VELOCITY so repeated clicks don't compound past
+          // the sane upper bound.
+          const sign = this._omega >= 0 ? 1 : -1;
+          const next = this._omega + sign * mag;
+          this._omega = Math.max(
+            -MAX_VELOCITY_RAD_PER_S,
+            Math.min(MAX_VELOCITY_RAD_PER_S, next),
+          );
+        } else {
+          // Fresh start from rest — random direction.
+          const sign = Math.random() < 0.5 ? -1 : 1;
+          this._omega = sign * mag;
+          this._result = null;
+        }
       }
     } else {
       // Drag release — sample-window-averaged angular velocity.
@@ -1507,6 +1521,10 @@ export class SpinningWheelCard extends LitElement {
       }
     }
     const wasSpinning = Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
+    // Same `disable_boost` gate as the pointer path — keyboard
+    // activation is the WCAG-equivalent of a click and should respect
+    // the same kid-friendly opt-out.
+    if (wasSpinning && this.config.disable_boost === true) return;
     const mag =
       CLICK_IMPULSE_MIN +
       Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
@@ -1842,7 +1860,14 @@ export class SpinningWheelCard extends LitElement {
         : todoEmpty
           ? localize("status.todo_empty", lang)
           : localize("status.idle", lang);
-    const header = this.config.name ?? localize("common.default_name", lang);
+    // Empty / whitespace-only `name` hides the header entirely
+    // (ha-card's `.header` falsy-check skips the slot). `undefined` is
+    // *also* falsy, so the previous localized-default fallback was
+    // dropped on purpose — fresh-installed cards now show a clean
+    // wheel without a "Spinning Wheel" title until the user opts in.
+    const header = this.config.name?.trim()
+      ? this.config.name
+      : undefined;
 
     return html`
       <ha-card .header=${header}>

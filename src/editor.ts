@@ -46,6 +46,7 @@ const STATIC_DEFAULTS = {
   hub_color: "theme" as const,
   show_status: true,
   disable_confirm_actions: false,
+  disable_boost: false,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split a comma- or newline-separated text field into trimmed,
@@ -355,6 +356,7 @@ export class SpinningWheelCardEditor
     const todoActive = !!this._config.todo_entity;
     return [
       { name: "name", selector: { text: {} } },
+      ...this._buildGeneralBlock(lang),
       {
         name: "todo_entity",
         selector: { entity: { domain: "todo" } },
@@ -391,10 +393,60 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
           ]),
-      // General expandable — card-wide style + behaviour preferences.
-      // Defaults closed (matches the Bindings + Advanced expandables) so
-      // the editor opens compact; user clicks once to tweak. Order
-      // mirrors the user's requested grouping verbatim.
+      { name: "disable_confirm_actions", selector: { boolean: {} } },
+      // Bindings panel — one expandable per unique label, dynamically
+      // generated each render so adding/renaming labels reshapes the
+      // form. flatten:true on every layer so binding_<i>_<suffix> keys
+      // surface at the top level of `data` (the ha-form expandable
+      // footgun: without flatten, ha-form nests them under data["bindings"]
+      // and the write-back fails silently — see ha-lovelace-card SKILL.md).
+      ...this._buildBindingsBlock(),
+      // Advanced wrapper — the raw arrays for paste-from-YAML / power
+      // users wanting CSS keywords or var(--…) for colours, full
+      // ActionConfig objects for actions, or per-segment-position
+      // weight cycling that the per-unique-label bindings panel
+      // can't express. Defaults closed.
+      {
+        type: "expandable" as const,
+        name: "raw_arrays",
+        title: localize("editor.advanced", lang),
+        flatten: true,
+        schema: [
+          {
+            name: "colors_csv",
+            selector: { text: { multiline: true } },
+          },
+          {
+            name: "label_colors_csv",
+            selector: { text: { multiline: true } },
+          },
+          {
+            name: "weights_csv",
+            selector: { text: {} },
+          },
+          {
+            name: "actions",
+            selector: {
+              entity: { domain: "script", multiple: true },
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  /** Per-unique-label expandables for the bindings panel. Each carries
+   *  the unique label as its title, two color_rgb pickers in a grid,
+   *  and a single-script entity picker. Empty when there are no labels
+   *  (which can't happen in practice — segments default to 8 → 8
+   *  unique numeric labels). */
+  /** "General" expandable — card-wide style + behaviour preferences.
+   *  Defaults closed (matches the Bindings + Advanced expandables) so
+   *  the editor opens compact; user clicks once to tweak. Ordered to
+   *  group i18n / physics / visual / display / audio / kid-safety
+   *  preferences in roughly that flow. */
+  private _buildGeneralBlock(lang: string): ReadonlyArray<HaFormSchema> {
+    return [
       {
         type: "expandable" as const,
         name: "general",
@@ -494,55 +546,12 @@ export class SpinningWheelCardEditor
           },
           { name: "show_status", selector: { boolean: {} } },
           { name: "sound", selector: { boolean: {} } },
-        ],
-      },
-      { name: "disable_confirm_actions", selector: { boolean: {} } },
-      // Bindings panel — one expandable per unique label, dynamically
-      // generated each render so adding/renaming labels reshapes the
-      // form. flatten:true on every layer so binding_<i>_<suffix> keys
-      // surface at the top level of `data` (the ha-form expandable
-      // footgun: without flatten, ha-form nests them under data["bindings"]
-      // and the write-back fails silently — see ha-lovelace-card SKILL.md).
-      ...this._buildBindingsBlock(),
-      // Advanced wrapper — the raw arrays for paste-from-YAML / power
-      // users wanting CSS keywords or var(--…) for colours, full
-      // ActionConfig objects for actions, or per-segment-position
-      // weight cycling that the per-unique-label bindings panel
-      // can't express. Defaults closed.
-      {
-        type: "expandable" as const,
-        name: "raw_arrays",
-        title: localize("editor.advanced", lang),
-        flatten: true,
-        schema: [
-          {
-            name: "colors_csv",
-            selector: { text: { multiline: true } },
-          },
-          {
-            name: "label_colors_csv",
-            selector: { text: { multiline: true } },
-          },
-          {
-            name: "weights_csv",
-            selector: { text: {} },
-          },
-          {
-            name: "actions",
-            selector: {
-              entity: { domain: "script", multiple: true },
-            },
-          },
+          { name: "disable_boost", selector: { boolean: {} } },
         ],
       },
     ];
   }
 
-  /** Per-unique-label expandables for the bindings panel. Each carries
-   *  the unique label as its title, two color_rgb pickers in a grid,
-   *  and a single-script entity picker. Empty when there are no labels
-   *  (which can't happen in practice — segments default to 8 → 8
-   *  unique numeric labels). */
   private _buildBindingsBlock(): ReadonlyArray<HaFormSchema> {
     const lang = this._lang();
     const uniques = this._uniqueLabels();
@@ -640,6 +649,8 @@ export class SpinningWheelCardEditor
         return localize("editor.actions", lang);
       case "disable_confirm_actions":
         return localize("editor.disable_confirm_actions", lang);
+      case "disable_boost":
+        return localize("editor.disable_boost", lang);
       default:
         return field.name;
     }
@@ -684,6 +695,8 @@ export class SpinningWheelCardEditor
           return "editor.actions_helper";
         case "disable_confirm_actions":
           return "editor.disable_confirm_actions_helper";
+        case "disable_boost":
+          return "editor.disable_boost_helper";
         case "raw_arrays":
           return "editor.advanced_helper";
         default:
@@ -928,6 +941,9 @@ export class SpinningWheelCardEditor
       next.disable_confirm_actions === STATIC_DEFAULTS.disable_confirm_actions
     ) {
       delete next.disable_confirm_actions;
+    }
+    if (next.disable_boost === STATIC_DEFAULTS.disable_boost) {
+      delete next.disable_boost;
     }
     if (next.language === "auto") delete next.language;
     if (next.todo_entity === "" || next.todo_entity == null) {

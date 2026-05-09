@@ -37,6 +37,7 @@
     "show_status": "Mostra riga di stato",
     "actions": "Azioni",
     "disable_confirm_actions": "Disattiva la richiesta di conferma",
+    "disable_boost": "Disattiva l'accelerazione al clic",
     "general": "Generale",
     "bindings": "Associazioni dei segmenti",
     "binding_color": "Colore di riempimento",
@@ -67,6 +68,7 @@
     "show_status_helper": "Mostra la riga di testo sotto la ruota (\"Gira…\" / \"Risultato: X\" / il suggerimento di inattività). Disattiva per un aspetto più minimale.",
     "actions_helper": "Selezione multipla di entità script da eseguire alla vittoria — l'indice corrisponde agli slot delle etichette uniche. Modificando qui SI SOSTITUISCONO tutte le voci stringa; gli oggetti ActionConfig completi impostati in YAML vengono aggiunti in coda. Per modifiche sicure per riga, usa “Associazioni dei segmenti” sopra.",
     "disable_confirm_actions_helper": "Off (predefinito) — la scheda chiede prima di eseguire l'azione del segmento vincente. On — le azioni vengono eseguite senza richiesta. Usa con cautela: un giro casuale può attivare automazioni reali.",
+    "disable_boost_helper": "Off (predefinito) — cliccando mentre la ruota gira si aggiunge un altro impulso; una sequenza di clic può mantenerla in movimento. On — i clic durante un giro vengono ignorati. Utile quando i bambini tendono a cliccare in continuazione e si vuole che la rotazione si fermi naturalmente. Il trascinamento per lanciare non è influenzato.",
     "advanced_helper": "Array grezzi per incollare da YAML, parole chiave CSS, var(--…) o oggetti Lovelace ActionConfig completi. Modificando una riga in “Associazioni dei segmenti” questi valori restano sincronizzati.",
     "friction_low": "Basso — rotazioni lunghe e pigre",
     "friction_medium": "Medio — classico",
@@ -103,6 +105,7 @@
     "actions_type": "actions deve essere un array di ID entità script.*, oggetti azione o voci null",
     "actions_length": "la lunghezza di actions ({len}) non deve superare segments ({segments})",
     "actions_string": "le voci stringa di actions devono essere un entity_id script.* (ricevuto: {value})",
-    "disable_confirm_actions_type": "disable_confirm_actions deve essere un booleano"
+    "disable_confirm_actions_type": "disable_confirm_actions deve essere un booleano",
+    "disable_boost_type": "disable_boost deve essere un booleano"
   }
 }

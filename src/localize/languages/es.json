@@ -37,6 +37,7 @@
     "show_status": "Mostrar línea de estado",
     "actions": "Acciones",
     "disable_confirm_actions": "Desactivar el diálogo de confirmación",
+    "disable_boost": "Desactivar el impulso al hacer clic",
     "general": "General",
     "bindings": "Asignaciones de segmentos",
     "binding_color": "Color de relleno",
@@ -67,6 +68,7 @@
     "show_status_helper": "Mostrar la línea de texto bajo la ruleta (\"Girando…\" / \"Resultado: X\" / el aviso de inactividad). Desactívalo para un aspecto más minimalista.",
     "actions_helper": "Selección múltiple de entidades de script que se disparan al ganar — el índice corresponde al slot de etiqueta única. Editar aquí SUSTITUYE todas las entradas de tipo cadena; los objetos ActionConfig completos definidos en YAML se añaden al final. Para edición segura por fila, usa “Asignaciones de segmentos” arriba.",
     "disable_confirm_actions_helper": "Desactivado (por defecto): la tarjeta pregunta antes de ejecutar la acción del segmento ganador. Activado: las acciones se ejecutan sin preguntar. Úsalo con precaución: un giro casual puede activar automatizaciones reales.",
+    "disable_boost_helper": "Desactivado (por defecto): hacer clic mientras la ruleta gira añade otro impulso; una ráfaga de clics puede mantenerla en movimiento. Activado: los clics durante un giro se ignoran. Útil cuando los niños tienden a hacer clic sin parar y quieres que la rotación se detenga de forma natural. Arrastrar y lanzar no se ve afectado.",
     "advanced_helper": "Matrices crudas para pegar desde YAML, palabras clave CSS, var(--…) u objetos Lovelace ActionConfig completos. Editar una fila en “Asignaciones de segmentos” mantiene estos valores sincronizados.",
     "friction_low": "Baja — giros largos y suaves",
     "friction_medium": "Media — clásica",
@@ -103,6 +105,7 @@
     "actions_type": "actions debe ser un array de IDs de entidad script.*, objetos de acción o entradas nulas",
     "actions_length": "la longitud de actions ({len}) no debe superar segments ({segments})",
     "actions_string": "las entradas de tipo cadena en actions deben ser un entity_id script.* (recibido: {value})",
-    "disable_confirm_actions_type": "disable_confirm_actions debe ser un booleano"
+    "disable_confirm_actions_type": "disable_confirm_actions debe ser un booleano",
+    "disable_boost_type": "disable_boost debe ser un booleano"
   }
 }
