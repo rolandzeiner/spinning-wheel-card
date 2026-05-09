@@ -971,11 +971,23 @@ export class SpinningWheelCardEditor
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
     }
-    // Same strip for result_entity — empty entity selector emits ""
-    // and would trip setConfig's regex check (which is also why we
-    // can't pass "" through to the dashboard).
-    if (next.result_entity === "" || next.result_entity == null) {
-      delete next.result_entity;
+    // result_entity has a quirk that todo_entity doesn't: ha-form's
+    // entity selector emits an empty value-changed shortly after we
+    // programmatically set `_config.result_entity` (the just-created
+    // input_text isn't in `hass.states` yet, so the selector reconciles
+    // the "unknown" id to ""). If we naively strip on empty, the
+    // dashboard's pending config loses `result_entity` between Create
+    // and Save — user thinks the click did nothing, clicks again,
+    // accumulates orphan helpers. Preserve the prior value when it
+    // was set; only strip when it never existed.
+    const formClearedResult =
+      next.result_entity === "" || next.result_entity == null;
+    if (formClearedResult) {
+      if (this._config.result_entity) {
+        next.result_entity = this._config.result_entity;
+      } else {
+        delete next.result_entity;
+      }
     }
 
     // ── 8. Cache CSV verbatim where applicable; regenerate when the
