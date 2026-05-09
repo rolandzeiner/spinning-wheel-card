@@ -25,7 +25,7 @@ A Lovelace custom card with a click-to-spin / drag-to-flick wheel for Home Assis
 - **Translatable** — English and German bundled, falls back to English for any other HA language. UI strings, validation errors, default card title, and default hub text all translate.
 - **Keyboard support** — focus the wheel, press `Space` or `Enter` to spin. Same impulse / boost behaviour as a pointer click.
 - **Honours `prefers-reduced-motion`** — the multi-second decay is skipped at the physics layer for users who have asked the OS to reduce motion. The wheel still spins (the spin *is* the feature) but only an instant snap to the result; no per-frame animation, no audio.
-- **No runtime dependencies beyond `lit`** (~15 KB gzipped). Rollup-bundled into a single `dist/spinning-wheel-card.js` (~50 KB unminified, ~17 KB gzipped).
+- **No runtime dependencies beyond `lit`**. Rollup + terser produce a single `dist/spinning-wheel-card.js` ≈ 87 KB minified, ≈ 29 KB gzipped — the bulk is the eight-language translation set.
 
 ## Installation
 
@@ -53,7 +53,7 @@ A Lovelace custom card with a click-to-spin / drag-to-flick wheel for Home Assis
 type: custom:spinning-wheel-card
 ```
 
-That's it — defaults: 8 numeric segments, medium friction, sound on, tangent labels, "SPIN" centre, English (or German if your HA locale is `de*`).
+That's it — defaults: 8 numeric segments, medium friction, sound on, tangent labels, localised hub text, language auto-detected from the HA profile (en / de / fr / it / es / pt / zh / ja).
 
 ## Configuration reference
 
@@ -71,7 +71,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `colors` | string[] (1..segments) | active `theme` palette | CSS colours (hex, `rgb()`, `hsl()`, `var(--…)`, named). Mapped to **unique labels in order of first appearance** — segments sharing a label always share a colour. Overrides `theme`. |
 | `label_colors` | string[] (1..segments) | dark grey | CSS colours for the segment label text. Same unique-label mapping as `colors`. |
 | `text_orientation` | `tangent` / `radial` | `tangent` | Tangent wraps each label around the rim, glyph-by-glyph along the segment arc. Radial rotates 90° CW so text reads along the spoke from rim to centre. |
-| `hub_text` | string | localised "SPIN" / "DREH" | Centre-hub label. Auto-shrinks for long strings. Empty string hides it. |
+| `hub_text` | string | localised per active language (`SPIN` / `DREH` / `TOURNER` / `GIRA` / `GIRAR` / `GIRAR` / `旋转` / `回す`) | Centre-hub label. Auto-shrinks for long strings. Empty string hides it. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub fill + indicator triangle colour. `theme` uses HA's `--primary-color` (hub label auto-picks black/white via WCAG luminance). `black` is solid black with white hub label. `white` is solid white with black hub label. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
 | `show_status` | boolean | `true` | Show the text line beneath the wheel (`Spinning…` / `Result: X` / the click-to-spin idle hint). Set `false` for a more minimal look. |
@@ -81,7 +81,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | Preset   | Per-frame multiplier @ 60 fps | Roughly stops after |
 | -------- | -------------------- | ------------------- |
 | `low`    | 0.995                | ~6 s                |
-| `medium` | 0.99 (default)       | ~4 s                |
+| `medium` | 0.99                 | ~4 s                |
 | `high`   | 0.98                 | ~2 s                |
 
 Decay is frame-rate independent — `ω *= friction^(60·dt)` — so the wall-clock stop time is the same at 30 / 60 / 120 fps.
@@ -148,7 +148,7 @@ type: custom:spinning-wheel-card
 sound: false
 ```
 
-**Pride wheel** — six rainbow stripes (cycles when segments > 6):
+**Pride wheel** — six rainbow stripes from the 10-colour Pride palette (cycling only kicks in at `segments > 10`):
 
 ```yaml
 type: custom:spinning-wheel-card

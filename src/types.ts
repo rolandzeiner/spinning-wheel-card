@@ -1,13 +1,5 @@
-// Local mirror of the HA / Lovelace types this card actually uses.
-// We only depend on a handful of fields, so pinning a local shape is
-// cheaper than carrying a transitive npm dep that drifts behind
-// HA-internal types.
+// Local mirror of HA / Lovelace types this card uses.
 
-/** Single entity in `hass.states`. The attributes bag is open-ended —
- *  the integration's coordinator emits the keys this card reads. Add
- *  the named keys your card pulls (`departures`, `slots`, …) below so
- *  call sites get autocomplete; everything else falls through the
- *  `Record<string, unknown>` mixin. */
 export interface HassEntity {
   state: string;
   attributes: Record<string, unknown> & {
@@ -19,12 +11,7 @@ export interface HassEntity {
   entity_id?: string;
 }
 
-/** Minimal HA shape — only the fields this card touches. `language` is
- *  the user-profile locale; `callWS` powers the card-version probe;
- *  `localize` is HA's own UI translation lookup (the editor reuses it
- *  for built-in field names so we don't carry duplicates); `themes.darkMode`
- *  drives adaptive-logo work. Anything beyond these lives untyped and is
- *  read with a cast at the call site. */
+/** Minimal HA shape — only the fields this card touches. */
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
   /** Modern HA exposes the user's locale here. Older versions only had

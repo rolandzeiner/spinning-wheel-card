@@ -1,17 +1,4 @@
 // Spinning Wheel Card — Lovelace custom card.
-//
-// Click anywhere on the wheel for a random impulse spin. Click + drag to
-// throw the wheel: while dragging, the wheel follows the cursor exactly
-// (the angle from centre maps to wheel rotation); on release, the last
-// few pointer-move samples are averaged into an angular velocity and
-// the wheel keeps spinning, decaying via configurable friction.
-//
-// Physics uses a frame-rate-independent decay: ω *= friction^(60 * dt)
-// where `friction` is the per-frame multiplier at a 60 fps reference.
-// The RAF loop only runs while ω is above a small threshold, so the
-// card consumes zero CPU once the wheel has stopped.
-//
-// Standalone — no integration backing, no entities consumed.
 
 import { LitElement, html, css, nothing } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
@@ -39,9 +26,7 @@ interface WindowWithCustomCards extends Window {
     documentationURL?: string;
   }>;
 }
-// Module-init context: hass isn't available yet, so use navigator.language
-// for the picker entry. The localize helper falls back to English for any
-// language outside the supported set (currently en, de).
+// hass not available at module init — use navigator.language for the picker.
 const initialLang =
   typeof navigator !== "undefined" ? navigator.language : "en";
 
@@ -55,12 +40,10 @@ const initialLang =
 });
 
 // ── Tunables ─────────────────────────────────────────────────────────
-// Default size used until ResizeObserver delivers the live canvas width.
 const DEFAULT_SIZE = 280;
-const MIN_SIZE = 140;          // floor — at smaller sizes labels become unreadable
-const MAX_SIZE = 600;          // ceiling — keeps the canvas reasonable on huge dashboards
-// Pointer / hub geometry as fractions of the live size, calibrated to
-// match the previous fixed-pixel look at 280 px.
+const MIN_SIZE = 140;
+const MAX_SIZE = 600;
+// Pointer / hub geometry as fractions of size, calibrated against 280 px.
 const HUB_RADIUS_FRAC = 18 / DEFAULT_SIZE;
 const POINTER_HALF_WIDTH_FRAC = 12 / DEFAULT_SIZE;
 const POINTER_TOP_FRAC = 2 / DEFAULT_SIZE;
@@ -74,43 +57,23 @@ const FRICTION: Record<Friction, number> = {
   high: 0.98,    // ~2 s
 };
 
-// Below this |ω| we snap to zero and stop the RAF loop.
 const STOP_THRESHOLD_RAD_PER_S = 0.05;
-
-// Click impulse range (random sign).
 const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
 const CLICK_IMPULSE_MAX = 16;  // rad/s ≈ 2.5 rev/s
-
-// During drag, samples older than this are dropped from the velocity
-// estimate. Smooths out spikes when the user pauses mid-drag.
 const VELOCITY_SAMPLE_WINDOW_MS = 100;
-
-// Bound the release velocity so a panic flick doesn't produce
-// 50-rev/s nonsense.
 const MAX_VELOCITY_RAD_PER_S = 40;
 
 const TWO_PI = Math.PI * 2;
 
-/** Normalise an angle to [0, 2π). Used after every `_angle` mutation
- *  so the accumulator cannot drift into float-precision territory over
- *  long sessions of repeated spins (`%` on a multi-billion-radian double
- *  is already lossy by several segments). */
+/** Wrap to [0, 2π). Prevents float drift after long sessions —
+ *  `%` on a multi-billion-radian double is already lossy. */
 const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI;
 
-// Tick acoustics — tuned so a fast spin doesn't drown in overlapping ticks.
-// At MAX_VELOCITY with 24 segments the wheel naturally crosses ~150
-// segments/sec; without these throttles every crossing queued a 40 ms
-// tick, producing a noisy buzz. With them: max ~33 ticks/sec, each at
-// floor-intensity, each shorter — three multiplicative reductions.
-const TICK_RATE_LIMIT_MS = 30;     // floor between consecutive ticks (≈33 Hz max)
+const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
 const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
-const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity at MAX_VELOCITY (relative to peak)
+const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
 
-/** Threshold (radians) of accumulated pointer-angle change before a
- *  press is reclassified from "click" to "drag". With label radius
- *  ≈ 0.66 × wheel radius, this works out to ~3 px of physical movement
- *  on a 280 px wheel — small enough to feel responsive, large enough
- *  to absorb mouse-jitter during a deliberate click. */
+/** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
 
 // 8 evenly-spaced HSL colours. Index modulo segments for >8.
@@ -119,22 +82,13 @@ const SEGMENT_COLORS: ReadonlyArray<string> = [
   "#457b9d", "#1d3557", "#9b5de5", "#06d6a0",
 ];
 
-/** Soft pastel palette (8 colours) — low-saturation, light value. Reads
- *  well with the default dark-grey label text. */
 const PASTEL_PALETTE: ReadonlyArray<string> = [
   "#FFB3BA", "#FFDFBA", "#FDFD96", "#B5EAD7",
   "#BAE1FF", "#C7CEEA", "#E0BBE4", "#FFC8DD",
 ];
 
-/** Pride palette — Gilbert Baker / 1979 simplified six-stripe rainbow
- *  PLUS the three unique colours from the Monica Helms 1999 transgender
- *  flag (light blue, pink, white; the flag itself mirrors them as
- *  five stripes — we only need the unique three for a wheel palette).
- *  Nine colours total; cycles for segments > 9. The Progress Pride
- *  flag (Daniel Quasar 2018) also adds black + brown for POC inclusion
- *  — left out here because pure black and pure brown segments tend to
- *  look like rendering bugs on a wheel rather than deliberate stripes;
- *  users who want them can supply via the `colors` config. */
+/** Gilbert Baker rainbow (6) + Helms transgender unique stripes (3) +
+ *  bisexual purple. Ten colours; cycles for segments > 10. */
 const PRIDE_PALETTE: ReadonlyArray<string> = [
   // Gilbert Baker rainbow
   "#E40303", // red
@@ -151,9 +105,6 @@ const PRIDE_PALETTE: ReadonlyArray<string> = [
   "#800080", // purple
 ];
 
-/** Neon palette (8 colours) — vivid, fully-saturated tones. Pair with
- *  white `label_colors` for the strongest contrast on the saturated
- *  fills, otherwise the dark-grey default still reads at AA. */
 const NEON_PALETTE: ReadonlyArray<string> = [
   "#FF14A6", // hot pink
   "#FF6700", // orange
@@ -172,9 +123,6 @@ const THEME_PALETTES: Record<Theme, ReadonlyArray<string>> = {
   neon: NEON_PALETTE,
 };
 
-// Fallback label-text colour when the user hasn't supplied label_colors.
-// Dark grey reads well against most of the default segment palette and
-// is the value the card used before label_colors became configurable.
 const DEFAULT_LABEL_COLOR = "#1a1a1a";
 
 interface VelocitySample {
@@ -228,11 +176,8 @@ export class SpinningWheelCard extends LitElement {
   private _resizeObserver: ResizeObserver | null = null;
 
   public setConfig(config: SpinningWheelCardConfig): void {
-    // setConfig may run before hass is set (HA's lifecycle order isn't
-    // guaranteed); use navigator language as a fallback so error text
-    // is still localised for the user. Prefer the INCOMING config's
-    // language over the current one so an edit that also flips the
-    // language gets its error reported in the new language.
+    // Prefer the incoming language so an edit that flips language AND
+    // introduces an error reports the error in the new language.
     const lang =
       (config?.language as string | undefined) ??
       this.config?.language ??
@@ -370,8 +315,6 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.show_status_type", lang));
     }
-    // Default `name` is set in render() rather than here, so the display
-    // header stays reactive to language changes.
     this.config = { ...config };
     this._result = null;
   }
@@ -409,7 +352,6 @@ export class SpinningWheelCard extends LitElement {
     return { columns: 6, rows: "auto", min_columns: 4, min_rows: 5 };
   }
 
-  // Config-derived helpers
   private _segments(): number {
     return this.config.segments ?? 8;
   }
@@ -545,9 +487,8 @@ export class SpinningWheelCard extends LitElement {
     this._dragAccumulated = 0;
     this._velocitySamples = [];
     this._lastTickSeg = -1;
-    // Drop the icon-path cache too; HA may have re-registered its icon
-    // sources between disconnects (theme reload, frontend update). The
-    // first redraw after reconnect re-resolves what's actually needed.
+    // Drop the icon cache — HA may re-register icon sources between
+    // mounts; the next redraw re-resolves what's needed.
     this._iconCache.clear();
     this._iconLoading.clear();
   }
@@ -557,10 +498,6 @@ export class SpinningWheelCard extends LitElement {
   }
 
   // ── Theme-aware colours for pointer + hub ──────────────────────────
-  // Read live values from the host's computed styles so the indicator
-  // and the spin button pick up whatever HA theme is active. Re-resolved
-  // on every draw — getComputedStyle is cheap and themes can flip
-  // (light/dark mode toggle) between paints.
 
   private _resolveTheme(ctx: CanvasRenderingContext2D): {
     indicatorFill: string;
@@ -613,11 +550,8 @@ export class SpinningWheelCard extends LitElement {
     };
   }
 
-  /** Canvas-backed colour canonicalisation — accepts any CSS colour and
-   *  returns [r, g, b]. The trick: setting ctx.fillStyle and reading it
-   *  back gives the canonical "#rrggbb" or "rgb(...)" form. CSS variable
-   *  refs (var(--…)) are resolved by getComputedStyle upstream, so they
-   *  never reach this function. */
+  /** Canonicalise any CSS colour to [r, g, b] via the canvas fillStyle
+   *  round-trip — setting and reading back returns the canonical form. */
   private _cssColorToRgb(
     color: string,
     ctx: CanvasRenderingContext2D,
@@ -659,12 +593,8 @@ export class SpinningWheelCard extends LitElement {
     return `rgb(${apply(r)}, ${apply(g)}, ${apply(b)})`;
   }
 
-  /** Draw `text` along an arc of radius R, centred on `midAngle`. The
-   *  caller is expected to have already applied the wheel's parent
-   *  rotation (so angles are in the wheel-local frame). Each glyph is
-   *  positioned at its own angle along the arc and rotated to be tangent
-   *  there — the text follows the curve of the segment. Caller owns
-   *  ctx.font / fillStyle / textAlign / textBaseline. */
+  /** Draw text along an arc of radius R, centred on midAngle. Each glyph
+   *  rotated to be locally tangent. Caller owns font/fillStyle/align. */
   private _drawArchedText(
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -692,28 +622,21 @@ export class SpinningWheelCard extends LitElement {
   }
 
   // ── MDI / HA icon support ───────────────────────────────────────────
-  // When a label looks like `mdi:foo` or `hass:foo` we render the icon
-  // instead of the text. The path data is borrowed at runtime from a
-  // hidden `<ha-icon>` element (which HA already loads as part of its
-  // frontend). We extract the SVG `d` attribute, cache it, and render
-  // via Path2D on the canvas — no @mdi/js bundle, no DOM overlay over
-  // the wheel. Tinting follows the same labelColors[i] as text.
+  // Icon labels (`mdi:foo`, `hass:foo`) borrow their SVG path from a
+  // hidden ha-icon at runtime — no @mdi/js bundle, rendered via Path2D.
 
   /** path | null = looked up but not found | undefined = not yet looked up. */
   private _iconCache = new Map<string, string | null>();
   /** in-flight loads, prevents N redundant DOM queries per redraw. */
   private _iconLoading = new Set<string>();
 
-  /** True if the label text refers to an HA icon (mdi: / hass: / iif:
-   *  custom-namespace icons registered by other integrations). */
+  /** Matches mdi:foo / hass:foo / any namespaced HA icon reference. */
   private _looksLikeIcon(label: string): boolean {
     return /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i.test(label);
   }
 
-  /** Synchronous lookup — returns the icon's SVG `d` string when ready,
-   *  null when HA reports the icon is missing, or undefined when the
-   *  load is still in flight (caller renders a placeholder + wait for
-   *  the next `_draw`, which this helper schedules on completion). */
+  /** Path string when ready, null when HA reports missing, undefined
+   *  while the load is in flight (kicks off the load on first call). */
   private _getIconPath(name: string): string | null | undefined {
     const cached = this._iconCache.get(name);
     if (cached !== undefined) return cached;
@@ -738,15 +661,7 @@ export class SpinningWheelCard extends LitElement {
       probe.style.height = "24px";
       document.body.appendChild(probe);
 
-      // ha-icon resolves the path asynchronously — its updateComplete
-      // resolves before the SVG is in the shadow root in some flows.
-      // Poll for ~500 ms (30 frames at 60 fps) before giving up. Three
-      // places to check, in priority order:
-      //   1. The nested <ha-svg-icon>'s .path property (modern HA — the
-      //      fastest, no shadow-DOM walk).
-      //   2. The nested <ha-svg-icon>'s shadow root <path d="…"> (same
-      //      thing but read from the rendered SVG).
-      //   3. ha-icon's own shadow root <path> (legacy iron-icon flow).
+      // ha-icon resolves async; poll up to ~500 ms (30 frames).
       let path: string | null = null;
       for (let attempt = 0; attempt < 30 && !path; attempt++) {
         if (probe.updateComplete) {
@@ -760,6 +675,8 @@ export class SpinningWheelCard extends LitElement {
           | (HTMLElement & { path?: string })
           | null
           | undefined;
+        // Fallback chain: modern ha-svg-icon.path → its shadow <path>
+        // → ha-icon's own <path> (legacy iron-icon flow).
         path =
           svgIcon?.path ??
           svgIcon?.shadowRoot?.querySelector("path")?.getAttribute("d") ??
@@ -781,10 +698,8 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
-  /** Render an MDI/HA icon path centred at the given segment angle and
-   *  radius. The path's 24×24 viewBox is scaled to `iconPx` and rotated
-   *  to match the active orientation. Caller passes the resolved fill
-   *  colour. */
+  /** Draw a 24×24 MDI path centred on the segment, scaled to iconPx,
+   *  rotated to match the active orientation (same rule as text). */
   private _drawSegmentIcon(
     ctx: CanvasRenderingContext2D,
     pathStr: string,
@@ -824,19 +739,13 @@ export class SpinningWheelCard extends LitElement {
 
   private _startAnim(): void {
     if (this._rafId !== null) return;
-    // Honour the user's motion preference: skip the multi-second decay
-    // entirely. Snap omega to zero in place, keep the wheel at whatever
-    // angle the impulse just left it, announce the result. WCAG 2.3.3
-    // compliance — the spin *is* the feature, but the user has asked
-    // not to see the animation, so we do not run it.
+    // WCAG 2.3.3 — when the user has asked for reduced motion, skip the
+    // multi-second decay. Apply 1.5 s of equivalent decay so the result
+    // isn't trivially the impulse-application angle, then announce.
     if (
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
     ) {
-      // Run the spin "instantly" — apply a chunk of decay so the final
-      // resting angle isn't trivially the impulse-application angle,
-      // but skip the per-frame visual playback. 1.5 s of equivalent
-      // decay at the configured friction is a balanced middle ground.
       this._angle = wrapAngle(this._angle + this._omega * 1.5);
       this._omega = 0;
       this._spinning = false;
@@ -856,11 +765,8 @@ export class SpinningWheelCard extends LitElement {
       // Frame-rate-independent decay: at 60 fps, dt≈1/60, exponent≈1.
       this._omega *= Math.pow(this._frictionFactor(), 60 * dt);
 
-      // Bell-curve intensity: rises from quiet at low speed to peak
-      // around TICK_PEAK_SPEED, then tapers to TICK_HIGH_SPEED_FLOOR by
-      // MAX_VELOCITY. Real wheels have loud per-impact clicks at any
-      // speed but the ear blurs them at high speed — modelling that
-      // taper here keeps the fast-spin sound from piling into a wash.
+      // Bell curve: ramp 0 → peak by TICK_PEAK_SPEED, taper to FLOOR
+      // by MAX_VELOCITY so dense ticks don't pile into a wash.
       const omegaAbs = Math.abs(this._omega);
       let intensity: number;
       if (omegaAbs <= TICK_PEAK_SPEED) {
@@ -898,11 +804,9 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
-  /** Index of the segment currently under the 12 o'clock pointer.
-   *  Segment 0 is centred on the pointer at angle 0 — offset by -arcs[0]/2
-   *  in the wheel's local frame. The angle under the pointer (in wheel
-   *  local coordinates) is therefore (-_angle + arcs[0]/2), normalised
-   *  to [0, 2π). Walks the cumulative arcs to find the containing slice. */
+  /** Index of segment under the 12 o'clock pointer. Segment 0 is centred
+   *  there at angle 0 (offset by arcs[0]/2 in local coords); we walk
+   *  cumulative arcs until the running sum exceeds the pointer angle. */
   private _segmentIndexUnderPointer(): number {
     const arcs = this._arcs();
     if (arcs.length === 0) return 0;
@@ -924,11 +828,6 @@ export class SpinningWheelCard extends LitElement {
   }
 
   // ── Audio (peg clicks) ──────────────────────────────────────────────
-  // Lazy AudioContext — created on first user interaction so we satisfy
-  // the browser's gesture requirement, then reused for all subsequent
-  // ticks. The synth is one short noise burst per tick through a
-  // resonant bandpass; quick exponential decay envelope; gain scales
-  // with the passed intensity (0..1) so faster spins click louder.
 
   private _audioCtx: AudioContext | null = null;
   /** True once `ctx.resume()` has resolved. `_playTick` returns early
@@ -947,10 +846,9 @@ export class SpinningWheelCard extends LitElement {
     if (typeof window.AudioContext === "undefined") return null;
     try {
       this._audioCtx = new AudioContext();
-      // `resume()` on a freshly-constructed context is usually a no-op
-      // but Safari (and Chromium when the page hasn't received a user
-      // gesture yet) returns a pending promise. Flip the readiness flag
-      // when it resolves so `_playTick` waits for a usable currentTime.
+      // Safari (and gesture-less Chromium) returns a pending promise
+      // here; flip _audioReady when it resolves so _playTick doesn't
+      // schedule against a stale currentTime.
       const ctx = this._audioCtx;
       if (ctx.state === "running") {
         this._audioReady = true;
@@ -960,9 +858,7 @@ export class SpinningWheelCard extends LitElement {
           .then(() => {
             this._audioReady = true;
           })
-          .catch(() => {
-            // Suspended context recovers on the next user gesture; no-op.
-          });
+          .catch(() => {});
       }
     } catch {
       return null;
@@ -974,10 +870,7 @@ export class SpinningWheelCard extends LitElement {
     if (!this._soundEnabled()) return;
     const ctx = this._ensureAudio();
     if (!ctx) return;
-    // Skip the click rather than schedule against a not-yet-resumed
-    // context; the very next tick after `resume()` resolves will play.
-    // The cost is a single inaudible click on first-spin; in exchange
-    // we never produce a phantom-silent burst.
+    // Skip rather than schedule against a not-yet-resumed context.
     if (!this._audioReady || ctx.state !== "running") {
       if (ctx.state === "suspended") {
         void ctx
@@ -990,9 +883,7 @@ export class SpinningWheelCard extends LitElement {
       return;
     }
     const t0 = ctx.currentTime;
-    // Duration tracks intensity: 40 ms tail at peak (satisfying "tok"
-    // on slow-mid spins), shrinking to 25 ms snap at low intensity
-    // (high-speed taper) so adjacent ticks don't blur into a buzz.
+    // Tick duration follows intensity so high-speed clicks don't blur.
     const I = Math.max(0, Math.min(1, intensity));
     const dur = 0.025 + 0.015 * I; // 25..40 ms
 
@@ -1037,12 +928,9 @@ export class SpinningWheelCard extends LitElement {
     src.stop(t0 + dur + 0.01);
   }
 
-  /** Call after every angle update. Emits a tick when the segment under
-   *  the pointer changes, with a hard cap on tick rate (TICK_RATE_LIMIT_MS).
-   *  Above the cap the segment index still advances so we'll fire on the
-   *  next crossing past the cooldown — at the cost of dropping some
-   *  intermediate clicks at very high spin speeds, which the ear can't
-   *  separate anyway. */
+  /** Emit a tick when the segment under the pointer changes, capped at
+   *  TICK_RATE_LIMIT_MS. The cursor still advances when rate-limited so
+   *  we don't fire spuriously after the cooldown. */
   private _maybeTick(intensity: number): void {
     if (!this._soundEnabled()) {
       this._lastTickSeg = -1;
@@ -1095,11 +983,9 @@ export class SpinningWheelCard extends LitElement {
     this._dragLastAngle = a;
     this._dragAccumulated = 0;
     this._velocitySamples = [];
-    // CRUCIALLY: do NOT zero omega or stop the anim here. We don't yet
-    // know whether this is a click or a drag. A click during a spin
-    // should boost speed (handled in pointerup); only a real drag
-    // should commandeer the wheel — that transition happens in
-    // pointermove once movement crosses _DRAG_COMMIT_RAD.
+    // Don't zero omega or stop anim here — we don't yet know if this
+    // is a click or a drag. Click-during-spin should boost; only a
+    // real drag (after DRAG_COMMIT_RAD in pointermove) commandeers.
     if (this._soundEnabled()) {
       const ctx = this._ensureAudio();
       if (ctx?.state === "suspended") {
@@ -1110,10 +996,8 @@ export class SpinningWheelCard extends LitElement {
           })
           .catch(() => {});
       }
-      // Only seed the tick cursor when the RAF loop is NOT running.
-      // While it runs the loop owns `_lastTickSeg`; reseeding here
-      // would race the next tick and either suppress a legitimate
-      // click or fire a spurious one on first move.
+      // Only seed when RAF isn't running — otherwise the loop owns
+      // `_lastTickSeg` and reseeding would race the next tick.
       if (this._rafId === null) {
         this._lastTickSeg = this._segmentIndexUnderPointer();
       }
@@ -1131,14 +1015,11 @@ export class SpinningWheelCard extends LitElement {
     if (delta > Math.PI) delta -= Math.PI * 2;
     else if (delta < -Math.PI) delta += Math.PI * 2;
 
-    // Track total movement to decide click-vs-drag. Until we cross the
-    // threshold the wheel runs unmodified — a spinning wheel keeps
-    // spinning, and the user can still click without taking it over.
+    // Track total movement so a sub-threshold wobble during a click
+    // doesn't take the wheel over.
     this._dragAccumulated += Math.abs(delta);
     if (!this._dragMoved && this._dragAccumulated > DRAG_COMMIT_RAD) {
       this._dragMoved = true;
-      // NOW commandeer the wheel: halt momentum so drag-following maps
-      // 1:1 with cursor angle.
       this._omega = 0;
       this._stopAnim();
       this._result = null;
@@ -1146,9 +1027,8 @@ export class SpinningWheelCard extends LitElement {
     this._dragLastAngle = a;
 
     if (!this._dragMoved) {
-      // Sub-threshold: don't move the wheel yet. Cursor angle still
-      // tracked above so the next delta is computed from the latest
-      // position (not the initial down position).
+      // Sub-threshold — don't move the wheel yet. lastAngle is updated
+      // above so the next delta starts from the current position.
       return;
     }
 
@@ -1190,7 +1070,6 @@ export class SpinningWheelCard extends LitElement {
           -MAX_VELOCITY_RAD_PER_S,
           Math.min(MAX_VELOCITY_RAD_PER_S, next),
         );
-        // RAF loop is already running; it picks up the new omega next frame.
       } else {
         // Fresh start from rest — random direction.
         const sign = Math.random() < 0.5 ? -1 : 1;
@@ -1227,13 +1106,9 @@ export class SpinningWheelCard extends LitElement {
       this._spinning = true;
       this._startAnim();
     } else if (this._rafId === null) {
-      // Insufficient release velocity to spin — typical case is a
-      // drag-to-stop where the user grabs a fast-spinning wheel and
-      // bleeds momentum off through the cursor. The drag-commit path
-      // already called `_stopAnim()` but left `_spinning = true`
-      // (the previous RAF loop owned that flag); without resetting it
-      // here the status line stays stuck on "Spinning…" indefinitely.
-      // Snap to a clean rest, announce the result, repaint.
+      // Drag-to-stop: drag-commit already called _stopAnim but left
+      // _spinning true (the prior RAF loop owned that flag). Snap to
+      // rest here so the status line doesn't stay stuck on "Spinning…".
       this._omega = 0;
       this._spinning = false;
       this._lastTickSeg = -1;
@@ -1323,9 +1198,6 @@ export class SpinningWheelCard extends LitElement {
     const n = arcs.length;
     const labels = this._expandedLabels();
     const colors = this._segmentColors();
-    // Per-segment label-text colours come from the same unique-label
-    // mapping as segment fills, so segments sharing a label always
-    // share a label colour.
     const labelColors = this._segmentLabelColors();
     const orientation = this._textOrientation();
     const theme = this._resolveTheme(ctx);
@@ -1439,12 +1311,7 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
-    // Outer ring — softened from the original (3 px / 0.65 α). The
-    // canvas's CSS drop-shadow already provides depth, so the rim
-    // doesn't need to do much beyond defining the outer edge against
-    // the segment fills. 2 px / 0.30 α reads as a subtle boundary on
-    // light themes without going hard-pencil; on dark themes it stays
-    // visible but unobtrusive.
+    // Outer ring — kept soft (the CSS drop-shadow carries the depth).
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.lineWidth = 2;
@@ -1453,9 +1320,7 @@ export class SpinningWheelCard extends LitElement {
 
     ctx.restore();
 
-    // Centre hub (does NOT rotate). Tinted with --primary-color, with a
-    // subtle radial gradient (lighter top-left → darker edge) so it still
-    // reads as a button rather than a flat disc.
+    // Centre hub (does not rotate with the wheel).
     ctx.beginPath();
     ctx.arc(center, center, hubRadius, 0, Math.PI * 2);
     const grad = ctx.createRadialGradient(
@@ -1490,8 +1355,7 @@ export class SpinningWheelCard extends LitElement {
       ctx.restore();
     }
 
-    // Pointer (top of card, apex pointing DOWN into the wheel).
-    // Borderless — just the accent fill.
+    // Pointer triangle, apex pointing into the wheel.
     const pHalfW = size * POINTER_HALF_WIDTH_FRAC;
     const pTop = size * POINTER_TOP_FRAC;
     const pTip = size * POINTER_TIP_FRAC;
@@ -1504,9 +1368,8 @@ export class SpinningWheelCard extends LitElement {
     ctx.fill();
   }
 
-  // Track theme tokens so we redraw when HA flips light/dark — the
-  // colours we read in _resolveTheme are computed fresh each draw, but
-  // nothing else triggers a paint when the theme switches.
+  // Trigger a redraw when HA flips light/dark — _resolveTheme reads
+  // CSS vars per-draw but nothing else schedules a paint on theme flip.
   private _prevDarkMode: boolean | undefined = undefined;
   private _prevTheme: string | undefined = undefined;
 
