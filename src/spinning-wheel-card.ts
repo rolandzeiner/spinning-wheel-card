@@ -1249,11 +1249,16 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
-    // Outer ring
+    // Outer ring — softened from the original (3 px / 0.65 α). The
+    // canvas's CSS drop-shadow already provides depth, so the rim
+    // doesn't need to do much beyond defining the outer edge against
+    // the segment fills. 2 px / 0.30 α reads as a subtle boundary on
+    // light themes without going hard-pencil; on dark themes it stays
+    // visible but unobtrusive.
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.65)";
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
     ctx.stroke();
 
     ctx.restore();
