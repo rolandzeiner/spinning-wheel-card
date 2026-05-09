@@ -22,7 +22,76 @@ export interface HomeAssistant {
   config?: { time_zone?: string } & Record<string, unknown>;
   localize?: (key: string, ...args: unknown[]) => string;
   callWS?<T = unknown>(msg: { type: string; [key: string]: unknown }): Promise<T>;
+  /** Standard HA hass-shape — `home-assistant-js-websocket` exposes
+   *  `callService(domain, service, serviceData?, target?)`. Optional
+   *  here because this interface is intentionally a minimal subset; the
+   *  per-segment-action dispatcher guards the call. */
+  callService?<T = unknown>(
+    domain: string,
+    service: string,
+    serviceData?: Record<string, unknown>,
+    target?: HassServiceTarget,
+  ): Promise<T>;
 }
+
+/** Standard HA service-call target. Mirrors `home-assistant-js-websocket`'s
+ *  `HassServiceTarget`. Any one (or several) of the id fields can be set;
+ *  HA resolves device/area/floor/label IDs server-side. */
+export interface HassServiceTarget {
+  entity_id?: string | ReadonlyArray<string>;
+  device_id?: string | ReadonlyArray<string>;
+  area_id?: string | ReadonlyArray<string>;
+  floor_id?: string | ReadonlyArray<string>;
+  label_id?: string | ReadonlyArray<string>;
+}
+
+/** Confirmation envelope per HA's standard ActionConfig. `true` prompts
+ *  with a generic message; an object lets the user supply their own
+ *  `text`. `false` opts a single action out of confirmation when the
+ *  card-level default is on. */
+export type ConfirmationConfig =
+  | boolean
+  | { text?: string; exemptions?: ReadonlyArray<{ user: string }> };
+
+/** Lovelace ActionConfig — discriminated union mirroring HA's standard
+ *  tap_action / hold_action / double_tap_action shape. We re-declare it
+ *  locally instead of pulling in `custom-card-helpers` (the portfolio
+ *  dropped that runtime dep for supply-chain hygiene). 2024.8+ HA prefers
+ *  `perform-action` / `perform_action` over `call-service` / `service`;
+ *  both are accepted at runtime so existing YAML keeps working. */
+export type ActionConfig =
+  | { action: "none" }
+  | { action: "toggle"; entity?: string; confirmation?: ConfirmationConfig }
+  | { action: "more-info"; entity?: string; confirmation?: ConfirmationConfig }
+  | {
+      action: "call-service";
+      service: string;
+      service_data?: Record<string, unknown>;
+      data?: Record<string, unknown>;
+      target?: HassServiceTarget;
+      confirmation?: ConfirmationConfig;
+    }
+  | {
+      action: "perform-action";
+      perform_action: string;
+      data?: Record<string, unknown>;
+      target?: HassServiceTarget;
+      confirmation?: ConfirmationConfig;
+    }
+  | {
+      action: "navigate";
+      navigation_path: string;
+      navigation_replace?: boolean;
+      confirmation?: ConfirmationConfig;
+    }
+  | { action: "url"; url_path: string; confirmation?: ConfirmationConfig }
+  | {
+      action: "assist";
+      pipeline_id?: string;
+      start_listening?: boolean;
+      confirmation?: ConfirmationConfig;
+    }
+  | { action: "fire-dom-event"; [key: string]: unknown };
 
 /** Marker every card config extends. */
 export interface LovelaceCardConfig {
@@ -236,6 +305,24 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  the spoke. "radial" — labels rotated 90° CW; reads along the spoke
    *  from rim toward centre. */
   text_orientation?: TextOrientation;
+  /** Optional per-segment action fired when the segment wins. Each entry
+   *  is one of:
+   *    - a `script.<name>` entity_id (string shorthand → expanded to
+   *      `{ action: "perform-action", perform_action: "script.<name>" }`
+   *      at runtime — each script in HA is registered as its own service);
+   *    - a full Lovelace `ActionConfig` (`perform-action` / `call-service` /
+   *      `navigate` / `url` / `more-info` / `toggle` / `assist` /
+   *      `fire-dom-event`);
+   *    - `null` to fire nothing for that segment.
+   *  Same length / cycling rule as `labels`: 1..segments, cycled around
+   *  with **same-label-same-action mapping** (segments sharing a label
+   *  always fire the same action, mirroring the `colors` rule). */
+  actions?: ReadonlyArray<string | ActionConfig | null>;
+  /** Skip the "Run action for X?" confirmation prompt that fires by
+   *  default before a winning segment's action runs. Default `false`
+   *  (= confirm, safer). Per-action `confirmation: false` opts a single
+   *  action out without disabling confirmation globally. */
+  disable_confirm_actions?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

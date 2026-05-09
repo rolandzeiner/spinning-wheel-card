@@ -8,6 +8,9 @@
     "idle": "Click to spin · drag to throw",
     "todo_empty": "No open items in the todo list"
   },
+  "confirm": {
+    "run_action": "Run action for \"{value}\"?"
+  },
   "hub": {
     "default_text": "SPIN"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "Label orientation",
     "sound": "Click sound",
     "show_status": "Show status line",
+    "actions": "Actions",
+    "disable_confirm_actions": "Disable confirmation prompt",
     "language_helper": "Override the auto-detected display language for this card. Auto follows your HA profile (or browser language as a fallback).",
     "todo_entity_helper": "Optional. When set, the wheel's segments are filled with the open items of this todo list (max 24). Segments and Labels are ignored while a todo list is selected.",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "How segment labels are oriented. Tangent (default) wraps the text around the rim; Radial rotates labels 90° clockwise so they read along the spoke from rim to centre.",
     "sound_helper": "Play a peg-click sound on each segment crossing. Volume scales with wheel speed.",
     "show_status_helper": "Show the text line beneath the wheel (\"Spinning…\" / \"Result: X\" / the click-to-spin idle hint). Off for a more minimal look.",
+    "actions_helper": "Comma- or newline-separated script entity IDs (e.g. script.morning, script.evening). Each fires when its segment wins. Same-label-same-action rule applies — segments sharing a label always fire the same action. For full Lovelace actions (call-service, navigate, url, more-info), edit YAML.",
+    "disable_confirm_actions_helper": "Off (default) — the card asks before running a winning segment's action. On — actions fire silently. Use with care: a casual spin can run real automations.",
     "friction_low": "Low — long, lazy spins",
     "friction_medium": "Medium — classic",
     "friction_high": "High — stops quickly",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color must be one of: theme, black, white",
     "show_status_type": "show_status must be a boolean",
     "todo_entity_type": "todo_entity must be a string",
-    "todo_entity_invalid": "todo_entity must be a todo.* entity_id"
+    "todo_entity_invalid": "todo_entity must be a todo.* entity_id",
+    "actions_type": "actions must be an array of script.* entity IDs, action objects, or null entries",
+    "actions_length": "actions length ({len}) must not exceed segments ({segments})",
+    "actions_string": "actions string entries must be a script.* entity_id (got: {value})",
+    "disable_confirm_actions_type": "disable_confirm_actions must be a boolean"
   }
 }

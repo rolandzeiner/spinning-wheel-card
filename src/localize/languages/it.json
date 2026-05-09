@@ -8,6 +8,9 @@
     "idle": "Clicca per girare · trascina per lanciare",
     "todo_empty": "Nessun elemento aperto nella lista cose da fare"
   },
+  "confirm": {
+    "run_action": "Eseguire l'azione per \"{value}\"?"
+  },
   "hub": {
     "default_text": "GIRA"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "Orientamento etichette",
     "sound": "Suono del clic",
     "show_status": "Mostra riga di stato",
+    "actions": "Azioni",
+    "disable_confirm_actions": "Disattiva la richiesta di conferma",
     "language_helper": "Sovrascrive la lingua di visualizzazione rilevata automaticamente per questa scheda. Automatico segue il tuo profilo HA (con la lingua del browser come ripiego).",
     "todo_entity_helper": "Opzionale. Se impostato, i segmenti della ruota vengono riempiti con gli elementi aperti di questa lista (max 24). Segmenti ed etichette vengono ignorati finché una lista è selezionata.",
     "segments_helper": "In quante fette viene divisa la ruota. Da 4 a 24.",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "Come sono orientate le etichette dei segmenti. Tangente (predefinito) avvolge il testo lungo il bordo; Radiale ruota le etichette di 90° in senso orario in modo da leggerle lungo il raggio, dal bordo al centro.",
     "sound_helper": "Riproduce un clic di chiodo a ogni passaggio di segmento. Il volume scala con la velocità della ruota.",
     "show_status_helper": "Mostra la riga di testo sotto la ruota (\"Gira…\" / \"Risultato: X\" / il suggerimento di inattività). Disattiva per un aspetto più minimale.",
+    "actions_helper": "ID di entità script separati da virgola o nuova riga (es. script.mattino, script.sera). Ciascuna si attiva quando il suo segmento vince. Vale la regola stessa-etichetta-stessa-azione — i segmenti che condividono un'etichetta attivano sempre la stessa azione. Per le azioni Lovelace complete (call-service, navigate, url, more-info), modifica in YAML.",
+    "disable_confirm_actions_helper": "Off (predefinito) — la scheda chiede prima di eseguire l'azione del segmento vincente. On — le azioni vengono eseguite senza richiesta. Usa con cautela: un giro casuale può attivare automazioni reali.",
     "friction_low": "Basso — rotazioni lunghe e pigre",
     "friction_medium": "Medio — classico",
     "friction_high": "Alto — si ferma rapidamente",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color deve essere uno tra: theme, black, white",
     "show_status_type": "show_status deve essere un booleano",
     "todo_entity_type": "todo_entity deve essere una stringa",
-    "todo_entity_invalid": "todo_entity deve essere un entity_id todo.*"
+    "todo_entity_invalid": "todo_entity deve essere un entity_id todo.*",
+    "actions_type": "actions deve essere un array di ID entità script.*, oggetti azione o voci null",
+    "actions_length": "la lunghezza di actions ({len}) non deve superare segments ({segments})",
+    "actions_string": "le voci stringa di actions devono essere un entity_id script.* (ricevuto: {value})",
+    "disable_confirm_actions_type": "disable_confirm_actions deve essere un booleano"
   }
 }

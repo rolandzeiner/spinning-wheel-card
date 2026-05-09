@@ -8,6 +8,9 @@
     "idle": "Haz clic para girar · arrastra para lanzar",
     "todo_empty": "No hay elementos pendientes en la lista de tareas"
   },
+  "confirm": {
+    "run_action": "¿Ejecutar la acción para \"{value}\"?"
+  },
   "hub": {
     "default_text": "GIRAR"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "Orientación de etiquetas",
     "sound": "Sonido del clic",
     "show_status": "Mostrar línea de estado",
+    "actions": "Acciones",
+    "disable_confirm_actions": "Desactivar el diálogo de confirmación",
     "language_helper": "Sobrescribe el idioma de visualización detectado automáticamente para esta tarjeta. Automático sigue tu perfil de HA (con el idioma del navegador como respaldo).",
     "todo_entity_helper": "Opcional. Cuando se establece, los segmentos de la rueda se rellenan con los elementos pendientes de esta lista (máx 24). Segmentos y etiquetas se ignoran mientras una lista esté seleccionada.",
     "segments_helper": "En cuántas porciones se divide la ruleta. De 4 a 24.",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "Cómo se orientan las etiquetas de los segmentos. Tangente (por defecto) envuelve el texto alrededor del borde; Radial gira las etiquetas 90° en sentido horario para leerlas a lo largo del radio, del borde al centro.",
     "sound_helper": "Reproducir un clic en cada cruce de segmento. El volumen escala con la velocidad de la ruleta.",
     "show_status_helper": "Mostrar la línea de texto bajo la ruleta (\"Girando…\" / \"Resultado: X\" / el aviso de inactividad). Desactívalo para un aspecto más minimalista.",
+    "actions_helper": "IDs de entidad de script separados por coma o salto de línea (p. ej. script.mañana, script.noche). Cada una se activa cuando gana su segmento. Se aplica la regla misma-etiqueta-misma-acción — los segmentos que comparten una etiqueta siempre activan la misma acción. Para acciones Lovelace completas (call-service, navigate, url, more-info), edita en YAML.",
+    "disable_confirm_actions_helper": "Desactivado (por defecto): la tarjeta pregunta antes de ejecutar la acción del segmento ganador. Activado: las acciones se ejecutan sin preguntar. Úsalo con precaución: un giro casual puede activar automatizaciones reales.",
     "friction_low": "Baja — giros largos y suaves",
     "friction_medium": "Media — clásica",
     "friction_high": "Alta — se detiene rápido",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color debe ser uno de: theme, black, white",
     "show_status_type": "show_status debe ser un booleano",
     "todo_entity_type": "todo_entity debe ser una cadena",
-    "todo_entity_invalid": "todo_entity debe ser un entity_id todo.*"
+    "todo_entity_invalid": "todo_entity debe ser un entity_id todo.*",
+    "actions_type": "actions debe ser un array de IDs de entidad script.*, objetos de acción o entradas nulas",
+    "actions_length": "la longitud de actions ({len}) no debe superar segments ({segments})",
+    "actions_string": "las entradas de tipo cadena en actions deben ser un entity_id script.* (recibido: {value})",
+    "disable_confirm_actions_type": "disable_confirm_actions debe ser un booleano"
   }
 }

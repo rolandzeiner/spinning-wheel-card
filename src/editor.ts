@@ -12,14 +12,15 @@ import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
 import { localize, resolveLang } from "./localize/localize";
 
-// Editor exposes labels/weights/colors arrays as comma-separated *_csv
-// fields (no ha-form array selector). _onFormChanged parses CSV → array
-// at the boundary.
+// Editor exposes labels/weights/colors/actions arrays as comma-separated
+// *_csv fields (no ha-form array selector). _onFormChanged parses CSV
+// → array at the boundary.
 type EditorData = SpinningWheelCardConfig & {
   labels_csv?: string;
   weights_csv?: string;
   colors_csv?: string;
   label_colors_csv?: string;
+  actions_csv?: string;
 };
 
 // Form prefill so first-open dropdowns/toggles reflect the actual
@@ -34,6 +35,7 @@ const STATIC_DEFAULTS = {
   theme: "default" as const,
   hub_color: "theme" as const,
   show_status: true,
+  disable_confirm_actions: false,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split a comma- or newline-separated text field into trimmed,
@@ -73,6 +75,7 @@ export class SpinningWheelCardEditor
   @state() private _weightsText = "";
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
+  @state() private _actionsText = "";
 
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
@@ -80,6 +83,14 @@ export class SpinningWheelCardEditor
     this._weightsText = (config.weights ?? []).join(", ");
     this._colorsText = (config.colors ?? []).join(", ");
     this._labelColorsText = (config.label_colors ?? []).join(", ");
+    // Only round-trip string-shorthand actions through the CSV editor —
+    // full ActionConfig objects (set via YAML) aren't representable here.
+    // Object entries stay in `_config.actions`; if the user then edits
+    // the CSV, the resulting save replaces `actions` wholesale, so power
+    // users mixing both shapes need to use YAML directly.
+    this._actionsText = (config.actions ?? [])
+      .filter((a): a is string => typeof a === "string")
+      .join(", ");
   }
 
   private _lang(): string {
@@ -221,6 +232,11 @@ export class SpinningWheelCardEditor
       },
       { name: "sound", selector: { boolean: {} } },
       { name: "show_status", selector: { boolean: {} } },
+      {
+        name: "actions_csv",
+        selector: { text: { multiline: true } },
+      },
+      { name: "disable_confirm_actions", selector: { boolean: {} } },
     ];
   }
 
@@ -257,6 +273,10 @@ export class SpinningWheelCardEditor
         return localize("editor.sound", lang);
       case "show_status":
         return localize("editor.show_status", lang);
+      case "actions_csv":
+        return localize("editor.actions", lang);
+      case "disable_confirm_actions":
+        return localize("editor.disable_confirm_actions", lang);
       default:
         return field.name;
     }
@@ -294,6 +314,10 @@ export class SpinningWheelCardEditor
           return "editor.sound_helper";
         case "show_status":
           return "editor.show_status_helper";
+        case "actions_csv":
+          return "editor.actions_helper";
+        case "disable_confirm_actions":
+          return "editor.disable_confirm_actions_helper";
         default:
           return null;
       }
@@ -316,10 +340,12 @@ export class SpinningWheelCardEditor
     const weightsCsv = next.weights_csv ?? "";
     const colorsCsv = next.colors_csv ?? "";
     const labelColorsCsv = next.label_colors_csv ?? "";
+    const actionsCsv = next.actions_csv ?? "";
     delete next.labels_csv;
     delete next.weights_csv;
     delete next.colors_csv;
     delete next.label_colors_csv;
+    delete next.actions_csv;
 
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
 
@@ -351,6 +377,27 @@ export class SpinningWheelCardEditor
       next.label_colors = parsedLabelColors.slice(0, segments);
     }
 
+    const parsedActions = parseStringList(actionsCsv);
+    if (parsedActions.length === 0) {
+      // Preserve any object-form actions that were set in YAML — the
+      // CSV editor only round-trips strings, so an empty CSV could
+      // either mean "no actions" (drop) or "untouched while object
+      // entries exist" (keep). The setConfig hydration filtered to
+      // strings, so a freshly-empty CSV here means the user cleared
+      // the visible string entries; objects persist intact.
+      const existing = this._config.actions ?? [];
+      const objectsOnly = existing.filter(
+        (a): a is Exclude<typeof a, string> => typeof a !== "string",
+      );
+      if (objectsOnly.length === 0) {
+        delete next.actions;
+      } else {
+        next.actions = objectsOnly;
+      }
+    } else {
+      next.actions = parsedActions.slice(0, segments);
+    }
+
     // Distinguish "explicit clear" (hide label) from "never set"
     // (use localised default). ha-form may emit undefined for empty
     // inputs; pin to "" only when there *was* a previous string.
@@ -372,6 +419,9 @@ export class SpinningWheelCardEditor
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
     if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
     if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
+    if (next.disable_confirm_actions === STATIC_DEFAULTS.disable_confirm_actions) {
+      delete next.disable_confirm_actions;
+    }
     // "auto" is the editor sentinel — strip so saved YAML stays clean.
     if (next.language === "auto") delete next.language;
     // Empty entity selector emits "" — drop so the saved YAML stays
@@ -385,6 +435,7 @@ export class SpinningWheelCardEditor
     this._weightsText = weightsCsv;
     this._colorsText = colorsCsv;
     this._labelColorsText = labelColorsCsv;
+    this._actionsText = actionsCsv;
     this._config = next;
     fireEvent(this, "config-changed", { config: next });
   };
@@ -402,6 +453,7 @@ export class SpinningWheelCardEditor
       weights_csv: this._weightsText,
       colors_csv: this._colorsText,
       label_colors_csv: this._labelColorsText,
+      actions_csv: this._actionsText,
     };
     return html`
       <div class="editor">

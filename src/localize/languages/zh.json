@@ -8,6 +8,9 @@
     "idle": "点击旋转 · 拖动投掷",
     "todo_empty": "待办事项列表中没有未完成的项目"
   },
+  "confirm": {
+    "run_action": "为「{value}」运行动作?"
+  },
   "hub": {
     "default_text": "旋转"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "标签方向",
     "sound": "点击音效",
     "show_status": "显示状态行",
+    "actions": "动作",
+    "disable_confirm_actions": "禁用确认对话框",
     "language_helper": "为此卡片覆盖自动检测的显示语言。自动会跟随你的 HA 个人资料(以浏览器语言作为后备)。",
     "todo_entity_helper": "可选。设置后,转盘的段落将填充此待办事项列表中的未完成项目(最多 24 个)。选定列表时,将忽略段落数和标签。",
     "segments_helper": "转盘划分的扇区数量。范围 4 到 24。",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "扇区标签的方向。切线方向(默认)沿轮缘环绕文字;径向方向将标签顺时针旋转 90° 使其沿辐条从轮缘读至中心。",
     "sound_helper": "在每次跨过扇区时播放挡片点击声。音量随转速变化。",
     "show_status_helper": "在转盘下方显示文字行(“旋转中…” / “结果:X” / 空闲提示)。关闭可获得更简洁的外观。",
+    "actions_helper": "用逗号或换行分隔的脚本实体 ID(例如 script.morning, script.evening)。当对应扇区获胜时触发。适用相同标签共用动作规则 — 标签相同的扇区始终触发相同的动作。如需完整的 Lovelace 动作(call-service、navigate、url、more-info),请编辑 YAML。",
+    "disable_confirm_actions_helper": "关闭(默认)— 在执行获胜扇区的动作前会先询问确认。开启 — 动作会直接触发,不再询问。请谨慎使用:随手一转可能会触发真实的自动化。",
     "friction_low": "低 — 长时间缓慢旋转",
     "friction_medium": "中 — 经典",
     "friction_high": "高 — 快速停止",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color 必须是以下之一:theme、black、white",
     "show_status_type": "show_status 必须是布尔值",
     "todo_entity_type": "todo_entity 必须是字符串",
-    "todo_entity_invalid": "todo_entity 必须是 todo.* 实体 ID"
+    "todo_entity_invalid": "todo_entity 必须是 todo.* 实体 ID",
+    "actions_type": "actions 必须是 script.* 实体 ID、动作对象或 null 条目的数组",
+    "actions_length": "actions 的长度({len})不得超过 segments({segments})",
+    "actions_string": "actions 中的字符串条目必须是 script.* 实体 ID(实际:{value})",
+    "disable_confirm_actions_type": "disable_confirm_actions 必须为布尔值"
   }
 }

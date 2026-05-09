@@ -8,6 +8,9 @@
     "idle": "クリックで回転 · ドラッグで投げる",
     "todo_empty": "ToDo リストに未完了の項目はありません"
   },
+  "confirm": {
+    "run_action": "「{value}」のアクションを実行しますか?"
+  },
   "hub": {
     "default_text": "回す"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "ラベルの向き",
     "sound": "クリック音",
     "show_status": "ステータス行を表示",
+    "actions": "アクション",
+    "disable_confirm_actions": "確認ダイアログを無効にする",
     "language_helper": "このカードに対して、自動検出された表示言語を上書きします。自動は HA プロフィール (ブラウザ言語をフォールバック) に従います。",
     "todo_entity_helper": "任意。設定すると、ホイールのセグメントはこの ToDo リストの未完了項目で埋められます (最大 24 個)。リストを選択している間、セグメント数とラベルは無視されます。",
     "segments_helper": "ホイールを分割するセグメントの数。4 から 24 まで。",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "セグメントラベルの向き。タンジェント (デフォルト) は文字をリムに沿わせます。ラジアルは時計回りに 90° 回転させ、リムから中心へスポークに沿って読めるようにします。",
     "sound_helper": "セグメントを横切るたびにペグクリック音を鳴らします。音量はホイールの速度に応じて変化します。",
     "show_status_helper": "ホイールの下にテキスト行を表示します(「回転中…」/「結果: X」/ クリック案内)。よりミニマルにするにはオフにしてください。",
+    "actions_helper": "カンマまたは改行で区切られたスクリプトのエンティティ ID(例:script.morning, script.evening)。各セグメントが勝ったときに実行されます。同じラベル=同じアクションのルールが適用され、同じラベルを共有するセグメントは常に同じアクションを実行します。完全な Lovelace アクション(call-service / navigate / url / more-info)が必要な場合は YAML を編集してください。",
+    "disable_confirm_actions_helper": "オフ(既定)— カードは勝ったセグメントのアクションを実行する前に確認を求めます。オン — アクションは確認なしで実行されます。何気なく回しただけで本当の自動化が走る可能性があるため、注意して使用してください。",
     "friction_low": "弱 — 長くゆったり回る",
     "friction_medium": "中 — クラシック",
     "friction_high": "強 — すぐに止まる",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color は theme、black、white のいずれかである必要があります",
     "show_status_type": "show_status はブール値である必要があります",
     "todo_entity_type": "todo_entity は文字列である必要があります",
-    "todo_entity_invalid": "todo_entity は todo.* の entity_id である必要があります"
+    "todo_entity_invalid": "todo_entity は todo.* の entity_id である必要があります",
+    "actions_type": "actions は script.* エンティティ ID・アクションオブジェクト・null 要素からなる配列でなければなりません",
+    "actions_length": "actions の長さ ({len}) は segments ({segments}) を超えてはいけません",
+    "actions_string": "actions の文字列要素は script.* のエンティティ ID である必要があります(受信値:{value})",
+    "disable_confirm_actions_type": "disable_confirm_actions は真偽値でなければなりません"
   }
 }

@@ -8,6 +8,9 @@
     "idle": "Clique para girar · arraste para lançar",
     "todo_empty": "Nenhum item aberto na lista de tarefas"
   },
+  "confirm": {
+    "run_action": "Executar a ação para \"{value}\"?"
+  },
   "hub": {
     "default_text": "GIRAR"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "Orientação dos rótulos",
     "sound": "Som do clique",
     "show_status": "Mostrar linha de estado",
+    "actions": "Ações",
+    "disable_confirm_actions": "Desativar diálogo de confirmação",
     "language_helper": "Substitui o idioma de exibição detetado automaticamente para este cartão. Automático segue o seu perfil HA (com o idioma do navegador como recurso).",
     "todo_entity_helper": "Opcional. Quando definido, os segmentos da roda são preenchidos com os itens abertos desta lista (máx 24). Segmentos e rótulos são ignorados enquanto uma lista estiver selecionada.",
     "segments_helper": "Em quantas fatias a roda é dividida. De 4 a 24.",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "Como os rótulos dos segmentos são orientados. Tangente (padrão) envolve o texto pela borda; Radial roda os rótulos 90° no sentido horário para serem lidos ao longo do raio, da borda ao centro.",
     "sound_helper": "Reproduz um clique de pino a cada cruzamento de segmento. O volume varia com a velocidade da roda.",
     "show_status_helper": "Mostra a linha de texto sob a roda (\"A girar…\" / \"Resultado: X\" / a sugestão de inatividade). Desligue para um aspeto mais minimalista.",
+    "actions_helper": "IDs de entidade de script separados por vírgulas ou novas linhas (ex.: script.manha, script.noite). Cada um é acionado quando o respetivo segmento vence. Aplica-se a regra mesmo-rótulo-mesma-ação — segmentos com o mesmo rótulo acionam sempre a mesma ação. Para ações Lovelace completas (call-service, navigate, url, more-info), edite em YAML.",
+    "disable_confirm_actions_helper": "Desligado (padrão) — o cartão pergunta antes de executar a ação do segmento vencedor. Ligado — as ações são executadas sem pergunta. Use com cuidado: um giro casual pode disparar automações reais.",
     "friction_low": "Baixo — giros longos e tranquilos",
     "friction_medium": "Médio — clássico",
     "friction_high": "Alto — para rapidamente",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color deve ser um de: theme, black, white",
     "show_status_type": "show_status deve ser um booleano",
     "todo_entity_type": "todo_entity deve ser uma string",
-    "todo_entity_invalid": "todo_entity deve ser um entity_id todo.*"
+    "todo_entity_invalid": "todo_entity deve ser um entity_id todo.*",
+    "actions_type": "actions deve ser um array de IDs de entidade script.*, objetos de ação ou entradas nulas",
+    "actions_length": "o comprimento de actions ({len}) não pode exceder segments ({segments})",
+    "actions_string": "entradas string em actions devem ser um entity_id script.* (recebido: {value})",
+    "disable_confirm_actions_type": "disable_confirm_actions deve ser um booleano"
   }
 }

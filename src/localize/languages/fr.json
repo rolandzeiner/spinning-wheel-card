@@ -8,6 +8,9 @@
     "idle": "Cliquez pour tourner · glissez pour lancer",
     "todo_empty": "Aucun élément ouvert dans la liste de tâches"
   },
+  "confirm": {
+    "run_action": "Exécuter l'action pour « {value} » ?"
+  },
   "hub": {
     "default_text": "TOURNER"
   },
@@ -32,6 +35,8 @@
     "text_orientation": "Orientation des étiquettes",
     "sound": "Son du clic",
     "show_status": "Afficher la ligne d'état",
+    "actions": "Actions",
+    "disable_confirm_actions": "Désactiver la demande de confirmation",
     "language_helper": "Remplace la langue d'affichage détectée automatiquement pour cette carte. Automatique suit votre profil HA (avec la langue du navigateur en repli).",
     "todo_entity_helper": "Optionnel. Lorsque défini, les segments de la roue sont remplis avec les éléments ouverts de cette liste de tâches (max 24). Segments et étiquettes sont ignorés tant qu'une liste est sélectionnée.",
     "segments_helper": "Nombre de tranches en lesquelles la roue est divisée. De 4 à 24.",
@@ -53,6 +58,8 @@
     "text_orientation_helper": "Orientation des étiquettes des segments. Tangentielle (par défaut) enroule le texte autour du bord ; Radiale fait pivoter les étiquettes de 90° dans le sens horaire pour les lire le long du rayon, du bord vers le centre.",
     "sound_helper": "Émettre un clic de cheville à chaque passage de segment. Le volume varie avec la vitesse de la roue.",
     "show_status_helper": "Afficher la ligne de texte sous la roue (« Tourne… » / « Résultat : X » / l'invite d'inactivité). Désactivez pour un rendu plus minimaliste.",
+    "actions_helper": "IDs d'entités script séparés par des virgules ou des sauts de ligne (par ex. : script.matin, script.soir). Chacun s'exécute lorsque son segment gagne. Règle même-libellé-même-action : les segments partageant un libellé déclenchent toujours la même action. Pour les actions Lovelace complètes (call-service, navigate, url, more-info), éditez en YAML.",
+    "disable_confirm_actions_helper": "Désactivé (par défaut) — la carte demande avant d'exécuter l'action du segment gagnant. Activé — les actions s'exécutent sans demande. À utiliser avec prudence : un tour casuel peut déclencher de véritables automatisations.",
     "friction_low": "Faible — rotations longues et tranquilles",
     "friction_medium": "Moyen — classique",
     "friction_high": "Élevé — s'arrête rapidement",
@@ -84,6 +91,10 @@
     "hub_color_value": "hub_color doit valoir theme, black ou white",
     "show_status_type": "show_status doit être un booléen",
     "todo_entity_type": "todo_entity doit être une chaîne",
-    "todo_entity_invalid": "todo_entity doit être un entity_id todo.*"
+    "todo_entity_invalid": "todo_entity doit être un entity_id todo.*",
+    "actions_type": "actions doit être un tableau d'IDs d'entités script.*, d'objets d'action ou d'entrées null",
+    "actions_length": "la longueur de actions ({len}) ne doit pas dépasser segments ({segments})",
+    "actions_string": "les entrées chaîne de actions doivent être un entity_id script.* (reçu : {value})",
+    "disable_confirm_actions_type": "disable_confirm_actions doit être un booléen"
   }
 }

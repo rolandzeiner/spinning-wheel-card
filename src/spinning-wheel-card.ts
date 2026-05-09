@@ -5,6 +5,8 @@ import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type {
+  ActionConfig,
+  ConfirmationConfig,
   Friction,
   HomeAssistant,
   HubColor,
@@ -336,6 +338,46 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.todo_entity_invalid", lang));
       }
     }
+    if (config.actions !== undefined) {
+      if (!Array.isArray(config.actions)) {
+        throw new Error(localize("errors.actions_type", lang));
+      }
+      if (config.actions.length > segments) {
+        throw new Error(
+          localize("errors.actions_length", lang, {
+            len: config.actions.length,
+            segments,
+          }),
+        );
+      }
+      for (const a of config.actions) {
+        if (a === null) continue;
+        if (typeof a === "string") {
+          // Empty strings are tolerated (the editor's CSV parser drops
+          // them already; YAML users can write null instead) — anything
+          // non-empty must look like a `script.<name>` entity_id.
+          if (a !== "" && !/^script\.[a-z0-9_]+$/.test(a)) {
+            throw new Error(
+              localize("errors.actions_string", lang, { value: a }),
+            );
+          }
+          continue;
+        }
+        if (
+          typeof a === "object" &&
+          typeof (a as { action?: unknown }).action === "string"
+        ) {
+          continue;
+        }
+        throw new Error(localize("errors.actions_type", lang));
+      }
+    }
+    if (
+      config.disable_confirm_actions !== undefined &&
+      typeof config.disable_confirm_actions !== "boolean"
+    ) {
+      throw new Error(localize("errors.disable_confirm_actions_type", lang));
+    }
     // Detect a swap (or unset) of the todo_entity so we re-fetch — and
     // drop stale items from the old entity — instead of rendering them
     // briefly until the next state change.
@@ -519,6 +561,174 @@ export class SpinningWheelCard extends LitElement {
       out[i] = c;
     }
     return out;
+  }
+
+  /** Per-segment ActionConfig (or null = no action), aligned to the
+   *  expanded labels array. Same-label-same-action mapping mirrors the
+   *  `colors` rule: walks labels in order, each new unique label takes
+   *  the next entry from `actions`, and segments sharing a label always
+   *  fire the same action. The result of a spin is the *label*, not the
+   *  index, so this matches the user's mental model. */
+  private _segmentActions(): ReadonlyArray<ActionConfig | null> {
+    const labels = this._expandedLabels();
+    const src = this.config.actions;
+    if (!src || src.length === 0) {
+      return new Array<ActionConfig | null>(labels.length).fill(null);
+    }
+    const map = new Map<string, ActionConfig | null>();
+    let assigned = 0;
+    const out: (ActionConfig | null)[] = new Array(labels.length);
+    for (let i = 0; i < labels.length; i++) {
+      const lbl = labels[i] ?? "";
+      if (!map.has(lbl)) {
+        const raw = src[assigned % src.length];
+        map.set(lbl, this._normalizeAction(raw));
+        assigned += 1;
+      }
+      out[i] = map.get(lbl) ?? null;
+    }
+    return out;
+  }
+
+  /** Coerce raw config entries to the dispatcher's ActionConfig shape.
+   *  String shorthand: `script.<name>` → `perform-action` of that script
+   *  service. Any other string (or empty / null) → null (no-op). Object
+   *  entries pass through verbatim — setConfig has already validated
+   *  they carry an `action` field. */
+  private _normalizeAction(
+    raw: string | ActionConfig | null | undefined,
+  ): ActionConfig | null {
+    if (raw == null) return null;
+    if (typeof raw === "string") {
+      if (!/^script\.[a-z0-9_]+$/.test(raw)) return null;
+      return { action: "perform-action", perform_action: raw };
+    }
+    return raw;
+  }
+
+  /** Resolve whether an action should run after confirmation. Card-level
+   *  `disable_confirm_actions: true` skips the prompt entirely. Per-action
+   *  `confirmation: false` opts a single action out (overrides the
+   *  card-level default-on). Any other shape (`true` / `{text}` / unset)
+   *  falls through to a `window.confirm` prompt — dep-free, OS-native,
+   *  blocking. */
+  private async _confirmAction(cfg: ActionConfig): Promise<boolean> {
+    if (this.config.disable_confirm_actions === true) return true;
+    const cfgConfirm: ConfirmationConfig | undefined =
+      "confirmation" in cfg
+        ? (cfg.confirmation as ConfirmationConfig | undefined)
+        : undefined;
+    if (cfgConfirm === false) return true;
+    const text =
+      typeof cfgConfirm === "object" && cfgConfirm?.text
+        ? cfgConfirm.text
+        : localize("confirm.run_action", this._lang(), {
+            value: this._result ?? "",
+          });
+    return typeof window !== "undefined" && typeof window.confirm === "function"
+      ? window.confirm(text)
+      : true;
+  }
+
+  /** Hand-rolled Lovelace ActionConfig dispatcher. Covers the standard
+   *  HA action types without pulling in `custom-card-helpers`. Service
+   *  calls accept either the legacy `call-service` / `service` pair or
+   *  the modern `perform-action` / `perform_action` pair (renamed in
+   *  HA 2024.8 — runtime still accepts both). */
+  private async _dispatchAction(cfg: ActionConfig): Promise<void> {
+    if (!this.hass) return;
+    if (cfg.action === "none") return;
+    if (!(await this._confirmAction(cfg))) return;
+    switch (cfg.action) {
+      case "perform-action":
+      case "call-service": {
+        const svc =
+          cfg.action === "perform-action" ? cfg.perform_action : cfg.service;
+        if (typeof svc !== "string") return;
+        const dot = svc.indexOf(".");
+        if (dot <= 0 || dot === svc.length - 1) return;
+        const domain = svc.slice(0, dot);
+        const name = svc.slice(dot + 1);
+        const data =
+          cfg.action === "call-service"
+            ? (cfg.data ?? cfg.service_data ?? {})
+            : (cfg.data ?? {});
+        const target = "target" in cfg ? cfg.target : undefined;
+        await this.hass.callService?.(domain, name, data, target);
+        return;
+      }
+      case "navigate": {
+        if (typeof cfg.navigation_path !== "string") return;
+        if (cfg.navigation_replace) {
+          window.history.replaceState(null, "", cfg.navigation_path);
+        } else {
+          window.history.pushState(null, "", cfg.navigation_path);
+        }
+        // HA's frontend listens for this on `window` to re-render the
+        // active dashboard route — same event hui-* cards dispatch.
+        window.dispatchEvent(
+          new CustomEvent("location-changed", {
+            detail: { replace: cfg.navigation_replace ?? false },
+          }),
+        );
+        return;
+      }
+      case "url": {
+        if (typeof cfg.url_path !== "string") return;
+        window.open(cfg.url_path, "_blank", "noopener,noreferrer");
+        return;
+      }
+      case "more-info": {
+        if (!cfg.entity) return;
+        this.dispatchEvent(
+          new CustomEvent("hass-more-info", {
+            detail: { entityId: cfg.entity },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        return;
+      }
+      case "toggle": {
+        if (!cfg.entity) return;
+        await this.hass.callService?.(
+          "homeassistant",
+          "toggle",
+          {},
+          { entity_id: cfg.entity },
+        );
+        return;
+      }
+      case "assist": {
+        // Mirrors how HA's own action handler surfaces Assist —
+        // a CustomEvent the dashboard listens for.
+        this.dispatchEvent(
+          new CustomEvent("hass-assist-show", {
+            detail: {
+              pipeline_id: cfg.pipeline_id,
+              start_listening: cfg.start_listening ?? false,
+            },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        return;
+      }
+      case "fire-dom-event": {
+        const detail: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(cfg)) {
+          if (k !== "action") detail[k] = v;
+        }
+        this.dispatchEvent(
+          new CustomEvent("ll-custom", {
+            detail,
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        return;
+      }
+    }
   }
 
   /** Per-segment arc widths in radians, summing to 2π. Honours `weights`
@@ -926,6 +1136,13 @@ export class SpinningWheelCard extends LitElement {
     const labels = this._expandedLabels();
     const idx = this._segmentIndexUnderPointer();
     this._result = labels[idx] ?? null;
+    // Fire the winning segment's configured action, if any. Same-label-
+    // same-action mapping has already happened in _segmentActions; this
+    // is purely an indexed lookup. Confirmation (window.confirm) blocks
+    // the await, so a held click during the prompt can't double-fire.
+    const actions = this._segmentActions();
+    const action = actions[idx];
+    if (action) void this._dispatchAction(action);
   }
 
   // ── Audio (peg clicks) ──────────────────────────────────────────────
