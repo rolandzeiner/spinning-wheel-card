@@ -5,10 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 
-<p align="center">
-  <img src="assets/preview.svg" alt="Spinning wheel preview" width="320" />
-</p>
-
 A Lovelace custom card with a click-to-spin / drag-to-flick wheel for Home Assistant. The physics simulate angular momentum: while you drag, the wheel follows the cursor; on release, the recent pointer-move samples are averaged into an angular velocity, and the wheel keeps spinning, decaying via configurable friction until it stops. Pure frontend — no integration, no entities, no backend dependency. Drop the card in any dashboard.
 
 ## Features
