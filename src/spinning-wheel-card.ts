@@ -2,7 +2,7 @@
 
 import { LitElement, html, css, nothing } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import type {
   ActionConfig,
@@ -84,7 +84,6 @@ interface VelocitySample {
   angleDelta: number;
 }
 
-@customElement("spinning-wheel-card")
 export class SpinningWheelCard extends LitElement {
   public static getConfigElement(): LovelaceCardEditor {
     return document.createElement(
@@ -2048,4 +2047,22 @@ export class SpinningWheelCard extends LitElement {
       }
     }
   `;
+}
+
+// Idempotent custom-element registration. `@customElement(...)` (the Lit
+// decorator path) calls `customElements.define` unconditionally, which
+// throws on the SECOND module load — and that's exactly what happens
+// when a Lovelace user has the same bundle registered as TWO resources
+// (e.g. both `/hacsfiles/<repo>/<file>.js` AND `/local/community/<repo>/<file>.js`,
+// which is easy to do by accident when iterating with dev-push). The
+// throw aborts module init AFTER the editor's first registration but
+// BEFORE the card's, leaving HA with a registered editor but no card →
+// "Unknown type encountered" on the dashboard, even though the bundle
+// is loaded. Guarding the define makes the second load a no-op so the
+// card stays alive instead. Documented gotcha — see ha-lovelace-card
+// SKILL.md § "Editor-event plumbing" / "Editor registers itself via
+// `customElements.define` at module load. Guard with
+// `if (!customElements.get(tag))` so re-imports don't throw."
+if (!customElements.get("spinning-wheel-card")) {
+  customElements.define("spinning-wheel-card", SpinningWheelCard);
 }

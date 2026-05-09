@@ -1,6 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import type { TemplateResult, CSSResultGroup, PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import type {
   ActionConfig,
@@ -176,7 +176,6 @@ const clearRecentHelper = (): void => {
   }
 };
 
-@customElement("spinning-wheel-card-editor")
 export class SpinningWheelCardEditor
   extends LitElement
   implements LovelaceCardEditor
@@ -1196,4 +1195,16 @@ export class SpinningWheelCardEditor
   }
 
   static override styles: CSSResultGroup = editorStyles;
+}
+
+// Idempotent registration — see the matching note at the bottom of
+// spinning-wheel-card.ts. Without the guard, a second bundle load
+// (duplicate Lovelace resource) throws here and aborts module init
+// before the card class registers, breaking the dashboard with an
+// "Unknown type encountered" error.
+if (!customElements.get("spinning-wheel-card-editor")) {
+  customElements.define(
+    "spinning-wheel-card-editor",
+    SpinningWheelCardEditor,
+  );
 }
