@@ -606,6 +606,33 @@ export class SpinningWheelCard extends LitElement {
     return raw;
   }
 
+  /** Short, user-readable name for the action's destination — surfaced in
+   *  the confirmation prompt alongside the segment label so the user can
+   *  see *what* will run when the label itself is opaque (e.g. an MDI
+   *  icon name like `mdi:hamburger`). */
+  private _actionDisplayName(cfg: ActionConfig): string {
+    switch (cfg.action) {
+      case "perform-action":
+        return cfg.perform_action;
+      case "call-service":
+        return cfg.service;
+      case "navigate":
+        return `navigate: ${cfg.navigation_path}`;
+      case "url":
+        return cfg.url_path;
+      case "more-info":
+        return `more-info: ${cfg.entity ?? "?"}`;
+      case "toggle":
+        return `toggle: ${cfg.entity ?? "?"}`;
+      case "assist":
+        return "assist";
+      case "fire-dom-event":
+        return "fire-dom-event";
+      default:
+        return (cfg as { action: string }).action;
+    }
+  }
+
   /** Resolve whether an action should run after confirmation. Card-level
    *  `disable_confirm_actions: true` skips the prompt entirely. Per-action
    *  `confirmation: false` opts a single action out (overrides the
@@ -623,6 +650,7 @@ export class SpinningWheelCard extends LitElement {
       typeof cfgConfirm === "object" && cfgConfirm?.text
         ? cfgConfirm.text
         : localize("confirm.run_action", this._lang(), {
+            action: this._actionDisplayName(cfg),
             value: this._result ?? "",
           });
     return typeof window !== "undefined" && typeof window.confirm === "function"

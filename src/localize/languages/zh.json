@@ -9,7 +9,7 @@
     "todo_empty": "待办事项列表中没有未完成的项目"
   },
   "confirm": {
-    "run_action": "为「{value}」运行动作?"
+    "run_action": "为「{value}」运行「{action}」?"
   },
   "hub": {
     "default_text": "旋转"

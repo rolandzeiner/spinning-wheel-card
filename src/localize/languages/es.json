@@ -9,7 +9,7 @@
     "todo_empty": "No hay elementos pendientes en la lista de tareas"
   },
   "confirm": {
-    "run_action": "¿Ejecutar la acción para \"{value}\"?"
+    "run_action": "¿Ejecutar \"{action}\" para \"{value}\"?"
   },
   "hub": {
     "default_text": "GIRAR"

@@ -9,7 +9,7 @@
     "todo_empty": "Nenhum item aberto na lista de tarefas"
   },
   "confirm": {
-    "run_action": "Executar a ação para \"{value}\"?"
+    "run_action": "Executar \"{action}\" para \"{value}\"?"
   },
   "hub": {
     "default_text": "GIRAR"

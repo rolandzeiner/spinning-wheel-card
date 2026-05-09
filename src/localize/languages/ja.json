@@ -9,7 +9,7 @@
     "todo_empty": "ToDo リストに未完了の項目はありません"
   },
   "confirm": {
-    "run_action": "「{value}」のアクションを実行しますか?"
+    "run_action": "「{value}」に対して「{action}」を実行しますか?"
   },
   "hub": {
     "default_text": "回す"

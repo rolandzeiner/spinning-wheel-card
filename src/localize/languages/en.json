@@ -9,7 +9,7 @@
     "todo_empty": "No open items in the todo list"
   },
   "confirm": {
-    "run_action": "Run action for \"{value}\"?"
+    "run_action": "Run \"{action}\" for \"{value}\"?"
   },
   "hub": {
     "default_text": "SPIN"

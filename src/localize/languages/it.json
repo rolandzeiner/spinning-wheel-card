@@ -9,7 +9,7 @@
     "todo_empty": "Nessun elemento aperto nella lista cose da fare"
   },
   "confirm": {
-    "run_action": "Eseguire l'azione per \"{value}\"?"
+    "run_action": "Eseguire \"{action}\" per \"{value}\"?"
   },
   "hub": {
     "default_text": "GIRA"

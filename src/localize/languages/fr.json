@@ -9,7 +9,7 @@
     "todo_empty": "Aucun élément ouvert dans la liste de tâches"
   },
   "confirm": {
-    "run_action": "Exécuter l'action pour « {value} » ?"
+    "run_action": "Exécuter « {action} » pour « {value} » ?"
   },
   "hub": {
     "default_text": "TOURNER"

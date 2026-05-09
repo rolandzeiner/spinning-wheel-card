@@ -9,7 +9,7 @@
     "todo_empty": "Keine offenen Einträge in der Todo-Liste"
   },
   "confirm": {
-    "run_action": "Aktion für „{value}\" ausführen?"
+    "run_action": "„{action}\" für „{value}\" ausführen?"
   },
   "hub": {
     "default_text": "DREH"
