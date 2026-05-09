@@ -27,6 +27,17 @@ A Lovelace custom card with a click-to-spin / drag-to-flick wheel for Home Assis
 - **Honours `prefers-reduced-motion`** — the multi-second decay is skipped at the physics layer for users who have asked the OS to reduce motion. The wheel still spins (the spin *is* the feature) but only an instant snap to the result; no per-frame animation, no audio.
 - **No runtime dependencies beyond `lit`**. Rollup + terser produce a single `dist/spinning-wheel-card.js` ≈ 87 KB minified, ≈ 29 KB gzipped — the bulk is the eight-language translation set.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/card-config.webp" height="420" alt="Card config dialog showing every option in the visual editor" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Visual card editor — every option in one form</em></td>
+  </tr>
+</table>
+
 ## Installation
 
 ### HACS (recommended)
