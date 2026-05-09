@@ -86,6 +86,116 @@ export const editorStyles = css`
     justify-content: space-between;
   }
 
+  /* Custom labels widget — text + icon-picker chip composer. Lives
+     outside ha-form so a single chip list can mix free-typed labels
+     with MDI icons and preview the icons inline. */
+  .labels-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ha-space-2, 8px);
+    background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
+    border-radius: var(--ha-border-radius-lg, 12px);
+    padding: var(--ha-space-3, 14px) var(--ha-space-4, 16px);
+  }
+  .labels-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--ha-space-2, 8px);
+  }
+  .labels-section-label {
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: 500;
+    color: var(--primary-text-color);
+  }
+  .labels-section-count {
+    font-size: var(--ha-font-size-s, 12px);
+    color: var(--secondary-text-color);
+    font-variant-numeric: tabular-nums;
+  }
+  .labels-helper {
+    font-size: var(--ha-font-size-s, 12px);
+    color: var(--secondary-text-color);
+    line-height: 1.4;
+  }
+  .labels-empty {
+    font-size: var(--ha-font-size-s, 12px);
+    color: var(--secondary-text-color);
+    font-style: italic;
+    padding: var(--ha-space-2, 8px) 0;
+  }
+  .labels-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .label-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 4px 4px 10px;
+    min-height: 32px;
+    background: color-mix(in srgb, var(--primary-color) 16%, transparent);
+    color: var(--primary-text-color);
+    border-radius: 16px;
+    font-size: 0.8125rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .label-chip-icon {
+    background: color-mix(in srgb, var(--primary-color) 22%, transparent);
+  }
+  .label-chip ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--primary-color);
+  }
+  .label-chip-tag {
+    font-size: 0.75rem;
+    color: var(--secondary-text-color);
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  }
+  .label-chip-text {
+    white-space: nowrap;
+  }
+  .label-chip-remove {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .label-chip-remove:hover {
+    background: rgba(0, 0, 0, 0.18);
+  }
+  .label-chip-remove:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  .labels-add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ha-space-2, 8px);
+    align-items: stretch;
+  }
+  .labels-add-text {
+    flex: 1 1 200px;
+    min-width: 160px;
+  }
+  .labels-add-icon {
+    flex: 1 1 220px;
+    min-width: 200px;
+  }
+
   a:focus-visible,
   button:focus-visible {
     outline: 2px solid var(--primary-color);
