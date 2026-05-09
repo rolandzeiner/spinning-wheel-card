@@ -364,7 +364,21 @@ export class SpinningWheelCard extends LitElement {
     return this.config.sound ?? true;
   }
   private _textOrientation(): TextOrientation {
-    return this.config.text_orientation ?? "tangent";
+    if (this.config.text_orientation !== undefined) {
+      return this.config.text_orientation;
+    }
+    // Long todo summaries read much better along the spoke than wrapped
+    // around the rim. Default radial when filled from a todo list — user
+    // can still override by explicitly setting text_orientation.
+    if (this._isTodoMode()) return "radial";
+    return "tangent";
+  }
+
+  /** True when a todo_entity is wired AND the wheel is currently
+   *  rendering its open items (≥1). Used by both _textOrientation
+   *  (default-radial override) and _draw (auto-fit font sizing). */
+  private _isTodoMode(): boolean {
+    return this._todoLabels() !== null;
   }
 
   public getCardSize(): number {
@@ -1288,6 +1302,7 @@ export class SpinningWheelCard extends LitElement {
     const labelColors = this._segmentLabelColors();
     const orientation = this._textOrientation();
     const theme = this._resolveTheme(ctx);
+    const isTodoMode = this._isTodoMode();
 
     // Wheel body (rotated to current angle). Segment 0 is centred on the
     // 12-o'clock pointer when _angle = 0: we rotate the canvas by -π/2
@@ -1321,7 +1336,15 @@ export class SpinningWheelCard extends LitElement {
         const text = labels[i] ?? "";
         const fillColor = labelColors[i] ?? "#1a1a1a";
         const midAngle = start + arc / 2;
-        const labelRadius = radius * 0.66;
+        // Todo+radial: shift inward to widen the radial text budget. The
+        // rim-side margin (radius - labelRadius) is otherwise the binding
+        // constraint at the default 0.66 — at 0.55 the budget is ~35 %
+        // larger, which fits noticeably more text before any shrinking
+        // is needed. Tangent + non-todo modes keep the original 0.66.
+        const labelRadius =
+          isTodoMode && orientation === "radial"
+            ? radius * 0.55
+            : radius * 0.66;
 
         // If the label looks like an HA icon name (e.g. `mdi:home`,
         // `hass:account`), render the icon path instead of literal text.
@@ -1373,13 +1396,62 @@ export class SpinningWheelCard extends LitElement {
 
         ctx.save();
         ctx.fillStyle = fillColor;
-        ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        // Width budget: smaller segments → fewer chars before truncation.
-        const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
-        const display =
-          text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
+
+        let display: string;
+        if (isTodoMode) {
+          // Todo summaries are arbitrary user text — measure and shrink
+          // before truncating. Width budget per orientation:
+          //   radial  → 2 × the smaller of (labelRadius - hubRadius) and
+          //             (radius - labelRadius), with a 10 % margin.
+          //   tangent → arc-length at labelRadius, with a 15 % margin.
+          // Floor at MIN_TODO_FONT_PX so the text stays legible; if it
+          // still overruns at that size, ellipsis-truncate to fit.
+          const minPx = 7;
+          const widthBudget =
+            orientation === "radial"
+              ? 2 *
+                Math.min(labelRadius - hubRadius, radius - labelRadius) *
+                0.9
+              : arc * labelRadius * 0.85;
+          let px = labelFontPx;
+          let fits = false;
+          while (px >= minPx) {
+            ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+            if (ctx.measureText(text).width <= widthBudget) {
+              fits = true;
+              break;
+            }
+            px -= 1;
+          }
+          if (fits) {
+            display = text;
+          } else {
+            // Even at min size — chop characters off the tail until the
+            // string + ellipsis fits the budget. Bail at 1 char so we
+            // never output just "…".
+            ctx.font = `600 ${minPx}px ui-sans-serif, system-ui, sans-serif`;
+            let truncated = text;
+            while (
+              truncated.length > 1 &&
+              ctx.measureText(truncated + "…").width > widthBudget
+            ) {
+              truncated = truncated.slice(0, -1);
+            }
+            display = truncated + "…";
+            px = minPx;
+          }
+          ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+        } else {
+          // Existing static-labels behaviour: fixed font + char-count
+          // truncation. Cheaper and matches user expectations from v1.0.
+          ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
+          const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
+          display =
+            text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
+        }
+
         if (orientation === "radial") {
           // Radial — straight text reading along the spoke.
           ctx.rotate(midAngle);
