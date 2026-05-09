@@ -165,6 +165,10 @@ export type HaFormSchema =
 
 export type Friction = "low" | "medium" | "high";
 
+/** Built-in colour-theme presets. Used as the fallback palette when the
+ *  user hasn't supplied a `colors` array. Custom `colors` always wins. */
+export type Theme = "default" | "pastel" | "pride" | "neon";
+
 export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   type: string;
   name?: string;
@@ -180,10 +184,15 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  rule as labels: [3, 1] on 4 segments → big, small, big, small.
    *  Values are normalised — only their ratio matters. Default: all equal. */
   weights?: ReadonlyArray<number>;
+  /** Built-in colour-theme preset. Picks the fallback palette used when
+   *  `colors` is not supplied. `colors` (when set) always wins over
+   *  `theme`. Default: "default" (built-in 8-colour rainbow). */
+  theme?: Theme;
   /** Optional palette. Any CSS colour string (hex / rgb / hsl / named).
    *  Colours are mapped to UNIQUE LABELS in order of first appearance, so
    *  segments with the same label always share a colour. Length 1..segments.
-   *  Default: built-in 8-colour rainbow. */
+   *  When set, overrides `theme`. Default: the active `theme`'s palette,
+   *  or the built-in 8-colour rainbow when `theme` is "default" / unset. */
   colors?: ReadonlyArray<string>;
   /** Optional per-segment label text colour. Same cycling rule as
    *  `colors` — mapped to UNIQUE LABELS in order of first appearance, so

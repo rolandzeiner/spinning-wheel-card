@@ -18,6 +18,7 @@
     "name": "Kartentitel",
     "segments": "Segmente",
     "friction": "Reibung",
+    "theme": "Farbthema",
     "labels": "Beschriftungen",
     "weights": "Gewichtungen",
     "colors": "Farben",
@@ -27,6 +28,11 @@
     "sound": "Klickgeräusch",
     "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
     "friction_helper": "Wie schnell das Rad nach einer Drehung abbremst.",
+    "theme_helper": "Eingebaute Farbpalette, die verwendet wird, wenn Farben leer ist. Benutzerdefinierte Farben überschreiben dies immer.",
+    "theme_default": "Standard — eingebaute 8-Farben-Palette",
+    "theme_pastel": "Pastell — weich, niedrig gesättigt",
+    "theme_pride": "Pride — 6-Streifen-Regenbogenflagge",
+    "theme_neon": "Neon — leuchtend, lebhafte Farben",
     "labels_helper": "Komma- oder zeilengetrennt. Maximal eine pro Segment; bei weniger Beschriftungen werden sie rund um das Rad wiederholt (z. B. „A, B“ bei 8 Segmenten → A B A B A B A B). Leer lassen für 1..N.",
     "weights_helper": "Kommagetrennte relative Größen (nur das Verhältnis zählt). Gleiche Wiederholungsregel wie Beschriftungen — „3, 1“ bei 4 Segmenten ergibt groß, klein, groß, klein. Leer lassen für gleichgroße Stücke.",
     "colors_helper": "Komma- oder zeilengetrennte CSS-Farben (Hex, rgb, hsl, benannt). Werden in Reihenfolge des ersten Auftretens auf einzigartige Beschriftungen abgebildet — Segmente mit gleicher Beschriftung haben immer dieselbe Farbe. Länge bis zu `segments`; tatsächlich verwendet werden nur die ersten N (= Anzahl einzigartiger Beschriftungen). Leer lassen für die Standardpalette.",
@@ -59,6 +65,7 @@
     "label_colors_length": "label_colors-Länge ({len}) darf segments ({segments}) nicht überschreiten",
     "hub_text_type": "hub_text muss eine Zeichenkette sein",
     "sound_type": "sound muss ein Boolean sein",
-    "text_orientation_value": "text_orientation muss \"tangent\" oder \"radial\" sein"
+    "text_orientation_value": "text_orientation muss \"tangent\" oder \"radial\" sein",
+    "theme_value": "theme muss default, pastel, pride oder neon sein"
   }
 }

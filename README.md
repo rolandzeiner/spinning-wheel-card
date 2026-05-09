@@ -64,9 +64,10 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `name` | string | localised "Spinning Wheel" | Card header text. |
 | `segments` | integer 4–24 | `8` | How many slices the wheel is divided into. |
 | `friction` | `low` / `medium` / `high` | `medium` | Deceleration preset — see [Friction presets](#friction-presets). |
+| `theme` | `default` / `pastel` / `pride` / `neon` | `default` | Built-in colour palette used when `colors` is empty. **Always overridden by an explicit `colors` array** — see [Theme presets](#theme-presets). |
 | `labels` | string[] (1..segments) | `1` … `N` | Per-segment labels. **Shorter arrays cycle** around the wheel — `[Yes, No]` on 8 segments → `Yes No Yes No Yes No Yes No`. |
 | `weights` | number[] (1..segments) | all equal | Relative segment widths (only the ratio matters). Same cycling rule as `labels` — `[3, 1]` on 4 segments → big, small, big, small. |
-| `colors` | string[] (1..segments) | built-in 8-colour palette | CSS colours (hex, `rgb()`, `hsl()`, `var(--…)`, named). Mapped to **unique labels in order of first appearance** — segments sharing a label always share a colour. |
+| `colors` | string[] (1..segments) | active `theme` palette | CSS colours (hex, `rgb()`, `hsl()`, `var(--…)`, named). Mapped to **unique labels in order of first appearance** — segments sharing a label always share a colour. Overrides `theme`. |
 | `label_colors` | string[] (1..segments) | dark grey | CSS colours for the segment label text. Same unique-label mapping as `colors`. |
 | `text_orientation` | `tangent` / `radial` | `tangent` | Tangent wraps each label around the rim, glyph-by-glyph along the segment arc. Radial rotates 90° CW so text reads along the spoke from rim to centre. |
 | `hub_text` | string | localised "SPIN" / "DREH" | Centre-hub label. Auto-shrinks for long strings. Empty string hides it. |
@@ -81,6 +82,17 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `high`   | 0.98                 | ~2 s                |
 
 Decay is frame-rate independent — `ω *= friction^(60·dt)` — so the wall-clock stop time is the same at 30 / 60 / 120 fps.
+
+### Theme presets
+
+| Preset    | Palette |
+| --------- | --- |
+| `default` | 8-colour rainbow (red, orange, yellow, mint, slate-blue, navy, purple, teal). |
+| `pastel`  | 8 soft, low-saturation tones — pink, peach, butter, mint, sky, periwinkle, lavender, rose. |
+| `pride`   | 6-stripe Pride flag (red, orange, yellow, green, indigo, violet). Cycles for `segments > 6`. |
+| `neon`    | 8 vivid, fully-saturated tones — hot pink, orange, yellow, green, cyan, electric blue, purple, magenta. Pair with `label_colors: ["#ffffff"]` for the best contrast. |
+
+A custom `colors` array (or single CSS colour) always wins over the active `theme`. Same-label-same-colour mapping applies regardless of where the palette comes from — segments labelled `Yes` are always one shade, `No` another, no matter how many of each there are.
 
 ## Examples
 
@@ -131,6 +143,24 @@ hub_text: ""               # hide the centre label
 ```yaml
 type: custom:spinning-wheel-card
 sound: false
+```
+
+**Pride wheel** — six rainbow stripes (cycles when segments > 6):
+
+```yaml
+type: custom:spinning-wheel-card
+theme: pride
+segments: 6
+hub_text: PRIDE
+```
+
+**Neon party wheel** — vivid colours with white labels for max contrast:
+
+```yaml
+type: custom:spinning-wheel-card
+theme: neon
+label_colors: ["#ffffff"]
+hub_text: GO!
 ```
 
 ## Controls
