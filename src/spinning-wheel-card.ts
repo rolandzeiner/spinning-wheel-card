@@ -125,16 +125,29 @@ const PASTEL_PALETTE: ReadonlyArray<string> = [
   "#BAE1FF", "#C7CEEA", "#E0BBE4", "#FFC8DD",
 ];
 
-/** Pride flag — Gilbert Baker / 1979 simplified six-stripe rainbow
- *  (red / orange / yellow / green / indigo / violet). Cycles for
- *  segments > 6. Hex values are the "official" Pride flag swatches. */
+/** Pride palette — Gilbert Baker / 1979 simplified six-stripe rainbow
+ *  PLUS the three unique colours from the Monica Helms 1999 transgender
+ *  flag (light blue, pink, white; the flag itself mirrors them as
+ *  five stripes — we only need the unique three for a wheel palette).
+ *  Nine colours total; cycles for segments > 9. The Progress Pride
+ *  flag (Daniel Quasar 2018) also adds black + brown for POC inclusion
+ *  — left out here because pure black and pure brown segments tend to
+ *  look like rendering bugs on a wheel rather than deliberate stripes;
+ *  users who want them can supply via the `colors` config. */
 const PRIDE_PALETTE: ReadonlyArray<string> = [
+  // Gilbert Baker rainbow
   "#E40303", // red
   "#FF8C00", // orange
   "#FFED00", // yellow
   "#008026", // green
   "#004DFF", // indigo
   "#750787", // violet
+  // Helms transgender flag — unique stripes
+  "#5BCEFA", // light blue
+  "#F5A9B8", // pink
+  "#FFFFFF", // white
+  // Bisexual-flag purple (rgb(128, 0, 128))
+  "#800080", // purple
 ];
 
 /** Neon palette (8 colours) — vivid, fully-saturated tones. Pair with
