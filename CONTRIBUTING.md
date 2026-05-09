@@ -21,13 +21,14 @@ npm run build    # one-shot production build (terser-minified)
 
 For live testing in a Home Assistant install:
 
-1. Register `/local/community/spinning-wheel-card/spinning-wheel-card.js`
-   (type: JS module) as a Lovelace resource.
-2. Copy the bundle into `<config>/www/community/spinning-wheel-card/`
-   on every rebuild.
-
-A small rsync wrapper that automates step 2 over SSH makes the loop
-much faster — tailor it to your host and path conventions.
+1. Install the card via HACS as a custom repository (HACS auto-registers
+   the Lovelace resource at `/hacsfiles/spinning-wheel-card/spinning-wheel-card.js`).
+2. After each rebuild, copy `dist/spinning-wheel-card.js` to
+   `<config>/hacsfiles/spinning-wheel-card/spinning-wheel-card.js` on the HA
+   host — that's where HACS serves it from. Hard-refresh the browser
+   (⌘⇧R / Ctrl⇧R) to pick up the new bytes; HACS caches per version
+   tag, so dev iterations on the same tag rely on the browser cache
+   being bypassed.
 
 ## Verification gate (must pass before PR)
 
@@ -51,14 +52,15 @@ HACS plugin validation, and CodeQL JS/TS analysis.
 Add a new language by:
 
 1. Drop a `<code>.json` next to the existing
-   `src/localize/languages/{en,de}.json`. Same key tree, fully
-   translated.
+   `src/localize/languages/*.json` (eight bundled today: en / de / fr / it /
+   es / pt / zh / ja). Same key tree, fully translated.
 2. Register it in `src/localize/localize.ts`:
    ```ts
-   import * as fr from "./languages/fr.json";
-   const languages = { en, de, fr };
+   import * as nl from "./languages/nl.json";
+   const languages = { en, de, fr, it, es, pt, zh, ja, nl };
    ```
-3. `npm run build` and confirm the picker / status / editor switch.
+3. `npm run build` and confirm the picker / status / editor / confirmation
+   prompts switch.
 
 Missing keys fall back to English, so a partial translation is still a
 useful PR.
