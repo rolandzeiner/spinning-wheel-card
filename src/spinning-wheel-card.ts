@@ -378,28 +378,34 @@ export class SpinningWheelCard extends LitElement {
     return 6;
   }
 
+  /** Mirrors HA's `LovelaceGridOptions` shape from
+   *  `frontend/src/panels/lovelace/types.ts` (verified on `dev`,
+   *  May 2026). All fields are optional in the upstream interface;
+   *  we return concrete values so the section-view dashboard knows
+   *  what the wheel wants by default. `max_columns` is `number` only
+   *  (NOT `"full"` — only `columns` accepts that sentinel). */
   public getGridOptions(): {
-    columns: number | "full";
-    rows: number | "auto";
-    min_columns: number;
-    min_rows: number;
-    max_columns?: number | "full";
+    columns?: number | "full";
+    rows?: number | "auto";
+    min_columns?: number;
+    min_rows?: number;
+    max_columns?: number;
     max_rows?: number;
   } {
-    // Canvas is fluid (ResizeObserver-driven, capped at MAX_SIZE px),
-    // and the .wheel-wrap container query sizes it to the smaller of
-    // available width / height — so user drags on either handle land
-    // somewhere visible. `rows: "auto"` was the original default; it
-    // ignored vertical drags because ha-card auto-sized to content.
-    // Numeric default + max_rows binds the row handle to a real value
-    // the layout can shrink the canvas into.
+    // Concrete numeric defaults match how hui-clock-card (analog —
+    // also a square aspect-ratio renderer) declares its grid. The
+    // previous `rows: "auto"` made ha-card collapse to content
+    // height, leaving the row-drag handle bound to nothing —
+    // reported as "vertical resize doesn't work." Multiples of 3
+    // for `columns` (6 here) are HA's documented preference for
+    // fluid-aspect cards. No `max_*` caps: the canvas sizes itself
+    // via the ResizeObserver in firstUpdated and clamps internally
+    // at MAX_SIZE (600 px), so unbounded user drag is safe.
     return {
       columns: 6,
-      rows: 5,
+      rows: 6,
       min_columns: 4,
       min_rows: 4,
-      max_columns: "full",
-      max_rows: 12,
     };
   }
 
@@ -744,32 +750,77 @@ export class SpinningWheelCard extends LitElement {
   }
 
   protected override firstUpdated(_changed: PropertyValues): void {
+    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
+      | HTMLElement
+      | null;
     const c = this.shadowRoot?.getElementById("wheel") as
       | HTMLCanvasElement
       | null;
-    if (c) {
-      // Seed the size from layout if it has resolved already, otherwise
-      // the observer's first delivery will fix it within a frame.
-      const rect = c.getBoundingClientRect();
-      if (rect.width > 0) this._size = this._clampSize(rect.width);
-      this._resizeObserver = new ResizeObserver((entries) => {
-        // Entries are delivered on a microtask; a `disconnect()` that
-        // ran moments ago does not unqueue them. Bail when detached
-        // rather than mutating state on an unmounted element.
-        if (!this.isConnected) return;
-        for (const e of entries) {
-          const next = this._clampSize(e.contentRect.width);
-          // Tolerance avoids redraws on sub-pixel jitter from layout
-          // recalcs that don't actually change the rendered size.
-          if (Math.abs(next - this._size) >= 1) {
-            this._size = next;
-            this._draw();
-          }
-        }
-      });
-      this._resizeObserver.observe(c);
+    if (!wrap || !c) {
+      this._draw();
+      return;
     }
+    // Seed size from layout if it has resolved; the observer's first
+    // delivery fixes it within a frame either way.
+    const rect = wrap.getBoundingClientRect();
+    if (rect.width > 0 || rect.height > 0) {
+      this._size = this._clampSize(this._fitDim(rect.width, rect.height));
+      this._applyCanvasSize();
+    }
+    this._resizeObserver = new ResizeObserver((entries) => {
+      // Entries are delivered on a microtask; a `disconnect()` that ran
+      // moments ago does not unqueue them. Bail when detached rather
+      // than mutating state on an unmounted element.
+      if (!this.isConnected) return;
+      for (const e of entries) {
+        const next = this._clampSize(
+          this._fitDim(e.contentRect.width, e.contentRect.height),
+        );
+        // Tolerance avoids redraws on sub-pixel jitter from layout
+        // recalcs that don't actually change the rendered size.
+        if (Math.abs(next - this._size) >= 1) {
+          this._size = next;
+          this._applyCanvasSize();
+          this._draw();
+        }
+      }
+    });
+    // Observe the wrap, not the canvas — the canvas's CSS box is
+    // driven by the inline width/height we set ourselves, so observing
+    // it would create a no-op feedback loop. The wrap reflects the
+    // actual container the wheel can grow into.
+    this._resizeObserver.observe(wrap);
     this._draw();
+  }
+
+  /** Compute the wheel's effective square size from a container box.
+   *  Smaller of width / height in the normal case (cell has both
+   *  definite dimensions). Falls back to width-only when the height is
+   *  0 / NaN — happens in masonry view, vertical-stack-card, and any
+   *  surface that doesn't propagate a definite block-size. Without
+   *  this fallback the canvas would snap to MIN_SIZE forever in those
+   *  contexts, which manifested as the "width is NaN on default" bug
+   *  reported after the container-query layout went in. */
+  private _fitDim(w: number, h: number): number {
+    const wOk = Number.isFinite(w) && w > 0;
+    const hOk = Number.isFinite(h) && h > 0;
+    if (wOk && hOk) return Math.min(w, h);
+    if (wOk) return w;
+    if (hOk) return h;
+    return DEFAULT_SIZE;
+  }
+
+  /** Apply the current `_size` as inline width/height on the canvas
+   *  element. Mirrors the previous CSS-driven sizing path; using inline
+   *  style means the next ResizeObserver delivery sees a stable size
+   *  and doesn't re-fire spuriously. */
+  private _applyCanvasSize(): void {
+    const c = this.shadowRoot?.getElementById("wheel") as
+      | HTMLCanvasElement
+      | null;
+    if (!c) return;
+    c.style.width = `${this._size}px`;
+    c.style.height = `${this._size}px`;
   }
 
   public override disconnectedCallback(): void {
@@ -1848,11 +1899,15 @@ export class SpinningWheelCard extends LitElement {
       min-height: 0;
       box-sizing: border-box;
     }
-    /* Container-query scope for the canvas. container-type:size lets
-       the child query both inline-size (cqi = width) and block-size
-       (cqb = height); min(100cqi, 100cqb) sizes the canvas to the
-       smaller dimension so it stays square inside any cell shape —
-       wide-and-short, narrow-and-tall, or square. */
+    /* Centred flex container the canvas grows into. The actual
+       width/height values are written inline by the ResizeObserver
+       in firstUpdated(), based on min(wrap-width, wrap-height) with
+       a width-only fallback for indefinite-block-size hosts (masonry
+       view, vertical-stack-card, …). Container queries were tried
+       earlier but min(100cqi, 100cqb) collapsed to invalid on
+       surfaces that didn't propagate a definite block-size, which
+       reported as "width is NaN on default" — JS sizing avoids the
+       edge case entirely. */
     .wheel-wrap {
       flex: 1 1 auto;
       min-height: 0;
@@ -1861,16 +1916,11 @@ export class SpinningWheelCard extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      container-type: size;
-      container-name: wheel-area;
     }
     #wheel {
       display: block;
-      width: min(100cqi, 100cqb);
-      height: auto;
       max-width: 600px;
       max-height: 600px;
-      aspect-ratio: 1 / 1;
       touch-action: none;        /* let our pointer handler own gestures */
       cursor: grab;
       user-select: none;
