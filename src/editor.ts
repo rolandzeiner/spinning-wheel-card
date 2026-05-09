@@ -12,11 +12,9 @@ import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
 import { localize, resolveLang } from "./localize/localize";
 
-// `labels`, `weights` and `colors` live in the YAML config as arrays. The
-// visual editor exposes them as comma-separated text fields under the
-// synthetic names `*_csv` — the only way to feed an array into ha-form
-// without a dedicated `array` selector. We translate at the boundary in
-// _onFormChanged: parse CSV → array, drop the *_csv key, store array.
+// Editor exposes labels/weights/colors arrays as comma-separated *_csv
+// fields (no ha-form array selector). _onFormChanged parses CSV → array
+// at the boundary.
 type EditorData = SpinningWheelCardConfig & {
   labels_csv?: string;
   weights_csv?: string;
@@ -24,16 +22,10 @@ type EditorData = SpinningWheelCardConfig & {
   label_colors_csv?: string;
 };
 
-// Form defaults. Used to prefill the form on first open so dropdowns and
-// toggles reflect the values the card actually uses (rather than reading
-// undefined → empty/false). Stripped back out in _onFormChanged so the
-// saved YAML stays minimal — a key only persists when the user picked a
-// non-default value.
-//
-// The hub_text default is computed dynamically from the active locale so
-// that on first-open the form shows the localised hub text instead of
-// hard-coded English. Stripping in _onFormChanged uses the same locale,
-// so accidentally-saved-default values are still removed.
+// Form prefill so first-open dropdowns/toggles reflect the actual
+// operating values. Stripped back out in _onFormChanged so saved YAML
+// stays minimal. hub_text is intentionally NOT included — see
+// _formDefaults below.
 const STATIC_DEFAULTS = {
   segments: 8,
   friction: "medium" as const,
@@ -76,9 +68,7 @@ export class SpinningWheelCardEditor
   @state() private _config: SpinningWheelCardConfig = {
     type: "spinning-wheel-card",
   };
-  // The text fields' values live here so what the user typed is preserved
-  // verbatim across re-renders (otherwise the trailing comma they were
-  // about to type would round-trip away).
+  // CSV verbatim — preserves the trailing comma the user is about to type.
   @state() private _labelsText = "";
   @state() private _weightsText = "";
   @state() private _colorsText = "";
@@ -93,15 +83,11 @@ export class SpinningWheelCardEditor
   }
 
   private _lang(): string {
-    // Mirror the card's per-card language override so the editor
-    // re-renders in the chosen language as soon as the user picks it.
     return this._config?.language ?? resolveLang(this.hass);
   }
 
-  /** Schema is rebuilt per render so option labels (Friction presets,
-   *  Label-orientation choices) translate when the user's HA language
-   *  changes — ha-form bakes label text into the schema rather than
-   *  asking computeLabel for option labels. */
+  /** Rebuilt per render so option labels translate when language changes —
+   *  ha-form bakes label text into the schema. */
   private _buildSchema(): ReadonlyArray<HaFormSchema> {
     const lang = this._lang();
     return [
@@ -307,13 +293,9 @@ export class SpinningWheelCardEditor
     return key ? localize(key, lang) : undefined;
   };
 
-  /** Form-data defaults for prefill on first open. NOTE: `hub_text` is
-   *  intentionally NOT prefilled here. If we did, ha-form would
-   *  re-fill the input with the localised default ("SPIN"/"DREH") on
-   *  every render — including immediately after the user clears it —
-   *  making "no hub label" impossible to express through the visual
-   *  editor. Instead the form input stays blank until the user types
-   *  something, and the helper text mentions the localised default. */
+  /** Prefill defaults for first open. hub_text is intentionally NOT
+   *  prefilled — otherwise ha-form would re-fill it with the localised
+   *  default after every render, making "no hub label" impossible. */
   private _formDefaults(): Record<string, unknown> {
     return { ...STATIC_DEFAULTS };
   }
@@ -361,14 +343,9 @@ export class SpinningWheelCardEditor
       next.label_colors = parsedLabelColors.slice(0, segments);
     }
 
-    // hub_text: distinguish "user explicitly cleared the input" (should
-    // hide the hub label) from "user never set this field" (should fall
-    // through to the localised default). ha-form's text selector emits
-    // `undefined` (or `""`) when its input is empty; without the guard
-    // below, that's ambiguous with a fresh-config undefined and the card
-    // can't tell the user wanted the label hidden. If `_config` already
-    // had any string for hub_text and the form now reports missing/null,
-    // pin it to "" so the "explicit clear" intent survives.
+    // Distinguish "explicit clear" (hide label) from "never set"
+    // (use localised default). ha-form may emit undefined for empty
+    // inputs; pin to "" only when there *was* a previous string.
     const hadHubText = typeof this._config.hub_text === "string";
     const formClearedHubText =
       next.hub_text === undefined || next.hub_text === null;
@@ -376,10 +353,8 @@ export class SpinningWheelCardEditor
       next.hub_text = "";
     }
 
-    // Strip values that match defaults — they came from the form's
-    // prefill, not from the user, and shouldn't bloat the saved YAML.
-    // hub_text is NOT stripped: it's not in the prefill at all, so any
-    // value the user typed (including "") is meaningful and persisted.
+    // Strip prefilled defaults so saved YAML stays minimal. hub_text
+    // isn't stripped — anything the user typed (including "") is meant.
     if (next.segments === STATIC_DEFAULTS.segments) delete next.segments;
     if (next.friction === STATIC_DEFAULTS.friction) delete next.friction;
     if (next.text_orientation === STATIC_DEFAULTS.text_orientation) {
@@ -389,9 +364,7 @@ export class SpinningWheelCardEditor
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
     if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
     if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
-    // "auto" is the Auto sentinel for the language dropdown — strip so
-    // the saved YAML doesn't carry a non-language string and the card
-    // falls through to the auto-detect chain.
+    // "auto" is the editor sentinel — strip so saved YAML stays clean.
     if (next.language === "auto") delete next.language;
 
     this._labelsText = labelsCsv;
@@ -404,15 +377,12 @@ export class SpinningWheelCardEditor
 
   protected override render(): TemplateResult {
     const lang = this._lang();
-    // Prefill defaults so the form displays the actual operating values
-    // on first open. Spread order matters: defaults first, then user
-    // config overrides them. CSV synthetics last (they live only in the
-    // editor, not in the saved YAML).
+    // Spread order: defaults first, then user config (overrides),
+    // then CSV synthetics (editor-only, never saved).
     const data: EditorData = {
       ...this._formDefaults(),
       ...this._config,
-      // Map "no override" to the Auto sentinel so the dropdown shows
-      // "Auto (HA language)" rather than blank when nothing is set.
+      // Map "no override" to the Auto sentinel so the dropdown isn't blank.
       language: this._config.language ?? "auto",
       labels_csv: this._labelsText,
       weights_csv: this._weightsText,
