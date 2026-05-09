@@ -1,0 +1,25 @@
+{
+  "name": "spinning-wheel-card",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Standalone Lovelace custom card — a click-to-spin / drag-to-flick wheel with momentum-based physics.",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "build:push": "rollup -c && ./scripts/dev-push.sh --quiet"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "rollup": "^4.60.3",
+    "tslib": "^2.8.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "lit": "^3.3.0"
+  }
+}

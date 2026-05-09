@@ -1,0 +1,64 @@
+{
+  "common": {
+    "default_name": "Glücksrad"
+  },
+  "status": {
+    "spinning": "Dreht …",
+    "result": "Ergebnis: {value}",
+    "idle": "Klicken zum Drehen · Ziehen zum Werfen"
+  },
+  "hub": {
+    "default_text": "DREH"
+  },
+  "picker": {
+    "name": "Glücksrad",
+    "description": "Klick-zum-Drehen / Zieh-zum-Werfen-Rad mit physikbasiertem Schwung."
+  },
+  "editor": {
+    "name": "Kartentitel",
+    "segments": "Segmente",
+    "friction": "Reibung",
+    "labels": "Beschriftungen",
+    "weights": "Gewichtungen",
+    "colors": "Farben",
+    "label_colors": "Beschriftungsfarben",
+    "hub_text": "Nabentext",
+    "text_orientation": "Textausrichtung",
+    "sound": "Klickgeräusch",
+    "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
+    "friction_helper": "Wie schnell das Rad nach einer Drehung abbremst.",
+    "labels_helper": "Komma- oder zeilengetrennt. Maximal eine pro Segment; bei weniger Beschriftungen werden sie rund um das Rad wiederholt (z. B. „A, B“ bei 8 Segmenten → A B A B A B A B). Leer lassen für 1..N.",
+    "weights_helper": "Kommagetrennte relative Größen (nur das Verhältnis zählt). Gleiche Wiederholungsregel wie Beschriftungen — „3, 1“ bei 4 Segmenten ergibt groß, klein, groß, klein. Leer lassen für gleichgroße Stücke.",
+    "colors_helper": "Komma- oder zeilengetrennte CSS-Farben (Hex, rgb, hsl, benannt). Werden in Reihenfolge des ersten Auftretens auf einzigartige Beschriftungen abgebildet — Segmente mit gleicher Beschriftung haben immer dieselbe Farbe. Länge bis zu `segments`; tatsächlich verwendet werden nur die ersten N (= Anzahl einzigartiger Beschriftungen). Leer lassen für die Standardpalette.",
+    "label_colors_helper": "Komma- oder zeilengetrennte CSS-Farben für die Beschriftungstexte. Gleiche Abbildung auf einzigartige Beschriftungen wie bei Farben — verwendet werden nur die ersten N (= Anzahl einzigartiger Beschriftungen). Leer lassen für dunkelgrauen Text auf allen Segmenten.",
+    "hub_text_helper": "Text auf der Mittelnabe. Standard ist DREH. Leer lassen zum Ausblenden.",
+    "text_orientation_helper": "Wie Segmentbeschriftungen ausgerichtet werden. Tangential (Standard) legt den Text entlang des Randes; Radial dreht ihn 90° im Uhrzeigersinn, sodass er entlang der Speiche von außen nach innen liest.",
+    "sound_helper": "Klickgeräusch bei jedem Segmentübergang abspielen. Lautstärke skaliert mit der Drehzahl.",
+    "friction_low": "Niedrig — lange, gemächliche Drehungen",
+    "friction_medium": "Mittel — klassisch",
+    "friction_high": "Hoch — stoppt schnell",
+    "orientation_tangent": "Tangential — Beschriftungen entlang des Randes",
+    "orientation_radial": "Radial — Beschriftungen entlang der Speichen",
+    "footer_hint": "Klicke auf das Rad für eine zufällige Drehung, oder klicke und ziehe, um es zu werfen — die Geschwindigkeit beim Loslassen bestimmt die Drehung. Reibung bremst die Drehung, bis sie stoppt."
+  },
+  "errors": {
+    "invalid_config": "Ungültige Konfiguration",
+    "name_type": "name muss eine Zeichenkette sein",
+    "segments_range": "segments muss eine ganze Zahl zwischen 4 und 24 sein",
+    "friction_value": "friction muss low, medium oder high sein",
+    "labels_type": "labels muss ein Array von Zeichenketten sein",
+    "labels_length": "labels-Länge ({len}) darf segments ({segments}) nicht überschreiten",
+    "weights_type": "weights muss ein Array positiver Zahlen sein",
+    "weights_empty": "weights muss mindestens einen Eintrag enthalten",
+    "weights_length": "weights-Länge ({len}) darf segments ({segments}) nicht überschreiten",
+    "colors_type": "colors muss ein Array nicht-leerer Zeichenketten sein",
+    "colors_empty": "colors muss mindestens einen Eintrag enthalten",
+    "colors_length": "colors-Länge ({len}) darf segments ({segments}) nicht überschreiten",
+    "label_colors_type": "label_colors muss ein Array nicht-leerer Zeichenketten sein",
+    "label_colors_empty": "label_colors muss mindestens einen Eintrag enthalten",
+    "label_colors_length": "label_colors-Länge ({len}) darf segments ({segments}) nicht überschreiten",
+    "hub_text_type": "hub_text muss eine Zeichenkette sein",
+    "sound_type": "sound muss ein Boolean sein",
+    "text_orientation_value": "text_orientation muss \"tangent\" oder \"radial\" sein"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "common": {
+    "default_name": "Spinning Wheel"
+  },
+  "status": {
+    "spinning": "Spinning…",
+    "result": "Result: {value}",
+    "idle": "Click to spin · drag to throw"
+  },
+  "hub": {
+    "default_text": "SPIN"
+  },
+  "picker": {
+    "name": "Spinning Wheel",
+    "description": "A click-to-spin / drag-to-flick wheel with momentum-based physics."
+  },
+  "editor": {
+    "name": "Card title",
+    "segments": "Segments",
+    "friction": "Friction",
+    "labels": "Labels",
+    "weights": "Weights",
+    "colors": "Colors",
+    "label_colors": "Label colors",
+    "hub_text": "Hub text",
+    "text_orientation": "Label orientation",
+    "sound": "Click sound",
+    "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
+    "friction_helper": "How quickly the wheel decelerates after a spin or release.",
+    "labels_helper": "Comma- or newline-separated. Up to one per segment; if you give fewer they cycle around the wheel (e.g. \"A, B\" on 8 segments → A B A B A B A B). Leave empty for 1..N.",
+    "weights_helper": "Comma-separated relative sizes (only the ratio matters). Same cycling rule as labels — \"3, 1\" on 4 segments produces big, small, big, small. Leave empty for equal slices.",
+    "colors_helper": "Comma- or newline-separated CSS colours (hex, rgb, hsl, named). Mapped to UNIQUE labels in order of first appearance — segments sharing a label always share a colour. Length up to `segments`; only the first N (= unique label count) are actually used. Leave empty for the built-in palette.",
+    "label_colors_helper": "Comma- or newline-separated CSS colours for the segment label text. Same unique-label mapping as Colors — only the first N (= unique label count) are used. Leave empty for dark grey on every segment.",
+    "hub_text_helper": "Text shown on the centre hub. Defaults to SPIN. Empty to hide.",
+    "text_orientation_helper": "How segment labels are oriented. Tangent (default) wraps the text around the rim; Radial rotates labels 90° clockwise so they read along the spoke from rim to centre.",
+    "sound_helper": "Play a peg-click sound on each segment crossing. Volume scales with wheel speed.",
+    "friction_low": "Low — long, lazy spins",
+    "friction_medium": "Medium — classic",
+    "friction_high": "High — stops quickly",
+    "orientation_tangent": "Tangent — labels around the rim",
+    "orientation_radial": "Radial — labels along the spokes",
+    "footer_hint": "Click the wheel for a random impulse spin, or click and drag to throw it — the angular velocity at release determines the spin. Friction decays the spin until it stops."
+  },
+  "errors": {
+    "invalid_config": "Invalid configuration",
+    "name_type": "name must be a string",
+    "segments_range": "segments must be an integer between 4 and 24",
+    "friction_value": "friction must be one of: low, medium, high",
+    "labels_type": "labels must be an array of strings",
+    "labels_length": "labels length ({len}) must not exceed segments ({segments})",
+    "weights_type": "weights must be an array of positive numbers",
+    "weights_empty": "weights must contain at least one entry",
+    "weights_length": "weights length ({len}) must not exceed segments ({segments})",
+    "colors_type": "colors must be an array of non-empty strings",
+    "colors_empty": "colors must contain at least one entry",
+    "colors_length": "colors length ({len}) must not exceed segments ({segments})",
+    "label_colors_type": "label_colors must be an array of non-empty strings",
+    "label_colors_empty": "label_colors must contain at least one entry",
+    "label_colors_length": "label_colors length ({len}) must not exceed segments ({segments})",
+    "hub_text_type": "hub_text must be a string",
+    "sound_type": "sound must be a boolean",
+    "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\""
+  }
+}

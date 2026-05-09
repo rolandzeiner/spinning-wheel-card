@@ -1,0 +1,155 @@
+# Scaffold .gitignore for a HACS Lovelace card (frontend-only).
+# Mirrors the unified portfolio baseline (verified byte-identical
+# across the user's six *-austria integration repos as of 2026-05-08)
+# — adapted for a card-only repo with two card-specific tweaks:
+#
+#   1. `dist/` is NOT ignored. For a standalone HACS plugin the
+#      single-file bundle at dist/<card>.js IS the artefact users
+#      install — it must stay tracked. (For a HACS *integration* repo
+#      the card bundle lives at custom_components/<domain>/www/<card>.js
+#      and `dist/` would be ignored as Python packaging output.)
+#   2. The Python blocks below match nothing in this repo but stay in
+#      place — keeps the file aligned with the portfolio baseline so
+#      copy-paste between repos doesn't lose protections.
+#
+# IMPORTANT: review before committing. Loosen only with intention.
+#
+# Two load-bearing rules:
+#   1. `.claude/` ignores any per-project Claude state and project-level
+#      skills so they never land in git. User-level rules live in
+#      ~/.claude/skills/.
+#   2. `package-lock.json` is intentionally NOT here. It MUST stay
+#      committed so reproducible card builds work in CI.
+
+# ───────────────────────────────────────────────────────────────────
+# Python (kept for portfolio-baseline parity; not used in this repo)
+# ───────────────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+*.so
+.Python
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+*.egg-info/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.HA_VERSION
+uv.lock
+
+# ───────────────────────────────────────────────────────────────────
+# Node / JS / TypeScript
+# ───────────────────────────────────────────────────────────────────
+node_modules/
+.npm/
+*.js.map
+
+# Bundler caches
+.rollup.cache/
+.vite-cache/
+.parcel-cache/
+
+# Note: dist/ is intentionally NOT ignored — it's the published bundle.
+
+# ───────────────────────────────────────────────────────────────────
+# OS metadata
+# ───────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+Desktop.ini
+*.swp
+*.swo
+*~
+*.bak
+
+# ───────────────────────────────────────────────────────────────────
+# IDE / editor state
+# ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+.cursor/
+.cursorrules.local
+.continue/
+.windsurf/
+
+# ───────────────────────────────────────────────────────────────────
+# AI assistants — local state, transcripts, plans, project-level skills
+# ───────────────────────────────────────────────────────────────────
+.claude/
+.claude/skills/
+.claude-cache/
+.claude-*
+.aider*
+
+# ───────────────────────────────────────────────────────────────────
+# Static analysis tooling
+# ───────────────────────────────────────────────────────────────────
+.fallow/
+.fallowrc.json
+.fallowrc.jsonc
+fallow.toml
+
+# ───────────────────────────────────────────────────────────────────
+# Secrets / credentials — NEVER commit
+# ───────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.secrets
+*.secret
+secrets.json
+secrets.yaml
+auth.json
+credentials.json
+token.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ───────────────────────────────────────────────────────────────────
+# HA local state — logs, config copies (kept for parity)
+# ───────────────────────────────────────────────────────────────────
+.storage/
+home-assistant.log*
+home-assistant_*.log*
+*.log
+config/
+
+# ───────────────────────────────────────────────────────────────────
+# Personal dev tooling — push/sync scripts targeting a dev box, scratch
+# Each contributor wires these up locally; nothing under scripts/ is
+# shared via git.
+# ───────────────────────────────────────────────────────────────────
+scripts/
+dev-push.sh
+dev/
+test/
+target/
+
+# Personal notes / scratch — *.local.md is the convention
+CLAUDE.local.md
+*.local.md
+local_*.py
+private_*.py
