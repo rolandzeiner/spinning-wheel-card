@@ -71,6 +71,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `label_colors` | string[] (1..segments) | dark grey | CSS colours for the segment label text. Same unique-label mapping as `colors`. |
 | `text_orientation` | `tangent` / `radial` | `tangent` | Tangent wraps each label around the rim, glyph-by-glyph along the segment arc. Radial rotates 90° CW so text reads along the spoke from rim to centre. |
 | `hub_text` | string | localised "SPIN" / "DREH" | Centre-hub label. Auto-shrinks for long strings. Empty string hides it. |
+| `hub_color` | `theme` / `black` / `white` | `theme` | Hub fill + indicator triangle colour. `theme` uses HA's `--primary-color` (hub label auto-picks black/white via WCAG luminance). `black` is solid black with white hub label. `white` is solid white with black hub label. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
 
 ### Friction presets

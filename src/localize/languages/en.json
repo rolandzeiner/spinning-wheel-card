@@ -24,6 +24,7 @@
     "colors": "Colors",
     "label_colors": "Label colors",
     "hub_text": "Hub text",
+    "hub_color": "Hub & indicator color",
     "text_orientation": "Label orientation",
     "sound": "Click sound",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
@@ -38,6 +39,10 @@
     "colors_helper": "Comma- or newline-separated CSS colours (hex, rgb, hsl, named). Mapped to UNIQUE labels in order of first appearance — segments sharing a label always share a colour. Length up to `segments`; only the first N (= unique label count) are actually used. Leave empty for the built-in palette.",
     "label_colors_helper": "Comma- or newline-separated CSS colours for the segment label text. Same unique-label mapping as Colors — only the first N (= unique label count) are used. Leave empty for dark grey on every segment.",
     "hub_text_helper": "Text shown on the centre hub. Defaults to SPIN. Empty to hide.",
+    "hub_color_helper": "Centre hub and pointer triangle. Theme uses your HA primary colour; Black gives a black hub with white text; White gives a white hub with black text.",
+    "hub_color_theme": "Theme — use HA primary colour",
+    "hub_color_black": "Black — white text",
+    "hub_color_white": "White — black text",
     "text_orientation_helper": "How segment labels are oriented. Tangent (default) wraps the text around the rim; Radial rotates labels 90° clockwise so they read along the spoke from rim to centre.",
     "sound_helper": "Play a peg-click sound on each segment crossing. Volume scales with wheel speed.",
     "friction_low": "Low — long, lazy spins",
@@ -66,6 +71,7 @@
     "hub_text_type": "hub_text must be a string",
     "sound_type": "sound must be a boolean",
     "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\"",
-    "theme_value": "theme must be one of: default, pastel, pride, neon"
+    "theme_value": "theme must be one of: default, pastel, pride, neon",
+    "hub_color_value": "hub_color must be one of: theme, black, white"
   }
 }

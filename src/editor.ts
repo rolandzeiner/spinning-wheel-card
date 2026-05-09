@@ -40,6 +40,7 @@ const STATIC_DEFAULTS = {
   text_orientation: "tangent" as const,
   sound: true,
   theme: "default" as const,
+  hub_color: "theme" as const,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split a comma- or newline-separated text field into trimmed,
@@ -166,6 +167,28 @@ export class SpinningWheelCardEditor
       },
       { name: "hub_text", selector: { text: {} } },
       {
+        name: "hub_color",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              {
+                value: "theme",
+                label: localize("editor.hub_color_theme", lang),
+              },
+              {
+                value: "black",
+                label: localize("editor.hub_color_black", lang),
+              },
+              {
+                value: "white",
+                label: localize("editor.hub_color_white", lang),
+              },
+            ],
+          },
+        },
+      },
+      {
         name: "text_orientation",
         selector: {
           select: {
@@ -208,6 +231,8 @@ export class SpinningWheelCardEditor
         return localize("editor.label_colors", lang);
       case "hub_text":
         return localize("editor.hub_text", lang);
+      case "hub_color":
+        return localize("editor.hub_color", lang);
       case "text_orientation":
         return localize("editor.text_orientation", lang);
       case "sound":
@@ -237,6 +262,8 @@ export class SpinningWheelCardEditor
           return "editor.label_colors_helper";
         case "hub_text":
           return "editor.hub_text_helper";
+        case "hub_color":
+          return "editor.hub_color_helper";
         case "text_orientation":
           return "editor.text_orientation_helper";
         case "sound":
@@ -328,6 +355,7 @@ export class SpinningWheelCardEditor
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
+    if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
 
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;
