@@ -1,0 +1,80 @@
+{
+  "common": {
+    "default_name": "Ruleta giratoria"
+  },
+  "status": {
+    "spinning": "Girando…",
+    "result": "Resultado: {value}",
+    "idle": "Haz clic para girar · arrastra para lanzar"
+  },
+  "hub": {
+    "default_text": "GIRAR"
+  },
+  "picker": {
+    "name": "Ruleta giratoria",
+    "description": "Una ruleta para hacer clic o arrastrar con física basada en inercia."
+  },
+  "editor": {
+    "name": "Título de la tarjeta",
+    "segments": "Segmentos",
+    "friction": "Fricción",
+    "theme": "Tema de color",
+    "labels": "Etiquetas",
+    "weights": "Pesos",
+    "colors": "Colores",
+    "label_colors": "Colores de etiquetas",
+    "hub_text": "Texto del cubo",
+    "hub_color": "Color del cubo y del indicador",
+    "text_orientation": "Orientación de etiquetas",
+    "sound": "Sonido del clic",
+    "show_status": "Mostrar línea de estado",
+    "segments_helper": "En cuántas porciones se divide la ruleta. De 4 a 24.",
+    "friction_helper": "Con qué rapidez la ruleta desacelera tras un giro o suelta.",
+    "theme_helper": "Paleta integrada usada cuando Colores está vacío. Colores personalizados siempre prevalece.",
+    "theme_default": "Predeterminado — paleta integrada de 8 colores",
+    "theme_pastel": "Pastel — tonos suaves y poco saturados",
+    "theme_pride": "Pride — bandera arcoíris de 6 franjas",
+    "theme_neon": "Neón — colores vivos e intensos",
+    "labels_helper": "Separadas por coma o salto de línea. Hasta una por segmento; si pones menos, se repiten alrededor de la ruleta (p. ej. \"A, B\" en 8 segmentos → A B A B A B A B). Déjalo vacío para 1..N.",
+    "weights_helper": "Tamaños relativos separados por coma (solo importa la proporción). Misma regla de repetición que las etiquetas — \"3, 1\" en 4 segmentos produce grande, pequeño, grande, pequeño. Déjalo vacío para porciones iguales.",
+    "colors_helper": "Colores CSS separados por coma o salto de línea (hex, rgb, hsl, nombrados). Asignados a las etiquetas ÚNICAS en orden de primera aparición — los segmentos que comparten una etiqueta siempre comparten color. Longitud hasta `segments`; solo se usan los primeros N (= número de etiquetas únicas). Déjalo vacío para la paleta integrada.",
+    "label_colors_helper": "Colores CSS separados por coma o salto de línea para el texto de las etiquetas. Misma asignación por etiqueta única que Colores — solo se usan los primeros N (= número de etiquetas únicas). Déjalo vacío para gris oscuro en todos los segmentos.",
+    "hub_text_helper": "Texto mostrado en el cubo central. Por defecto GIRAR. Vacío para ocultarlo.",
+    "hub_color_helper": "Cubo central y triángulo indicador. Tema usa el color principal de HA; Negro da un cubo negro con texto blanco; Blanco da un cubo blanco con texto negro.",
+    "hub_color_theme": "Tema — usar el color principal de HA",
+    "hub_color_black": "Negro — texto blanco",
+    "hub_color_white": "Blanco — texto negro",
+    "text_orientation_helper": "Cómo se orientan las etiquetas de los segmentos. Tangente (por defecto) envuelve el texto alrededor del borde; Radial gira las etiquetas 90° en sentido horario para leerlas a lo largo del radio, del borde al centro.",
+    "sound_helper": "Reproducir un clic en cada cruce de segmento. El volumen escala con la velocidad de la ruleta.",
+    "show_status_helper": "Mostrar la línea de texto bajo la ruleta (\"Girando…\" / \"Resultado: X\" / el aviso de inactividad). Desactívalo para un aspecto más minimalista.",
+    "friction_low": "Baja — giros largos y suaves",
+    "friction_medium": "Media — clásica",
+    "friction_high": "Alta — se detiene rápido",
+    "orientation_tangent": "Tangente — etiquetas alrededor del borde",
+    "orientation_radial": "Radial — etiquetas a lo largo de los radios",
+    "footer_hint": "Haz clic en la ruleta para un giro de impulso aleatorio, o haz clic y arrastra para lanzarla — la velocidad angular al soltar determina el giro. La fricción la frena hasta detenerla."
+  },
+  "errors": {
+    "invalid_config": "Configuración no válida",
+    "name_type": "name debe ser una cadena de caracteres",
+    "segments_range": "segments debe ser un entero entre 4 y 24",
+    "friction_value": "friction debe ser uno de: low, medium, high",
+    "labels_type": "labels debe ser un array de cadenas",
+    "labels_length": "la longitud de labels ({len}) no debe superar segments ({segments})",
+    "weights_type": "weights debe ser un array de números positivos",
+    "weights_empty": "weights debe contener al menos una entrada",
+    "weights_length": "la longitud de weights ({len}) no debe superar segments ({segments})",
+    "colors_type": "colors debe ser un array de cadenas no vacías",
+    "colors_empty": "colors debe contener al menos una entrada",
+    "colors_length": "la longitud de colors ({len}) no debe superar segments ({segments})",
+    "label_colors_type": "label_colors debe ser un array de cadenas no vacías",
+    "label_colors_empty": "label_colors debe contener al menos una entrada",
+    "label_colors_length": "la longitud de label_colors ({len}) no debe superar segments ({segments})",
+    "hub_text_type": "hub_text debe ser una cadena de caracteres",
+    "sound_type": "sound debe ser un booleano",
+    "text_orientation_value": "text_orientation debe ser \"tangent\" o \"radial\"",
+    "theme_value": "theme debe ser uno de: default, pastel, pride, neon",
+    "hub_color_value": "hub_color debe ser uno de: theme, black, white",
+    "show_status_type": "show_status debe ser un booleano"
+  }
+}

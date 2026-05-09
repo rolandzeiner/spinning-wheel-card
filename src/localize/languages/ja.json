@@ -1,0 +1,80 @@
+{
+  "common": {
+    "default_name": "ルーレット"
+  },
+  "status": {
+    "spinning": "回転中…",
+    "result": "結果: {value}",
+    "idle": "クリックで回転 · ドラッグで投げる"
+  },
+  "hub": {
+    "default_text": "回す"
+  },
+  "picker": {
+    "name": "ルーレット",
+    "description": "クリックで回転、ドラッグで投げる慣性物理ベースのホイールカード。"
+  },
+  "editor": {
+    "name": "カードのタイトル",
+    "segments": "セグメント数",
+    "friction": "摩擦",
+    "theme": "カラーテーマ",
+    "labels": "ラベル",
+    "weights": "重み",
+    "colors": "カラー",
+    "label_colors": "ラベルの色",
+    "hub_text": "中央の文字",
+    "hub_color": "中央とポインタの色",
+    "text_orientation": "ラベルの向き",
+    "sound": "クリック音",
+    "show_status": "ステータス行を表示",
+    "segments_helper": "ホイールを分割するセグメントの数。4 から 24 まで。",
+    "friction_helper": "回転や手放し後にホイールが減速する速さ。",
+    "theme_helper": "カラーが空の場合に使用される組み込みパレット。カスタム カラーは常に優先されます。",
+    "theme_default": "デフォルト — 組み込みの 8 色パレット",
+    "theme_pastel": "パステル — 柔らかく彩度の低い色合い",
+    "theme_pride": "プライド — 6 色のレインボーフラッグ",
+    "theme_neon": "ネオン — 鮮やかで明るい色",
+    "labels_helper": "カンマまたは改行で区切ります。1 セグメントにつき最大 1 つ。少ない場合はホイールの周りで繰り返されます (例: 8 セグメントに「A, B」→ A B A B A B A B)。空にすると 1..N になります。",
+    "weights_helper": "カンマ区切りの相対サイズ (比率のみが意味を持ちます)。ラベルと同じ繰り返し規則 — 4 セグメントに「3, 1」で 大・小・大・小 になります。空にすると均等サイズになります。",
+    "colors_helper": "カンマまたは改行で区切られた CSS カラー (hex、rgb、hsl、名前付き)。最初に出現した順に「ユニークラベル」へ割り当てられ、同じラベルを持つセグメントは常に同じ色を共有します。長さは最大で `segments`。実際に使われるのは最初の N 個 (= ユニークラベル数) のみ。空にすると組み込みパレットになります。",
+    "label_colors_helper": "セグメントのラベル文字の CSS カラー。カラーと同じユニークラベルへの割り当てで、最初の N 個 (= ユニークラベル数) のみが使われます。空にするとすべてのセグメントが濃いグレーになります。",
+    "hub_text_helper": "中央のハブに表示されるテキスト。デフォルトは「回す」。空にすると非表示になります。",
+    "hub_color_helper": "中央のハブとポインタ三角形。テーマは HA のプライマリカラーを使います。黒は黒地に白文字、白は白地に黒文字になります。",
+    "hub_color_theme": "テーマ — HA のプライマリカラーを使う",
+    "hub_color_black": "黒 — 白文字",
+    "hub_color_white": "白 — 黒文字",
+    "text_orientation_helper": "セグメントラベルの向き。タンジェント (デフォルト) は文字をリムに沿わせます。ラジアルは時計回りに 90° 回転させ、リムから中心へスポークに沿って読めるようにします。",
+    "sound_helper": "セグメントを横切るたびにペグクリック音を鳴らします。音量はホイールの速度に応じて変化します。",
+    "show_status_helper": "ホイールの下にテキスト行を表示します(「回転中…」/「結果: X」/ クリック案内)。よりミニマルにするにはオフにしてください。",
+    "friction_low": "弱 — 長くゆったり回る",
+    "friction_medium": "中 — クラシック",
+    "friction_high": "強 — すぐに止まる",
+    "orientation_tangent": "タンジェント — リムに沿ったラベル",
+    "orientation_radial": "ラジアル — スポークに沿ったラベル",
+    "footer_hint": "ホイールをクリックするとランダムなインパルスで回転し、クリック&ドラッグで投げると放したときの角速度で回転します。摩擦により回転は減衰して停止します。"
+  },
+  "errors": {
+    "invalid_config": "設定が無効です",
+    "name_type": "name は文字列である必要があります",
+    "segments_range": "segments は 4 から 24 の整数である必要があります",
+    "friction_value": "friction は low、medium、high のいずれかである必要があります",
+    "labels_type": "labels は文字列の配列である必要があります",
+    "labels_length": "labels の長さ ({len}) は segments ({segments}) を超えてはいけません",
+    "weights_type": "weights は正の数の配列である必要があります",
+    "weights_empty": "weights には少なくとも 1 つの要素が必要です",
+    "weights_length": "weights の長さ ({len}) は segments ({segments}) を超えてはいけません",
+    "colors_type": "colors は空でない文字列の配列である必要があります",
+    "colors_empty": "colors には少なくとも 1 つの要素が必要です",
+    "colors_length": "colors の長さ ({len}) は segments ({segments}) を超えてはいけません",
+    "label_colors_type": "label_colors は空でない文字列の配列である必要があります",
+    "label_colors_empty": "label_colors には少なくとも 1 つの要素が必要です",
+    "label_colors_length": "label_colors の長さ ({len}) は segments ({segments}) を超えてはいけません",
+    "hub_text_type": "hub_text は文字列である必要があります",
+    "sound_type": "sound はブール値である必要があります",
+    "text_orientation_value": "text_orientation は \"tangent\" または \"radial\" である必要があります",
+    "theme_value": "theme は default、pastel、pride、neon のいずれかである必要があります",
+    "hub_color_value": "hub_color は theme、black、white のいずれかである必要があります",
+    "show_status_type": "show_status はブール値である必要があります"
+  }
+}

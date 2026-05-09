@@ -1,5 +1,11 @@
 import * as en from "./languages/en.json";
 import * as de from "./languages/de.json";
+import * as fr from "./languages/fr.json";
+import * as it from "./languages/it.json";
+import * as es from "./languages/es.json";
+import * as pt from "./languages/pt.json";
+import * as zh from "./languages/zh.json";
+import * as ja from "./languages/ja.json";
 
 // English is the canonical fallback. Any HA language outside this map
 // resolves through English, and any missing key in a partially-translated
@@ -7,6 +13,12 @@ import * as de from "./languages/de.json";
 const languages: Record<string, Record<string, unknown>> = {
   en,
   de,
+  fr,
+  it,
+  es,
+  pt,
+  zh,
+  ja,
 };
 
 function resolveTranslation(

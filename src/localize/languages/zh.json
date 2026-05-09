@@ -1,0 +1,80 @@
+{
+  "common": {
+    "default_name": "幸运转盘"
+  },
+  "status": {
+    "spinning": "旋转中…",
+    "result": "结果:{value}",
+    "idle": "点击旋转 · 拖动投掷"
+  },
+  "hub": {
+    "default_text": "旋转"
+  },
+  "picker": {
+    "name": "幸运转盘",
+    "description": "基于动量物理的点击旋转或拖动投掷转盘。"
+  },
+  "editor": {
+    "name": "卡片标题",
+    "segments": "扇区数量",
+    "friction": "摩擦力",
+    "theme": "颜色主题",
+    "labels": "标签",
+    "weights": "权重",
+    "colors": "颜色",
+    "label_colors": "标签颜色",
+    "hub_text": "中心文字",
+    "hub_color": "中心与指针颜色",
+    "text_orientation": "标签方向",
+    "sound": "点击音效",
+    "show_status": "显示状态行",
+    "segments_helper": "转盘划分的扇区数量。范围 4 到 24。",
+    "friction_helper": "旋转或释放后转盘减速的快慢。",
+    "theme_helper": "当“颜色”为空时使用的内置色板。自定义“颜色”始终优先。",
+    "theme_default": "默认 — 内置 8 色色板",
+    "theme_pastel": "粉彩 — 柔和低饱和色调",
+    "theme_pride": "Pride — 6 条彩虹旗",
+    "theme_neon": "霓虹 — 鲜艳明亮的颜色",
+    "labels_helper": "用逗号或换行分隔。每个扇区最多一个;若数量较少则会绕转盘循环(例如 8 个扇区上的 “A, B” → A B A B A B A B)。留空表示 1..N。",
+    "weights_helper": "用逗号分隔的相对大小(只有比例有意义)。与标签使用相同的循环规则 — 4 个扇区上的 “3, 1” 会得到大、小、大、小。留空表示等大扇区。",
+    "colors_helper": "用逗号或换行分隔的 CSS 颜色(hex、rgb、hsl、命名)。按首次出现顺序映射到“唯一标签” — 共享同一标签的扇区始终共享颜色。长度最多为 `segments`;实际只使用前 N 个(= 唯一标签数)。留空使用内置色板。",
+    "label_colors_helper": "用逗号或换行分隔的 CSS 颜色,用于扇区标签文字。与“颜色”使用相同的唯一标签映射 — 实际只使用前 N 个(= 唯一标签数)。留空表示所有扇区使用深灰色。",
+    "hub_text_helper": "显示在中心圆盘上的文字。默认为“旋转”。留空可隐藏。",
+    "hub_color_helper": "中心圆盘与指针三角形。主题使用 HA 主色;黑色为黑底白字;白色为白底黑字。",
+    "hub_color_theme": "主题 — 使用 HA 主色",
+    "hub_color_black": "黑色 — 白色文字",
+    "hub_color_white": "白色 — 黑色文字",
+    "text_orientation_helper": "扇区标签的方向。切线方向(默认)沿轮缘环绕文字;径向方向将标签顺时针旋转 90° 使其沿辐条从轮缘读至中心。",
+    "sound_helper": "在每次跨过扇区时播放挡片点击声。音量随转速变化。",
+    "show_status_helper": "在转盘下方显示文字行(“旋转中…” / “结果:X” / 空闲提示)。关闭可获得更简洁的外观。",
+    "friction_low": "低 — 长时间缓慢旋转",
+    "friction_medium": "中 — 经典",
+    "friction_high": "高 — 快速停止",
+    "orientation_tangent": "切线 — 标签沿轮缘",
+    "orientation_radial": "径向 — 标签沿辐条",
+    "footer_hint": "点击转盘以获得随机冲量旋转,或点击并拖动以投掷 — 释放时的角速度决定旋转。摩擦使旋转衰减直至停止。"
+  },
+  "errors": {
+    "invalid_config": "配置无效",
+    "name_type": "name 必须是字符串",
+    "segments_range": "segments 必须是 4 到 24 之间的整数",
+    "friction_value": "friction 必须是以下之一:low、medium、high",
+    "labels_type": "labels 必须是字符串数组",
+    "labels_length": "labels 的长度({len})不得超过 segments({segments})",
+    "weights_type": "weights 必须是正数数组",
+    "weights_empty": "weights 至少需要包含一项",
+    "weights_length": "weights 的长度({len})不得超过 segments({segments})",
+    "colors_type": "colors 必须是非空字符串数组",
+    "colors_empty": "colors 至少需要包含一项",
+    "colors_length": "colors 的长度({len})不得超过 segments({segments})",
+    "label_colors_type": "label_colors 必须是非空字符串数组",
+    "label_colors_empty": "label_colors 至少需要包含一项",
+    "label_colors_length": "label_colors 的长度({len})不得超过 segments({segments})",
+    "hub_text_type": "hub_text 必须是字符串",
+    "sound_type": "sound 必须是布尔值",
+    "text_orientation_value": "text_orientation 必须是 \"tangent\" 或 \"radial\"",
+    "theme_value": "theme 必须是以下之一:default、pastel、pride、neon",
+    "hub_color_value": "hub_color 必须是以下之一:theme、black、white",
+    "show_status_type": "show_status 必须是布尔值"
+  }
+}
