@@ -37,6 +37,7 @@
     "show_status": "Mostrar linha de estado",
     "actions": "Ações",
     "disable_confirm_actions": "Desativar diálogo de confirmação",
+    "general": "Geral",
     "bindings": "Vínculos dos segmentos",
     "binding_color": "Cor de preenchimento",
     "binding_label_color": "Cor do texto",

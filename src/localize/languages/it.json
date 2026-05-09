@@ -37,6 +37,7 @@
     "show_status": "Mostra riga di stato",
     "actions": "Azioni",
     "disable_confirm_actions": "Disattiva la richiesta di conferma",
+    "general": "Generale",
     "bindings": "Associazioni dei segmenti",
     "binding_color": "Colore di riempimento",
     "binding_label_color": "Colore del testo",

@@ -37,6 +37,7 @@
     "show_status": "显示状态行",
     "actions": "动作",
     "disable_confirm_actions": "禁用确认对话框",
+    "general": "常规",
     "bindings": "扇区绑定",
     "binding_color": "填充颜色",
     "binding_label_color": "标签文字颜色",

@@ -356,26 +356,6 @@ export class SpinningWheelCardEditor
     return [
       { name: "name", selector: { text: {} } },
       {
-        name: "language",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: "auto", label: localize("editor.language_auto", lang) },
-              // Native names — they shouldn't translate.
-              { value: "en", label: "English" },
-              { value: "de", label: "Deutsch" },
-              { value: "fr", label: "Français" },
-              { value: "it", label: "Italiano" },
-              { value: "es", label: "Español" },
-              { value: "pt", label: "Português" },
-              { value: "zh", label: "简体中文" },
-              { value: "ja", label: "日本語" },
-            ],
-          },
-        },
-      },
-      {
         name: "todo_entity",
         selector: { entity: { domain: "todo" } },
       },
@@ -388,83 +368,10 @@ export class SpinningWheelCardEditor
                 number: { min: 4, max: 24, step: 1, mode: "slider" },
               },
             } satisfies HaFormSchema,
-          ]),
-      {
-        name: "friction",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: "low", label: localize("editor.friction_low", lang) },
-              {
-                value: "medium",
-                label: localize("editor.friction_medium", lang),
-              },
-              { value: "high", label: localize("editor.friction_high", lang) },
-            ],
-          },
-        },
-      },
-      {
-        name: "theme",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              {
-                value: "default",
-                label: localize("editor.theme_default", lang),
-              },
-              {
-                value: "pastel",
-                label: localize("editor.theme_pastel", lang),
-              },
-              {
-                value: "pride",
-                label: localize("editor.theme_pride", lang),
-              },
-              {
-                value: "neon",
-                label: localize("editor.theme_neon", lang),
-              },
-            ],
-          },
-        },
-      },
-      ...(todoActive
-        ? []
-        : [
             {
               name: "labels_csv",
               selector: { text: { multiline: true } },
             } satisfies HaFormSchema,
-          ]),
-      { name: "hub_text", selector: { text: {} } },
-      {
-        name: "hub_color",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              {
-                value: "theme",
-                label: localize("editor.hub_color_theme", lang),
-              },
-              {
-                value: "black",
-                label: localize("editor.hub_color_black", lang),
-              },
-              {
-                value: "white",
-                label: localize("editor.hub_color_white", lang),
-              },
-            ],
-          },
-        },
-      },
-      ...(todoActive
-        ? []
-        : [
             {
               name: "text_orientation",
               selector: {
@@ -484,8 +391,111 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
           ]),
-      { name: "sound", selector: { boolean: {} } },
-      { name: "show_status", selector: { boolean: {} } },
+      // General expandable — card-wide style + behaviour preferences.
+      // Defaults closed (matches the Bindings + Advanced expandables) so
+      // the editor opens compact; user clicks once to tweak. Order
+      // mirrors the user's requested grouping verbatim.
+      {
+        type: "expandable" as const,
+        name: "general",
+        title: localize("editor.general", lang),
+        flatten: true,
+        schema: [
+          {
+            name: "language",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  {
+                    value: "auto",
+                    label: localize("editor.language_auto", lang),
+                  },
+                  // Native names — they shouldn't translate.
+                  { value: "en", label: "English" },
+                  { value: "de", label: "Deutsch" },
+                  { value: "fr", label: "Français" },
+                  { value: "it", label: "Italiano" },
+                  { value: "es", label: "Español" },
+                  { value: "pt", label: "Português" },
+                  { value: "zh", label: "简体中文" },
+                  { value: "ja", label: "日本語" },
+                ],
+              },
+            },
+          },
+          {
+            name: "friction",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "low", label: localize("editor.friction_low", lang) },
+                  {
+                    value: "medium",
+                    label: localize("editor.friction_medium", lang),
+                  },
+                  {
+                    value: "high",
+                    label: localize("editor.friction_high", lang),
+                  },
+                ],
+              },
+            },
+          },
+          {
+            name: "theme",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  {
+                    value: "default",
+                    label: localize("editor.theme_default", lang),
+                  },
+                  {
+                    value: "pastel",
+                    label: localize("editor.theme_pastel", lang),
+                  },
+                  {
+                    value: "pride",
+                    label: localize("editor.theme_pride", lang),
+                  },
+                  {
+                    value: "neon",
+                    label: localize("editor.theme_neon", lang),
+                  },
+                ],
+              },
+            },
+          },
+          { name: "hub_text", selector: { text: {} } },
+          {
+            name: "hub_color",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  {
+                    value: "theme",
+                    label: localize("editor.hub_color_theme", lang),
+                  },
+                  {
+                    value: "black",
+                    label: localize("editor.hub_color_black", lang),
+                  },
+                  {
+                    value: "white",
+                    label: localize("editor.hub_color_white", lang),
+                  },
+                ],
+              },
+            },
+          },
+          { name: "show_status", selector: { boolean: {} } },
+          { name: "sound", selector: { boolean: {} } },
+        ],
+      },
       { name: "disable_confirm_actions", selector: { boolean: {} } },
       // Bindings panel — one expandable per unique label, dynamically
       // generated each render so adding/renaming labels reshapes the

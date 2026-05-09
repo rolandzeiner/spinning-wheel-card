@@ -37,6 +37,7 @@
     "show_status": "Show status line",
     "actions": "Actions",
     "disable_confirm_actions": "Disable confirmation prompt",
+    "general": "General",
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",
     "binding_label_color": "Label text colour",

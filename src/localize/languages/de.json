@@ -37,6 +37,7 @@
     "show_status": "Statuszeile anzeigen",
     "actions": "Aktionen",
     "disable_confirm_actions": "Bestätigungsdialog deaktivieren",
+    "general": "Allgemein",
     "bindings": "Segment-Bindungen",
     "binding_color": "Füllfarbe",
     "binding_label_color": "Beschriftungsfarbe",

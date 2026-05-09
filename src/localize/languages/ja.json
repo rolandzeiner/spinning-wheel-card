@@ -37,6 +37,7 @@
     "show_status": "ステータス行を表示",
     "actions": "アクション",
     "disable_confirm_actions": "確認ダイアログを無効にする",
+    "general": "全般",
     "bindings": "セグメント割り当て",
     "binding_color": "塗りつぶし色",
     "binding_label_color": "ラベル文字色",
