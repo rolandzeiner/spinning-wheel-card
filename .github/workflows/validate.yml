@@ -15,7 +15,7 @@ jobs:
   validate-hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: hacs/action@main
         with:
           # plugin = Lovelace frontend resource (this repo).
@@ -25,7 +25,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Guard against backticks inside Lit css/html templates
         # Stray ` inside a css`...` or html`...` tagged template
@@ -54,7 +54,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
