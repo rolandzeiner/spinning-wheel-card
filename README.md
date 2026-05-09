@@ -177,15 +177,28 @@ hub_text: GO!
 
 ## Translations
 
-Bundled languages: **English (en)** and **German (de)**. The active language follows `hass.locale.language` (HA profile) and falls back through `hass.language` → `navigator.language` → `en`. Switching language in HA re-renders the card live; no reload needed.
+Bundled languages:
 
-Adding a third language is mechanical:
+| Code | Language |
+| --- | --- |
+| `en` | English |
+| `de` | German (Deutsch) |
+| `fr` | French (Français) |
+| `it` | Italian (Italiano) |
+| `es` | Spanish (Español) |
+| `pt` | Portuguese (Português) |
+| `zh` | Simplified Chinese (简体中文) |
+| `ja` | Japanese (日本語) |
 
-1. Drop a `<code>.json` next to `src/localize/languages/{en,de}.json` with the same key tree.
+The active language follows `hass.locale.language` (HA profile) and falls back through `hass.language` → `navigator.language` → `en`. BCP-47 region codes (`en-GB`, `de-AT`, `pt-BR`, `zh-CN`) are normalised to the ISO-639-1 base — so any regional variant of a supported language picks up the matching translation. Switching language in HA re-renders the card live; no reload needed.
+
+Adding another language is mechanical:
+
+1. Drop a `<code>.json` next to the existing `src/localize/languages/*.json` with the same key tree.
 2. Register it in `src/localize/localize.ts`:
    ```ts
-   import * as fr from "./languages/fr.json";
-   const languages = { en, de, fr };
+   import * as nl from "./languages/nl.json";
+   const languages = { en, de, fr, it, es, pt, zh, ja, nl };
    ```
 3. `npm run build`. PRs welcome.
 

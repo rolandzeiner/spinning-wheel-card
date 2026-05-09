@@ -1,0 +1,80 @@
+{
+  "common": {
+    "default_name": "Roue de la fortune"
+  },
+  "status": {
+    "spinning": "Tourne…",
+    "result": "Résultat : {value}",
+    "idle": "Cliquez pour tourner · glissez pour lancer"
+  },
+  "hub": {
+    "default_text": "TOURNER"
+  },
+  "picker": {
+    "name": "Roue de la fortune",
+    "description": "Une roue à cliquer ou à lancer avec une physique d'inertie."
+  },
+  "editor": {
+    "name": "Titre de la carte",
+    "segments": "Segments",
+    "friction": "Frottement",
+    "theme": "Thème de couleur",
+    "labels": "Étiquettes",
+    "weights": "Pondérations",
+    "colors": "Couleurs",
+    "label_colors": "Couleurs des étiquettes",
+    "hub_text": "Texte du moyeu",
+    "hub_color": "Couleur du moyeu et de l'aiguille",
+    "text_orientation": "Orientation des étiquettes",
+    "sound": "Son du clic",
+    "show_status": "Afficher la ligne d'état",
+    "segments_helper": "Nombre de tranches en lesquelles la roue est divisée. De 4 à 24.",
+    "friction_helper": "Vitesse à laquelle la roue ralentit après une rotation ou un lâcher.",
+    "theme_helper": "Palette de couleurs intégrée utilisée lorsque Couleurs est vide. Couleurs personnalisées prend toujours le dessus.",
+    "theme_default": "Par défaut — palette intégrée à 8 couleurs",
+    "theme_pastel": "Pastel — tons doux et peu saturés",
+    "theme_pride": "Pride — drapeau arc-en-ciel à 6 bandes",
+    "theme_neon": "Néon — couleurs vives et éclatantes",
+    "labels_helper": "Séparées par des virgules ou des sauts de ligne. Jusqu'à une par segment ; si vous en donnez moins, elles sont répétées autour de la roue (ex. « A, B » sur 8 segments → A B A B A B A B). Laissez vide pour 1..N.",
+    "weights_helper": "Tailles relatives séparées par des virgules (seul le rapport compte). Même règle de répétition que les étiquettes — « 3, 1 » sur 4 segments donne grand, petit, grand, petit. Laissez vide pour des tranches égales.",
+    "colors_helper": "Couleurs CSS séparées par des virgules ou des sauts de ligne (hex, rgb, hsl, nommées). Affectées aux étiquettes UNIQUES dans l'ordre de leur première apparition — les segments partageant une étiquette partagent toujours la même couleur. Longueur jusqu'à `segments` ; seuls les N premiers (= nombre d'étiquettes uniques) sont réellement utilisés. Laissez vide pour la palette intégrée.",
+    "label_colors_helper": "Couleurs CSS séparées par des virgules ou des sauts de ligne pour le texte des étiquettes. Même mappage par étiquette unique que Couleurs — seuls les N premiers (= nombre d'étiquettes uniques) sont utilisés. Laissez vide pour du gris foncé sur tous les segments.",
+    "hub_text_helper": "Texte affiché au centre du moyeu. Par défaut TOURNER. Vide pour le masquer.",
+    "hub_color_helper": "Moyeu central et triangle indicateur. Thème utilise la couleur principale de HA ; Noir donne un moyeu noir avec texte blanc ; Blanc donne un moyeu blanc avec texte noir.",
+    "hub_color_theme": "Thème — utiliser la couleur principale de HA",
+    "hub_color_black": "Noir — texte blanc",
+    "hub_color_white": "Blanc — texte noir",
+    "text_orientation_helper": "Orientation des étiquettes des segments. Tangentielle (par défaut) enroule le texte autour du bord ; Radiale fait pivoter les étiquettes de 90° dans le sens horaire pour les lire le long du rayon, du bord vers le centre.",
+    "sound_helper": "Émettre un clic de cheville à chaque passage de segment. Le volume varie avec la vitesse de la roue.",
+    "show_status_helper": "Afficher la ligne de texte sous la roue (« Tourne… » / « Résultat : X » / l'invite d'inactivité). Désactivez pour un rendu plus minimaliste.",
+    "friction_low": "Faible — rotations longues et tranquilles",
+    "friction_medium": "Moyen — classique",
+    "friction_high": "Élevé — s'arrête rapidement",
+    "orientation_tangent": "Tangentielle — étiquettes autour du bord",
+    "orientation_radial": "Radiale — étiquettes le long des rayons",
+    "footer_hint": "Cliquez sur la roue pour une rotation à impulsion aléatoire, ou cliquez-glissez pour la lancer — la vitesse angulaire au moment du lâcher détermine la rotation. Le frottement la fait ralentir jusqu'à l'arrêt."
+  },
+  "errors": {
+    "invalid_config": "Configuration invalide",
+    "name_type": "name doit être une chaîne de caractères",
+    "segments_range": "segments doit être un entier compris entre 4 et 24",
+    "friction_value": "friction doit valoir low, medium ou high",
+    "labels_type": "labels doit être un tableau de chaînes de caractères",
+    "labels_length": "la longueur de labels ({len}) ne doit pas dépasser segments ({segments})",
+    "weights_type": "weights doit être un tableau de nombres positifs",
+    "weights_empty": "weights doit contenir au moins une entrée",
+    "weights_length": "la longueur de weights ({len}) ne doit pas dépasser segments ({segments})",
+    "colors_type": "colors doit être un tableau de chaînes non vides",
+    "colors_empty": "colors doit contenir au moins une entrée",
+    "colors_length": "la longueur de colors ({len}) ne doit pas dépasser segments ({segments})",
+    "label_colors_type": "label_colors doit être un tableau de chaînes non vides",
+    "label_colors_empty": "label_colors doit contenir au moins une entrée",
+    "label_colors_length": "la longueur de label_colors ({len}) ne doit pas dépasser segments ({segments})",
+    "hub_text_type": "hub_text doit être une chaîne de caractères",
+    "sound_type": "sound doit être un booléen",
+    "text_orientation_value": "text_orientation doit valoir \"tangent\" ou \"radial\"",
+    "theme_value": "theme doit valoir default, pastel, pride ou neon",
+    "hub_color_value": "hub_color doit valoir theme, black ou white",
+    "show_status_type": "show_status doit être un booléen"
+  }
+}
