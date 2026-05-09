@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import type { TemplateResult, CSSResultGroup } from "lit";
+import type { TemplateResult, CSSResultGroup, PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type {
@@ -9,6 +9,7 @@ import type {
   LovelaceCardEditor,
   SpinningWheelCardConfig,
   Theme,
+  TodoItem,
 } from "./types";
 import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
@@ -150,6 +151,23 @@ export class SpinningWheelCardEditor
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
 
+  // ── Todo-list integration (editor-side mirror of card's fetch) ──────
+  // When `todo_entity` is wired the bindings panel projects per-item
+  // rows from the live entity, matching what the card renders at
+  // runtime. Without this mirror the panel would show rows for the
+  // static `_config.labels` (which are ignored when todo is active),
+  // making per-todo-item colour / action configuration impossible.
+  @state() private _todoItems: ReadonlyArray<TodoItem> | null = null;
+  /** Tracks the entity_id we last fetched against so swapping todo
+   *  entities or unsetting drops the cache. */
+  private _todoLastEntity: string | null = null;
+  /** HA reports a todo entity's open-count as `state` — refetch when
+   *  it changes (covers item adds, completes, removes, undos). */
+  private _todoLastEntityState: string | null = null;
+  /** Debounce flag — `hass` updates burst (theme + state on the same
+   *  tick is common); without this we'd kick off duplicate WS calls. */
+  private _todoLoading = false;
+
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
     this._labelsText = (config.labels ?? []).join(", ");
@@ -162,13 +180,99 @@ export class SpinningWheelCardEditor
     return this._config?.language ?? resolveLang(this.hass);
   }
 
+  protected override updated(_changed: PropertyValues): void {
+    // Editor-side mirror of the card's todo-fetch trigger. Two events
+    // refresh the cache:
+    //   1. `todo_entity` swapped (or unset) — drop the cache so stale
+    //      summaries from the previous entity don't bleed into the
+    //      bindings panel.
+    //   2. The entity's `state` (open-count) changed — items added /
+    //      completed / removed since the last fetch.
+    const entityId = this._config.todo_entity ?? null;
+    if (entityId !== this._todoLastEntity) {
+      this._todoLastEntity = entityId;
+      this._todoItems = null;
+      this._todoLastEntityState = null;
+    }
+    if (entityId) {
+      const entity = this.hass?.states?.[entityId];
+      const stateNow = entity?.state ?? null;
+      if (stateNow !== this._todoLastEntityState) {
+        this._todoLastEntityState = stateNow;
+        if (stateNow !== null) void this._fetchTodoItems();
+      }
+    }
+  }
+
+  /** Fetch open items from the configured todo entity via the
+   *  `todo/item/list` WS endpoint. Filters to `needs_action`, dedups
+   *  by summary in order — identical logic to the card's fetch at
+   *  spinning-wheel-card.ts:_fetchTodoItems so editor and runtime
+   *  agree on which items become unique-label slots. */
+  private async _fetchTodoItems(): Promise<void> {
+    const entity = this._config.todo_entity;
+    if (!entity || !this.hass?.callWS) return;
+    if (this._todoLoading) return;
+    this._todoLoading = true;
+    try {
+      const reply = (await this.hass.callWS({
+        type: "todo/item/list",
+        entity_id: entity,
+      })) as { items?: ReadonlyArray<TodoItem> } | undefined;
+      const all = reply?.items ?? [];
+      const open = all.filter(
+        (i) => (i.status ?? "needs_action") === "needs_action",
+      );
+      const seen = new Set<string>();
+      const unique: TodoItem[] = [];
+      for (const item of open) {
+        const key = item.summary ?? "";
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        unique.push(item);
+      }
+      this._todoItems = unique;
+    } catch (err) {
+      console.warn(
+        "[spinning-wheel-card editor] todo/item/list failed:",
+        err,
+      );
+      this._todoItems = [];
+    } finally {
+      this._todoLoading = false;
+    }
+  }
+
   // ── Bindings-panel resolution (mirrors card's same-label-same-X) ─────
 
   /** Unique labels in order of first appearance — the binding key for
    *  the per-row panel. Mirrors the walk in spinning-wheel-card.ts's
    *  `_mapPaletteToLabels` so the editor and card agree on which label
-   *  occupies which slot. Empty `labels` config defaults to "1".."N". */
+   *  occupies which slot.
+   *
+   *  Resolution priority:
+   *    1. Todo-list mode: when `todo_entity` is wired, project the
+   *       fetched item summaries (already deduped by `_fetchTodoItems`)
+   *       so the bindings panel matches what the card renders at
+   *       runtime. While items haven't loaded yet — or the list is
+   *       empty — return an empty array so the panel renders 0 rows
+   *       (the user sees the todo-empty state instead of mismatched
+   *       static labels).
+   *    2. Static `labels` config (cycled to length = segments).
+   *    3. Default "1".."N" when neither is set. */
   private _uniqueLabels(): ReadonlyArray<string> {
+    if (this._config.todo_entity) {
+      if (!this._todoItems || this._todoItems.length === 0) return [];
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const item of this._todoItems) {
+        const summary = item.summary ?? "";
+        if (!summary || seen.has(summary)) continue;
+        seen.add(summary);
+        out.push(summary);
+      }
+      return out;
+    }
     const segments = this._config.segments ?? DEFAULT_SEGMENTS;
     const src = this._config.labels;
     const expanded =
@@ -239,9 +343,16 @@ export class SpinningWheelCardEditor
   }
 
   /** Rebuilt per render so option labels translate when language changes —
-   *  ha-form bakes label text into the schema. */
+   *  ha-form bakes label text into the schema. When `todo_entity` is
+   *  wired, the fields whose values are overridden by the entity
+   *  (`segments`, `labels_csv`) or whose card-side defaults flip
+   *  (`text_orientation` defaults to radial in todo mode for
+   *  long-summary readability) are spliced out — the canonical
+   *  ha-form pattern for conditional fields per the conditional-
+   *  fields gotcha in `ha-lovelace-card` SKILL.md. */
   private _buildSchema(): ReadonlyArray<HaFormSchema> {
     const lang = this._lang();
+    const todoActive = !!this._config.todo_entity;
     return [
       { name: "name", selector: { text: {} } },
       {
@@ -268,10 +379,16 @@ export class SpinningWheelCardEditor
         name: "todo_entity",
         selector: { entity: { domain: "todo" } },
       },
-      {
-        name: "segments",
-        selector: { number: { min: 4, max: 24, step: 1, mode: "slider" } },
-      },
+      ...(todoActive
+        ? []
+        : [
+            {
+              name: "segments",
+              selector: {
+                number: { min: 4, max: 24, step: 1, mode: "slider" },
+              },
+            } satisfies HaFormSchema,
+          ]),
       {
         name: "friction",
         selector: {
@@ -314,10 +431,14 @@ export class SpinningWheelCardEditor
           },
         },
       },
-      {
-        name: "labels_csv",
-        selector: { text: { multiline: true } },
-      },
+      ...(todoActive
+        ? []
+        : [
+            {
+              name: "labels_csv",
+              selector: { text: { multiline: true } },
+            } satisfies HaFormSchema,
+          ]),
       { name: "hub_text", selector: { text: {} } },
       {
         name: "hub_color",
@@ -341,24 +462,28 @@ export class SpinningWheelCardEditor
           },
         },
       },
-      {
-        name: "text_orientation",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              {
-                value: "tangent",
-                label: localize("editor.orientation_tangent", lang),
+      ...(todoActive
+        ? []
+        : [
+            {
+              name: "text_orientation",
+              selector: {
+                select: {
+                  mode: "dropdown",
+                  options: [
+                    {
+                      value: "tangent",
+                      label: localize("editor.orientation_tangent", lang),
+                    },
+                    {
+                      value: "radial",
+                      label: localize("editor.orientation_radial", lang),
+                    },
+                  ],
+                },
               },
-              {
-                value: "radial",
-                label: localize("editor.orientation_radial", lang),
-              },
-            ],
-          },
-        },
-      },
+            } satisfies HaFormSchema,
+          ]),
       { name: "sound", selector: { boolean: {} } },
       { name: "show_status", selector: { boolean: {} } },
       { name: "disable_confirm_actions", selector: { boolean: {} } },
