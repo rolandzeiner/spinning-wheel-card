@@ -40,6 +40,7 @@
     "disable_boost": "Disable click-to-boost",
     "result_entity": "Result helper",
     "result_entity_create": "Create dedicated helper",
+    "result_entity_create_hint": "Want HA automations to trigger on each spin's result? Create a dedicated input_text helper here — the wheel will write the winning label to it after every spin, and you can wire automations on `platform: state, entity_id: …` to fire whatever you like.",
     "result_entity_default_name": "Spinning Wheel Result",
     "result_entity_created": "Result helper created: {entity}",
     "result_entity_create_failed": "Failed to create result helper. See browser console for details.",

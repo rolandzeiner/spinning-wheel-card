@@ -40,6 +40,7 @@
     "disable_boost": "禁用点击加速",
     "result_entity": "结果助手",
     "result_entity_create": "创建专用助手",
+    "result_entity_create_hint": "想让 HA 自动化随每次旋转结果触发?在这里创建一个专用的 input_text 助手 — 转盘会在每次旋转后把获胜标签写入其中,你就可以用 `platform: state, entity_id: …` 触发任意自动化。",
     "result_entity_default_name": "幸运转盘结果",
     "result_entity_created": "已创建结果助手:{entity}",
     "result_entity_create_failed": "创建结果助手失败,详情请查看浏览器控制台。",

@@ -47,7 +47,16 @@ export const editorStyles = css`
      being phased out of HA's frontend". */
   .create-helper-row {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: var(--ha-space-2, 8px);
+    align-items: flex-end;
+  }
+  .create-helper-hint {
+    margin: 0;
+    width: 100%;
+    font-size: var(--ha-font-size-s, 12px);
+    line-height: 1.4;
+    color: var(--secondary-text-color);
   }
   .create-helper-btn {
     appearance: none;

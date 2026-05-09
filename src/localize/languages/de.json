@@ -40,6 +40,7 @@
     "disable_boost": "Klick-Boost deaktivieren",
     "result_entity": "Ergebnis-Helfer",
     "result_entity_create": "Dedizierten Helfer erstellen",
+    "result_entity_create_hint": "HA-Automationen sollen bei jedem Drehergebnis ausgelöst werden? Erstelle hier einen dedizierten input_text-Helfer — das Rad schreibt nach jedem Dreh die gewinnende Beschriftung hinein, und du kannst per `platform: state, entity_id: …` beliebige Automationen daran knüpfen.",
     "result_entity_default_name": "Glücksrad-Ergebnis",
     "result_entity_created": "Ergebnis-Helfer erstellt: {entity}",
     "result_entity_create_failed": "Erstellung des Ergebnis-Helfers fehlgeschlagen. Details in der Browser-Konsole.",

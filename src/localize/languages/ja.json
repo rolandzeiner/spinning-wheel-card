@@ -40,6 +40,7 @@
     "disable_boost": "クリックでの加速を無効にする",
     "result_entity": "結果ヘルパー",
     "result_entity_create": "専用ヘルパーを作成",
+    "result_entity_create_hint": "回転結果のたびに HA のオートメーションを発火させたいですか?ここで専用の input_text ヘルパーを作成すると、回転ごとに勝利ラベルが書き込まれます。`platform: state, entity_id: …` で任意のオートメーションをトリガーできます。",
     "result_entity_default_name": "ルーレットの結果",
     "result_entity_created": "結果ヘルパーを作成しました:{entity}",
     "result_entity_create_failed": "結果ヘルパーの作成に失敗しました。詳細はブラウザのコンソールを確認してください。",

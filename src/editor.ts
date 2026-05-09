@@ -151,6 +151,16 @@ export class SpinningWheelCardEditor
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
 
+  /** Tracks whether the user clicked "Create dedicated helper" during
+   *  this editor session. Hides the button as soon as creation
+   *  succeeds — even if ha-form's entity selector spuriously emits an
+   *  empty value-changed shortly after (the just-created entity may
+   *  not be in `hass.states` yet, and some HA versions reconcile that
+   *  to "" briefly). The session-scoped flag survives that race; the
+   *  YAML's `result_entity` (when saved) is still the durable check
+   *  on the next editor open. */
+  @state() private _helperCreatedThisSession = false;
+
   // ── Todo-list integration (editor-side mirror of card's fetch) ──────
   // When `todo_entity` is wired the bindings panel projects per-item
   // rows from the live entity, matching what the card renders at
@@ -1046,13 +1056,17 @@ export class SpinningWheelCardEditor
     };
     // The "Create dedicated helper" button is admin-only — `input_text/
     // create` is wrapped in `require_admin` upstream. Hidden when a
-    // helper is already wired (no point), or when the user isn't
-    // admin (the WS call would 4xx anyway). Lives in the same
-    // custom-Lit slot as the footer hint — single bespoke widget
-    // alongside ha-form, per the skill's "ha-form + targeted custom
-    // template" pattern.
+    // helper is already wired (`_config.result_entity` set) OR when
+    // creation succeeded earlier in this session
+    // (`_helperCreatedThisSession` — see field comment for the
+    // ha-form-strips-empty race), OR when the user isn't admin.
+    // Lives in the same custom-Lit slot as the footer hint — single
+    // bespoke widget alongside ha-form, per the skill's "ha-form +
+    // targeted custom template" pattern.
     const showCreateHelper =
-      !this._config.result_entity && this.hass?.user?.is_admin === true;
+      !this._helperCreatedThisSession &&
+      !this._config.result_entity &&
+      this.hass?.user?.is_admin === true;
     return html`
       <div class="editor">
         <ha-form
@@ -1066,6 +1080,9 @@ export class SpinningWheelCardEditor
         ${showCreateHelper
           ? html`
               <div class="create-helper-row">
+                <p class="create-helper-hint">
+                  ${localize("editor.result_entity_create_hint", lang)}
+                </p>
                 <button
                   type="button"
                   class="create-helper-btn"
@@ -1106,6 +1123,7 @@ export class SpinningWheelCardEditor
       if (reply?.id) {
         const entityId = `input_text.${reply.id}`;
         this._config = { ...this._config, result_entity: entityId };
+        this._helperCreatedThisSession = true;
         fireEvent(this, "config-changed", { config: this._config });
         // HA's standard toast slot — fire-and-forget, dashboard's
         // <notification-manager> picks it up via the bubbling +

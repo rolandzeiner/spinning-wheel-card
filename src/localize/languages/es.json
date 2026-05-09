@@ -40,6 +40,7 @@
     "disable_boost": "Desactivar el impulso al hacer clic",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Crear helper dedicado",
+    "result_entity_create_hint": "¿Quieres que las automatizaciones de HA se disparen con cada resultado de giro? Crea aquí un helper input_text dedicado: la ruleta escribirá la etiqueta ganadora tras cada giro, y puedes activar automatizaciones con `platform: state, entity_id: …`.",
     "result_entity_default_name": "Resultado de la ruleta",
     "result_entity_created": "Helper de resultado creado: {entity}",
     "result_entity_create_failed": "Error al crear el helper de resultado. Consulta la consola del navegador para más detalles.",

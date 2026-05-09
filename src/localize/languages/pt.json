@@ -40,6 +40,7 @@
     "disable_boost": "Desativar o impulso ao clicar",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Criar helper dedicado",
+    "result_entity_create_hint": "Quer que automações do HA disparem a cada resultado de giro? Crie aqui um helper input_text dedicado — a roda escreve nele o rótulo vencedor após cada giro, e você pode conectar automações com `platform: state, entity_id: …`.",
     "result_entity_default_name": "Resultado da roda",
     "result_entity_created": "Helper de resultado criado: {entity}",
     "result_entity_create_failed": "Falha ao criar o helper de resultado. Consulte o console do navegador para detalhes.",

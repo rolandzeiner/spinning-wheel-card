@@ -40,6 +40,7 @@
     "disable_boost": "Disattiva l'accelerazione al clic",
     "result_entity": "Helper del risultato",
     "result_entity_create": "Crea un helper dedicato",
+    "result_entity_create_hint": "Vuoi che le automazioni HA si attivino al risultato di ogni giro? Crea qui un helper input_text dedicato: la ruota vi scriverà l'etichetta vincente dopo ogni giro, e potrai collegare automazioni con `platform: state, entity_id: …`.",
     "result_entity_default_name": "Risultato della ruota",
     "result_entity_created": "Helper del risultato creato: {entity}",
     "result_entity_create_failed": "Creazione dell'helper del risultato non riuscita. Vedi la console del browser per i dettagli.",
