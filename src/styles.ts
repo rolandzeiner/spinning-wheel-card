@@ -1,12 +1,5 @@
 import { css } from "lit";
 
-// Editor-side styles. Live in the editor's shadow root.
-// HA form components (ha-textfield, ha-switch, etc.) bring their own
-// theming — keep editor CSS to layout + spacing.
-//
-// `<ha-form>` owns its own focus rings, but custom widgets inside the
-// editor (chips, picker buttons, ...) need the same a11y catch-all the
-// card carries. Ship the three blocks here too.
 export const editorStyles = css`
   :host {
     color-scheme: light dark;
@@ -39,16 +32,8 @@ export const editorStyles = css`
     line-height: 1.4;
   }
 
-  /* "Create dedicated helper" button — admin-only, rendered below
-     ha-form when no result_entity is wired. Native <button> styled
-     with HA theme tokens; <mwc-button> is being phased out and ha-form
-     has no native button-in-schema slot, so this is the documented
-     path. Skill ref: ha-lovelace-card SKILL.md § "@material/mwc-* is
-     being phased out of HA's frontend". */
-  /* Standalone result_entity picker rendered below ha-form. Lives
-     outside the form to dodge ha-form's entity-selector-emits-empty
-     race after programmatic value updates (see editor.ts comments).
-     Visual gap matches ha-form's natural row spacing. */
+  /* Native <button> rather than <mwc-button> — mwc-* is being phased
+     out of HA's frontend (ha-lovelace-card SKILL.md). */
   .result-entity-row {
     display: block;
     margin-top: var(--ha-space-2, 8px);
@@ -101,7 +86,6 @@ export const editorStyles = css`
     justify-content: space-between;
   }
 
-  /* ── Accessibility primitives ───────────────────────────────────── */
   a:focus-visible,
   button:focus-visible {
     outline: 2px solid var(--primary-color);

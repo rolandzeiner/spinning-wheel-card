@@ -1,5 +1,3 @@
-// Local mirror of HA / Lovelace types this card uses.
-
 export interface HassEntity {
   state: string;
   attributes: Record<string, unknown> & {
@@ -14,36 +12,27 @@ export interface HassEntity {
 /** Minimal HA shape — only the fields this card touches. */
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
-  /** Modern HA exposes the user's locale here. Older versions only had
-   *  `language` at the top level — we read both with `??` fallback. */
+  /** Modern HA exposes the user's locale here; older versions only had
+   *  top-level `language`. Read both with `??` fallback. */
   locale?: { language?: string } & Record<string, unknown>;
   language?: string;
   themes?: { darkMode?: boolean } & Record<string, unknown>;
   config?: { time_zone?: string } & Record<string, unknown>;
   localize?: (key: string, ...args: unknown[]) => string;
   callWS?<T = unknown>(msg: { type: string; [key: string]: unknown }): Promise<T>;
-  /** Standard HA hass-shape — `home-assistant-js-websocket` exposes
-   *  `callService(domain, service, serviceData?, target?)`. Optional
-   *  here because this interface is intentionally a minimal subset; the
-   *  per-segment-action dispatcher guards the call. */
   callService?<T = unknown>(
     domain: string,
     service: string,
     serviceData?: Record<string, unknown>,
     target?: HassServiceTarget,
   ): Promise<T>;
-  /** Active HA user — populated by the frontend on every connection.
-   *  The card only reads `is_admin` (admin-only WS calls like
-   *  `input_text/create` need to be gated client-side so non-admins
-   *  don't see a button that's going to fail). Real shape carries
-   *  more fields (`is_owner`, `name`, etc.); we narrow to what we
-   *  use. */
+  /** Active HA user. Only `is_admin` is read — admin-only WS calls
+   *  (e.g. `input_text/create`) must be gated client-side so non-admins
+   *  don't see a button that's going to fail. */
   user?: { is_admin?: boolean; is_owner?: boolean; name?: string };
 }
 
-/** Standard HA service-call target. Mirrors `home-assistant-js-websocket`'s
- *  `HassServiceTarget`. Any one (or several) of the id fields can be set;
- *  HA resolves device/area/floor/label IDs server-side. */
+/** Mirrors `home-assistant-js-websocket`'s `HassServiceTarget`. */
 export interface HassServiceTarget {
   entity_id?: string | ReadonlyArray<string>;
   device_id?: string | ReadonlyArray<string>;
@@ -53,19 +42,15 @@ export interface HassServiceTarget {
 }
 
 /** Confirmation envelope per HA's standard ActionConfig. `true` prompts
- *  with a generic message; an object lets the user supply their own
- *  `text`. `false` opts a single action out of confirmation when the
- *  card-level default is on. */
+ *  with a generic message; an object supplies custom `text`. `false`
+ *  opts a single action out when the card-level default is on. */
 export type ConfirmationConfig =
   | boolean
   | { text?: string; exemptions?: ReadonlyArray<{ user: string }> };
 
-/** Lovelace ActionConfig — discriminated union mirroring HA's standard
- *  tap_action / hold_action / double_tap_action shape. We re-declare it
- *  locally instead of pulling in `custom-card-helpers` (the portfolio
- *  dropped that runtime dep for supply-chain hygiene). 2024.8+ HA prefers
- *  `perform-action` / `perform_action` over `call-service` / `service`;
- *  both are accepted at runtime so existing YAML keeps working. */
+/** Lovelace ActionConfig — re-declared locally (avoids the
+ *  `custom-card-helpers` runtime dep). 2024.8+ HA prefers
+ *  `perform-action` / `perform_action`; both keys accepted at runtime. */
 export type ActionConfig =
   | { action: "none" }
   | { action: "toggle"; entity?: string; confirmation?: ConfirmationConfig }
@@ -113,8 +98,6 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-/** `LovelaceCard` is only referenced as the `hui-error-card` tag-map
- *  entry below, so an HTMLElement alias suffices. */
 export type LovelaceCard = HTMLElement;
 
 /** `bubbles: true` + `composed: true` are required so the event crosses
@@ -130,8 +113,6 @@ export function fireEvent<T>(
   );
 }
 
-// Register your editor element + the built-in error card with the global
-// HTMLElementTagNameMap so TypeScript autocompletes them in templates.
 declare global {
   interface HTMLElementTagNameMap {
     "spinning-wheel-card-editor": LovelaceCardEditor;
@@ -157,11 +138,8 @@ interface HaSelectorElement extends HTMLElement {
   required?: boolean;
 }
 
-// HASelector union — covers the most common selector keys. Widen as you
-// reach for new ones; the canonical, exhaustive list is HA frontend
-// src/data/selector.ts. Keys are: entity, area, device, boolean, text,
-// number, select, color_rgb, color_temp, icon, time, date, datetime,
-// duration, theme, object, constant.
+// Subset of HA selector keys; canonical list lives in HA frontend
+// src/data/selector.ts. Widen as needed.
 export type HASelector =
   | { entity: { domain?: string | string[]; integration?: string; multiple?: boolean } }
   | { area: { multiple?: boolean } }
@@ -212,12 +190,9 @@ export interface HaFormExpandableSchema {
   type: "expandable";
   name: string;
   title?: string;
-  /**
-   * REQUIRED for flat config shapes (the common case). Without it,
-   * ha-form's value-changed reducer nests the inner fields' values
-   * under `data[name]` and the card silently misses them. See the
-   * `<ha-form>` `expandable` footgun gotcha in SKILL.md.
-   */
+  /** REQUIRED for flat config shapes (the common case). Without it,
+   *  ha-form nests inner field values under `data[name]` and the card
+   *  silently misses them — the `<ha-form>` expandable footgun. */
   flatten?: boolean;
   schema: ReadonlyArray<HaFormSchema>;
 }
@@ -228,125 +203,88 @@ export type HaFormSchema =
 
 export type Friction = "low" | "medium" | "high";
 
-/** Built-in colour-theme presets. Used as the fallback palette when the
- *  user hasn't supplied a `colors` array. Custom `colors` always wins. */
+/** Built-in palette presets. Custom `colors` always wins over `theme`. */
 export type Theme = "default" | "pastel" | "pride" | "neon";
 
-/** Hub + indicator colour mode.
- *  - `theme`: use the active HA `--primary-color` (default).
- *  - `black`: solid black hub + indicator with white hub text.
- *  - `white`: solid white hub + indicator with black hub text. */
+/** Hub + indicator fill mode. `theme` uses HA's `--primary-color`;
+ *  `black` / `white` are solid with auto-contrast hub text. */
 export type HubColor = "theme" | "black" | "white";
 
-/** Single item in a HA `todo.*` entity's list. The fields below are the
- *  ones the wheel touches; the WS reply carries more (uid, due, etc.)
- *  that we deliberately ignore. */
+/** Subset of HA `todo.*` item shape — only fields the wheel touches. */
 export interface TodoItem {
-  /** Free-text label the user typed in HA. Becomes a wheel segment label. */
   summary: string;
-  /** "needs_action" = open / "completed" = done. Wheel only renders open. */
   status?: "needs_action" | "completed";
-  /** UID is opaque-string in HA's todo schema — we don't read it but
-   *  declaring the field keeps strict-mode `noUncheckedIndexedAccess`
-   *  happy when the WS reply is destructured. */
   uid?: string;
 }
 
 export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   type: string;
   name?: string;
-  /** Optional HA `todo.*` entity_id. When set, the wheel's segments are
-   *  filled with the entity's *open* (needs_action) item summaries
-   *  fetched via `todo/item/list`, and `segments` is auto-derived from
-   *  the item count (clamped 4..24). The static `labels` array is
-   *  ignored while a todo_entity is active — todo wins. Refetch fires
-   *  whenever the entity's `state` (open-count) changes. */
+  /** HA `todo.*` entity_id. When set, segments are filled with open
+   *  (needs_action) item summaries from `todo/item/list`; `segments` is
+   *  auto-derived (clamped 4..24); the static `labels` array is ignored.
+   *  Refetch fires when the entity's open-count changes. */
   todo_entity?: string;
-  /** Override the auto-detected display language for this card (any
-   *  ISO-639-1 code). When unset, the card follows
-   *  hass.locale.language → hass.language → navigator.language → "en".
-   *  Unsupported codes fall through to English just like the auto-detect
-   *  path. */
+  /** Per-card override for the display language (ISO-639-1). Unset =
+   *  follow `hass.locale.language` → `hass.language` → `navigator.language`
+   *  → "en". Unsupported codes fall through to English. */
   language?: string;
-  /** How many segments the wheel is divided into (4–24). Default 8. */
+  /** Segment count (4–24). Default 8. */
   segments?: number;
   /** Deceleration preset. Default "medium". */
   friction?: Friction;
-  /** Optional per-segment labels. Length 1..segments — when shorter than
-   *  `segments`, the labels are cycled around the wheel (e.g. ["A","B"]
-   *  on 8 segments → A B A B A B A B). Defaults to "1".."N" when omitted. */
+  /** Per-segment labels (1..segments). Shorter arrays cycle around the
+   *  wheel. Defaults to "1".."N". */
   labels?: ReadonlyArray<string>;
-  /** Optional per-segment relative weights (segment widths). Same cycling
-   *  rule as labels: [3, 1] on 4 segments → big, small, big, small.
-   *  Values are normalised — only their ratio matters. Default: all equal. */
+  /** Per-segment relative weights (1..segments). Cycles like `labels`;
+   *  values normalised — only ratios matter. Default: all equal. */
   weights?: ReadonlyArray<number>;
-  /** Built-in colour-theme preset. Picks the fallback palette used when
-   *  `colors` is not supplied. `colors` (when set) always wins over
-   *  `theme`. Default: "default" (built-in 8-colour rainbow). */
+  /** Fallback palette preset, used when `colors` is unset. */
   theme?: Theme;
-  /** Optional palette. Any CSS colour string (hex / rgb / hsl / named).
-   *  Colours are mapped to UNIQUE LABELS in order of first appearance, so
-   *  segments with the same label always share a colour. Length 1..segments.
-   *  When set, overrides `theme`. Default: the active `theme`'s palette,
-   *  or the built-in 8-colour rainbow when `theme` is "default" / unset. */
+  /** Per-segment fill colours (any CSS colour string). Mapped to UNIQUE
+   *  LABELS in order of first appearance, so segments sharing a label
+   *  always share a colour. Length 1..segments. Overrides `theme`. */
   colors?: ReadonlyArray<string>;
-  /** Optional per-segment label text colour. Same cycling rule as
-   *  `colors` — mapped to UNIQUE LABELS in order of first appearance, so
-   *  segments sharing a label always share a label colour. Length
-   *  1..segments. Default: dark grey for every segment. */
+  /** Per-segment label text colours. Same unique-label mapping rule as
+   *  `colors`. Length 1..segments. Default: dark grey for every segment. */
   label_colors?: ReadonlyArray<string>;
-  /** Text rendered on the centre hub. Default "SPIN". Empty string to hide. */
+  /** Centre hub text. Empty string hides it. */
   hub_text?: string;
-  /** Centre-hub fill + pointer-indicator fill. `theme` (default) uses
-   *  HA's `--primary-color`; `black` and `white` use solid colours
-   *  with auto-contrast hub text. */
+  /** Centre-hub + pointer fill mode. */
   hub_color?: HubColor;
-  /** Play a peg-click sound on each segment crossing (volume scales with
-   *  wheel speed). Default true. */
+  /** Play a peg-click sound on each segment crossing. Default true. */
   sound?: boolean;
-  /** Show the status line beneath the wheel ("Spinning…" / "Result: X" /
-   *  the click-to-spin idle hint). Default true. Set false to hide it
-   *  for a more minimal look. */
+  /** Show the status line beneath the wheel. Default true. */
   show_status?: boolean;
-  /** "tangent" (default) — labels wrap around the rim, perpendicular to
-   *  the spoke. "radial" — labels rotated 90° CW; reads along the spoke
-   *  from rim toward centre. */
+  /** Label orientation. `tangent` wraps along the rim; `radial` reads
+   *  along the spoke from rim toward centre. */
   text_orientation?: TextOrientation;
-  /** Optional per-segment action fired when the segment wins. Each entry
-   *  is one of:
-   *    - a `script.<name>` entity_id (string shorthand → expanded to
-   *      `{ action: "perform-action", perform_action: "script.<name>" }`
-   *      at runtime — each script in HA is registered as its own service);
-   *    - a full Lovelace `ActionConfig` (`perform-action` / `call-service` /
-   *      `navigate` / `url` / `more-info` / `toggle` / `assist` /
-   *      `fire-dom-event`);
-   *    - `null` to fire nothing for that segment.
-   *  Same length / cycling rule as `labels`: 1..segments, cycled around
-   *  with **same-label-same-action mapping** (segments sharing a label
-   *  always fire the same action, mirroring the `colors` rule). */
+  /** Per-segment action fired when the segment wins. Entries are either
+   *  a `script.<name>` shorthand (expanded to `perform-action` at
+   *  runtime), a full Lovelace `ActionConfig`, or `null`. Same cycling +
+   *  same-label-same-action mapping rule as `colors`. */
   actions?: ReadonlyArray<string | ActionConfig | null>;
-  /** Skip the "Run action for X?" confirmation prompt that fires by
-   *  default before a winning segment's action runs. Default `false`
-   *  (= confirm, safer). Per-action `confirmation: false` opts a single
-   *  action out without disabling confirmation globally. */
+  /** Skip the "Run action for X?" prompt that fires before a winning
+   *  segment's action runs. Per-action `confirmation: false` opts a
+   *  single action out without disabling globally. Default false. */
   disable_confirm_actions?: boolean;
-  /** Disable the click-to-boost behaviour: when `true`, clicks (or
-   *  Space/Enter keystrokes) while the wheel is spinning are ignored
-   *  instead of adding a fresh impulse. Useful for kid-friendly
-   *  dashboards where rapid clicking would otherwise keep the wheel
-   *  in motion indefinitely. Default `false` (boost-on-click enabled,
-   *  matches the original click-to-spin/click-to-boost UX). Drag-to-
-   *  throw is unaffected. */
+  /** Ignore clicks / Space / Enter while the wheel is spinning instead
+   *  of adding a fresh impulse. Useful for kid-friendly dashboards.
+   *  Drag-to-throw is unaffected. Default false. */
   disable_boost?: boolean;
-  /** Optional `input_text.*` entity_id to write the winning segment
-   *  label into after every spin. Lets HA automations trigger on
-   *  `platform: state, entity_id: input_text.…` and gives the user a
-   *  visible "last result" widget without extra plumbing. Editor's
-   *  Create button auto-creates a dedicated helper named "Spinning
-   *  Wheel Result" (admin only — `input_text/create` is admin-gated
-   *  upstream); non-admins must pick an existing helper. Empty /
-   *  unset = no entity write. */
+  /** `input_text.*` entity_id to write the winning label into after
+   *  every spin. The editor's Create button can auto-provision a helper
+   *  (admin only — `input_text/create` is admin-gated upstream). */
   result_entity?: string;
+  /** Render only the upper half of the disc (pointer top, hub on the
+   *  cut line, hub text hidden). Physics are unchanged; only the painted
+   *  geometry differs. Default false. */
+  half_circle?: boolean;
+  /** Manual picker mode — disables click-to-spin and the momentum loop.
+   *  Drag rotates 1:1; on release the segment under the indicator snaps
+   *  to centre and its action fires. Space / Enter re-fires the current
+   *  selection. Default false. */
+  selector_mode?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

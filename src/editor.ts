@@ -16,15 +16,10 @@ import { editorStyles } from "./styles";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
-// Editor exposes labels/weights/colors arrays as comma-separated *_csv
-// fields. The bindings panel projects per-unique-label values into
-// synthetic `binding_<i>_<color|label_color|action>` keys; both shapes
-// strip from `next` in _onFormChanged before firing config-changed so
-// they never reach saved YAML. `actions` is a real config field
-// (string[]) — ha-form's entity selector with multiple:true round-trips
-// it directly. The synthetic-keys index signature is permissive
-// (`unknown`) because ha-form's data prop is loosely typed and the
-// per-binding values are read back via narrow runtime guards.
+// Editor projects array config (labels / weights / colors / label_colors)
+// as `*_csv` strings and per-unique-label values as synthetic
+// `binding_<i>_<suffix>` keys. Both shapes are stripped in _onFormChanged
+// before config-changed fires so they never reach saved YAML.
 type EditorData = SpinningWheelCardConfig & {
   labels_csv?: string;
   weights_csv?: string;
@@ -33,10 +28,9 @@ type EditorData = SpinningWheelCardConfig & {
   [syntheticKey: string]: unknown;
 };
 
-// Form prefill so first-open dropdowns/toggles reflect the actual
-// operating values. Stripped back out in _onFormChanged so saved YAML
-// stays minimal. hub_text is intentionally NOT included — see
-// _formDefaults below.
+// Form prefill so first-open dropdowns/toggles reflect operating values;
+// stripped in _onFormChanged so saved YAML stays minimal. hub_text is
+// excluded — see _formDefaults.
 const STATIC_DEFAULTS = {
   segments: 8,
   friction: "medium" as const,
@@ -47,20 +41,19 @@ const STATIC_DEFAULTS = {
   show_status: true,
   disable_confirm_actions: false,
   disable_boost: false,
+  half_circle: false,
+  selector_mode: false,
 } satisfies Partial<SpinningWheelCardConfig>;
 
-/** Split a comma- or newline-separated text field into trimmed,
- *  non-empty entries. Used for `labels`, `colors`, `label_colors` —
- *  the rules are identical for all three. */
+/** Split CSV / newline-separated text into trimmed, non-empty entries. */
 const parseStringList = (csv: string): ReadonlyArray<string> =>
   csv
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
-/** Parse a comma/whitespace-separated list of positive numbers. Used
- *  only for `weights`. Skips tokens that don't parse to a finite > 0
- *  rather than throwing — saves the user one trip through validation. */
+/** Parse CSV / whitespace-separated positive numbers; skips invalid
+ *  tokens silently rather than throwing. */
 const parseWeights = (csv: string): ReadonlyArray<number> => {
   const out: number[] = [];
   for (const tok of csv.split(/[,\s]+/)) {
@@ -71,12 +64,11 @@ const parseWeights = (csv: string): ReadonlyArray<number> => {
   return out;
 };
 
-/** Parse a CSS colour string into an [r, g, b] tuple for ha-form's
- *  color_rgb selector. Handles `#RRGGBB`, `#RGB`, and `rgb(r, g, b)` —
- *  the three forms the editor itself emits. Returns null for anything
- *  else (named colours, `var(--…)`, hsl(), etc.) — those keep working
- *  in YAML / Advanced > Colours but show as undefined in the picker
- *  (defaults to fallback). */
+/** Parse a CSS colour into an [r, g, b] tuple for ha-form's color_rgb
+ *  selector. Handles `#RRGGBB`, `#RGB`, `rgb(r, g, b)` — the three forms
+ *  the editor itself emits. Returns null for everything else (named
+ *  colours, `var(--…)`, hsl()); those keep working in YAML but the
+ *  picker falls back to undefined. */
 const cssToRgb = (
   s: string | undefined,
 ): readonly [number, number, number] | null => {
@@ -114,11 +106,9 @@ const cssToRgb = (
   return null;
 };
 
-/** Tuple → "rgb(r, g, b)". Canonical, parses cleanly back via cssToRgb. */
 const rgbToCss = (rgb: readonly [number, number, number]): string =>
   `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
-/** Type guard for the tuple shape ha-form's color_rgb selector emits. */
 const isRgbTuple = (v: unknown): v is readonly [number, number, number] =>
   Array.isArray(v) &&
   v.length === 3 &&
@@ -126,14 +116,7 @@ const isRgbTuple = (v: unknown): v is readonly [number, number, number] =>
   typeof v[1] === "number" &&
   typeof v[2] === "number";
 
-/** Default Theme used in resolution fallbacks (matches the card's
- *  `THEME_PALETTES[this.config.theme ?? "default"]` pattern). */
 const DEFAULT_THEME: Theme = "default";
-
-/** Default segment count when not configured. Mirrors the card's
- *  `this.config.segments ?? 8` (and matches STATIC_DEFAULTS.segments
- *  below — kept as a separate const so the resolution helpers don't
- *  reach across the const declaration order). */
 const DEFAULT_SEGMENTS = 8;
 
 export class SpinningWheelCardEditor
@@ -151,31 +134,18 @@ export class SpinningWheelCardEditor
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
 
-  /** Tracks whether the user clicked "Create dedicated helper" during
-   *  this editor session. Hides the button as soon as creation
-   *  succeeds — even if ha-form's entity selector spuriously emits an
-   *  empty value-changed shortly after (the just-created entity may
-   *  not be in `hass.states` yet, and some HA versions reconcile that
-   *  to "" briefly). The session-scoped flag survives that race; the
-   *  YAML's `result_entity` (when saved) is still the durable check
-   *  on the next editor open. */
+  /** Survives the post-create empty value-changed race: ha-form's entity
+   *  selector emits "" briefly after a programmatic update because the
+   *  just-created entity isn't in `hass.states` yet. Session-scoped;
+   *  saved `result_entity` is the durable check on next open. */
   @state() private _helperCreatedThisSession = false;
 
-  // ── Todo-list integration (editor-side mirror of card's fetch) ──────
-  // When `todo_entity` is wired the bindings panel projects per-item
-  // rows from the live entity, matching what the card renders at
-  // runtime. Without this mirror the panel would show rows for the
-  // static `_config.labels` (which are ignored when todo is active),
-  // making per-todo-item colour / action configuration impossible.
+  // Editor-side mirror of the card's todo fetch. Without this the
+  // bindings panel would show rows for the static `_config.labels`
+  // (ignored at runtime when todo is active).
   @state() private _todoItems: ReadonlyArray<TodoItem> | null = null;
-  /** Tracks the entity_id we last fetched against so swapping todo
-   *  entities or unsetting drops the cache. */
   private _todoLastEntity: string | null = null;
-  /** HA reports a todo entity's open-count as `state` — refetch when
-   *  it changes (covers item adds, completes, removes, undos). */
   private _todoLastEntityState: string | null = null;
-  /** Debounce flag — `hass` updates burst (theme + state on the same
-   *  tick is common); without this we'd kick off duplicate WS calls. */
   private _todoLoading = false;
 
   public setConfig(config: SpinningWheelCardConfig): void {
@@ -191,13 +161,6 @@ export class SpinningWheelCardEditor
   }
 
   protected override updated(_changed: PropertyValues): void {
-    // Editor-side mirror of the card's todo-fetch trigger. Two events
-    // refresh the cache:
-    //   1. `todo_entity` swapped (or unset) — drop the cache so stale
-    //      summaries from the previous entity don't bleed into the
-    //      bindings panel.
-    //   2. The entity's `state` (open-count) changed — items added /
-    //      completed / removed since the last fetch.
     const entityId = this._config.todo_entity ?? null;
     if (entityId !== this._todoLastEntity) {
       this._todoLastEntity = entityId;
@@ -214,11 +177,8 @@ export class SpinningWheelCardEditor
     }
   }
 
-  /** Fetch open items from the configured todo entity via the
-   *  `todo/item/list` WS endpoint. Filters to `needs_action`, dedups
-   *  by summary in order — identical logic to the card's fetch at
-   *  spinning-wheel-card.ts:_fetchTodoItems so editor and runtime
-   *  agree on which items become unique-label slots. */
+  /** Mirrors the card's _fetchTodoItems so editor and runtime agree on
+   *  which items become unique-label slots. */
   private async _fetchTodoItems(): Promise<void> {
     const entity = this._config.todo_entity;
     if (!entity || !this.hass?.callWS) return;
@@ -253,23 +213,10 @@ export class SpinningWheelCardEditor
     }
   }
 
-  // ── Bindings-panel resolution (mirrors card's same-label-same-X) ─────
-
   /** Unique labels in order of first appearance — the binding key for
-   *  the per-row panel. Mirrors the walk in spinning-wheel-card.ts's
-   *  `_mapPaletteToLabels` so the editor and card agree on which label
-   *  occupies which slot.
-   *
-   *  Resolution priority:
-   *    1. Todo-list mode: when `todo_entity` is wired, project the
-   *       fetched item summaries (already deduped by `_fetchTodoItems`)
-   *       so the bindings panel matches what the card renders at
-   *       runtime. While items haven't loaded yet — or the list is
-   *       empty — return an empty array so the panel renders 0 rows
-   *       (the user sees the todo-empty state instead of mismatched
-   *       static labels).
-   *    2. Static `labels` config (cycled to length = segments).
-   *    3. Default "1".."N" when neither is set. */
+   *  the per-row panel. Mirrors the card's `_mapPaletteToLabels` walk
+   *  so editor and runtime agree on slot assignment. Priority:
+   *  todo items > static `labels` > "1".."N". */
   private _uniqueLabels(): ReadonlyArray<string> {
     if (this._config.todo_entity) {
       if (!this._todoItems || this._todoItems.length === 0) return [];
@@ -300,9 +247,8 @@ export class SpinningWheelCardEditor
     return out;
   }
 
-  /** Resolve the active fill-colour palette: explicit `colors` if set,
-   *  otherwise the active `theme`'s palette, otherwise the default
-   *  rainbow. Aligned to unique-label indices, cycling shorter sources. */
+  /** Per-unique-label fill colour: explicit `colors` > theme palette >
+   *  default rainbow. Cycles shorter sources. */
   private _resolvedColors(): ReadonlyArray<string> {
     const uniques = this._uniqueLabels();
     const themeName = this._config.theme ?? DEFAULT_THEME;
@@ -314,8 +260,7 @@ export class SpinningWheelCardEditor
     );
   }
 
-  /** Resolve the active label-text palette. Defaults to a single dark
-   *  grey for every unique label when `label_colors` is unset. */
+  /** Per-unique-label text colour. Defaults to a single dark grey. */
   private _resolvedLabelColors(): ReadonlyArray<string> {
     const uniques = this._uniqueLabels();
     const custom = this._config.label_colors;
@@ -323,10 +268,9 @@ export class SpinningWheelCardEditor
     return uniques.map((_, i) => src[i % src.length] ?? DEFAULT_LABEL_COLOR);
   }
 
-  /** Per-unique-label string-shorthand action (or empty). Object-form
-   *  ActionConfig entries (set via YAML) are projected as empty in the
-   *  picker — they remain in `_config.actions` and are preserved across
-   *  per-row edits at indices the user does not touch. */
+  /** Per-unique-label string-shorthand action (empty for object-form
+   *  ActionConfigs from YAML). Objects survive per-row edits at indices
+   *  the user does not touch. */
   private _resolvedActions(): ReadonlyArray<string> {
     const uniques = this._uniqueLabels();
     const src = this._config.actions ?? [];
@@ -336,12 +280,10 @@ export class SpinningWheelCardEditor
     });
   }
 
-  /** Per-unique-label weight (default 1). Cycles short weight arrays.
-   *  Note: the card's underlying model cycles weights per-segment-
-   *  position, not per-unique-label — so this projection captures the
-   *  common case "label X is bigger than label Y" but loses the rarer
-   *  "the second occurrence of X is smaller than the first" pattern.
-   *  Power users with per-position weight needs use Advanced > Weights. */
+  /** Per-unique-label weight (default 1). The card cycles weights by
+   *  segment position, not unique label — this projection captures the
+   *  common "label X is bigger than label Y" case; per-position needs
+   *  use Advanced > Weights. */
   private _resolvedWeights(): ReadonlyArray<number> {
     const uniques = this._uniqueLabels();
     const src = this._config.weights ?? [];
@@ -352,14 +294,10 @@ export class SpinningWheelCardEditor
     });
   }
 
-  /** Rebuilt per render so option labels translate when language changes —
-   *  ha-form bakes label text into the schema. When `todo_entity` is
-   *  wired, the fields whose values are overridden by the entity
-   *  (`segments`, `labels_csv`) or whose card-side defaults flip
-   *  (`text_orientation` defaults to radial in todo mode for
-   *  long-summary readability) are spliced out — the canonical
-   *  ha-form pattern for conditional fields per the conditional-
-   *  fields gotcha in `ha-lovelace-card` SKILL.md. */
+  /** Rebuilt per render — ha-form bakes label text into the schema, so
+   *  language changes need a fresh schema. Fields overridden by an
+   *  active todo_entity are spliced out (ha-lovelace-card SKILL §
+   *  conditional fields). */
   private _buildSchema(): ReadonlyArray<HaFormSchema> {
     const lang = this._lang();
     const todoActive = !!this._config.todo_entity;
@@ -402,18 +340,12 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
           ]),
-      // Bindings panel — one expandable per unique label, dynamically
-      // generated each render so adding/renaming labels reshapes the
-      // form. flatten:true on every layer so binding_<i>_<suffix> keys
-      // surface at the top level of `data` (the ha-form expandable
-      // footgun: without flatten, ha-form nests them under data["bindings"]
-      // and the write-back fails silently — see ha-lovelace-card SKILL.md).
+      // flatten:true on every binding layer — without it ha-form nests
+      // values under data["bindings"] and writes fail silently
+      // (expandable footgun).
       ...this._buildBindingsBlock(),
-      // Advanced wrapper — the raw arrays for paste-from-YAML / power
-      // users wanting CSS keywords or var(--…) for colours, full
-      // ActionConfig objects for actions, or per-segment-position
-      // weight cycling that the per-unique-label bindings panel
-      // can't express. Defaults closed.
+      // Advanced raw-arrays escape hatch for paste-from-YAML, CSS
+      // keywords, full ActionConfig objects, per-position weight cycling.
       {
         type: "expandable" as const,
         name: "raw_arrays",
@@ -440,25 +372,14 @@ export class SpinningWheelCardEditor
           },
         ],
       },
-      // `disable_confirm_actions` lives at the very bottom — it's a
-      // safety toggle that only matters once the user has wired
-      // actions in the Bindings panel above (or the Advanced raw
-      // `actions` array). Placing it last keeps the top of the form
-      // focused on what's edited most often.
+      // Safety toggle pinned to the bottom — only relevant after the
+      // user has wired actions above.
       { name: "disable_confirm_actions", selector: { boolean: {} } },
     ];
   }
 
-  /** Per-unique-label expandables for the bindings panel. Each carries
-   *  the unique label as its title, two color_rgb pickers in a grid,
-   *  and a single-script entity picker. Empty when there are no labels
-   *  (which can't happen in practice — segments default to 8 → 8
-   *  unique numeric labels). */
-  /** "General" expandable — card-wide style + behaviour preferences.
-   *  Defaults closed (matches the Bindings + Advanced expandables) so
-   *  the editor opens compact; user clicks once to tweak. Ordered to
-   *  group i18n / physics / visual / display / audio / kid-safety
-   *  preferences in roughly that flow. */
+  /** Card-wide style + behaviour preferences expandable. Ordered
+   *  i18n / physics / visual / display / audio / kid-safety. */
   private _buildGeneralBlock(lang: string): ReadonlyArray<HaFormSchema> {
     return [
       {
@@ -477,7 +398,7 @@ export class SpinningWheelCardEditor
                     value: "auto",
                     label: localize("editor.language_auto", lang),
                   },
-                  // Native names — they shouldn't translate.
+                  // Native names — never translated.
                   { value: "en", label: "English" },
                   { value: "de", label: "Deutsch" },
                   { value: "fr", label: "Français" },
@@ -561,14 +482,11 @@ export class SpinningWheelCardEditor
           { name: "show_status", selector: { boolean: {} } },
           { name: "sound", selector: { boolean: {} } },
           { name: "disable_boost", selector: { boolean: {} } },
-          // result_entity is managed OUTSIDE ha-form — see the
-          // standalone <ha-selector> in render(). ha-form's entity
-          // selector emits a stale value-changed shortly after a
-          // programmatic update (the just-created input_text isn't in
-          // hass.states yet, selector reconciles to "") which racing
-          // with _onFormChanged was dropping the value silently.
-          // Keeping it out of the schema entirely sidesteps that
-          // class of bug; the standalone widget renders identically.
+          { name: "half_circle", selector: { boolean: {} } },
+          { name: "selector_mode", selector: { boolean: {} } },
+          // result_entity rendered standalone (see render()) to dodge
+          // ha-form's entity-selector-emits-empty-after-programmatic-set
+          // race that was dropping the just-created helper.
         ],
       },
     ];
@@ -618,128 +536,73 @@ export class SpinningWheelCardEditor
     ];
   }
 
+  /** Per-field i18n bindings keyed by schema name. Bindings-panel
+   *  synthetics (`binding_<i>_<suffix>`) live in BINDING_SUFFIX_LABELS
+   *  below — same label per suffix across rows. */
+  private static readonly FIELD_I18N: ReadonlyMap<
+    string,
+    { label: string; helper?: string }
+  > = new Map([
+    ["name", { label: "editor.name" }],
+    ["language", { label: "editor.language", helper: "editor.language_helper" }],
+    ["todo_entity", { label: "editor.todo_entity", helper: "editor.todo_entity_helper" }],
+    ["segments", { label: "editor.segments", helper: "editor.segments_helper" }],
+    ["friction", { label: "editor.friction", helper: "editor.friction_helper" }],
+    ["theme", { label: "editor.theme", helper: "editor.theme_helper" }],
+    ["labels_csv", { label: "editor.labels", helper: "editor.labels_helper" }],
+    ["weights_csv", { label: "editor.weights", helper: "editor.weights_helper" }],
+    ["colors_csv", { label: "editor.colors", helper: "editor.colors_helper" }],
+    ["label_colors_csv", { label: "editor.label_colors", helper: "editor.label_colors_helper" }],
+    ["hub_text", { label: "editor.hub_text", helper: "editor.hub_text_helper" }],
+    ["hub_color", { label: "editor.hub_color", helper: "editor.hub_color_helper" }],
+    ["text_orientation", { label: "editor.text_orientation", helper: "editor.text_orientation_helper" }],
+    ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
+    ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
+    ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
+    ["disable_confirm_actions", { label: "editor.disable_confirm_actions", helper: "editor.disable_confirm_actions_helper" }],
+    ["disable_boost", { label: "editor.disable_boost", helper: "editor.disable_boost_helper" }],
+    ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
+    ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
+    ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
+  ]);
+
+  private static readonly BINDING_SUFFIX_LABELS: ReadonlyArray<
+    readonly [string, string]
+  > = [
+    ["_label_color", "editor.binding_label_color"],
+    ["_color", "editor.binding_color"],
+    ["_weight", "editor.binding_weight"],
+    ["_action", "editor.binding_action"],
+  ];
+
   private _computeLabel = (field: { name: string }): string => {
     const lang = this._lang();
-    // Bindings-panel synthetics — `binding_<i>_<suffix>`. Match by
-    // suffix so the per-row labels translate without a per-index case.
     if (field.name.startsWith("binding_")) {
-      if (field.name.endsWith("_label_color")) {
-        return localize("editor.binding_label_color", lang);
-      }
-      if (field.name.endsWith("_color")) {
-        return localize("editor.binding_color", lang);
-      }
-      if (field.name.endsWith("_weight")) {
-        return localize("editor.binding_weight", lang);
-      }
-      if (field.name.endsWith("_action")) {
-        return localize("editor.binding_action", lang);
+      for (const [suffix, key] of SpinningWheelCardEditor.BINDING_SUFFIX_LABELS) {
+        if (field.name.endsWith(suffix)) return localize(key, lang);
       }
     }
-    switch (field.name) {
-      case "name":
-        return localize("editor.name", lang);
-      case "language":
-        return localize("editor.language", lang);
-      case "todo_entity":
-        return localize("editor.todo_entity", lang);
-      case "segments":
-        return localize("editor.segments", lang);
-      case "friction":
-        return localize("editor.friction", lang);
-      case "theme":
-        return localize("editor.theme", lang);
-      case "labels_csv":
-        return localize("editor.labels", lang);
-      case "weights_csv":
-        return localize("editor.weights", lang);
-      case "colors_csv":
-        return localize("editor.colors", lang);
-      case "label_colors_csv":
-        return localize("editor.label_colors", lang);
-      case "hub_text":
-        return localize("editor.hub_text", lang);
-      case "hub_color":
-        return localize("editor.hub_color", lang);
-      case "text_orientation":
-        return localize("editor.text_orientation", lang);
-      case "sound":
-        return localize("editor.sound", lang);
-      case "show_status":
-        return localize("editor.show_status", lang);
-      case "actions":
-        return localize("editor.actions", lang);
-      case "disable_confirm_actions":
-        return localize("editor.disable_confirm_actions", lang);
-      case "disable_boost":
-        return localize("editor.disable_boost", lang);
-      default:
-        return field.name;
-    }
+    const entry = SpinningWheelCardEditor.FIELD_I18N.get(field.name);
+    return entry ? localize(entry.label, lang) : field.name;
   };
 
   private _computeHelper = (field: { name: string }): string | undefined => {
-    const lang = this._lang();
-    // Per-row binding inputs are self-explanatory inside the
-    // unique-label expandable — no helper text per field.
     if (field.name.startsWith("binding_")) return undefined;
-    const key = (() => {
-      switch (field.name) {
-        case "language":
-          return "editor.language_helper";
-        case "todo_entity":
-          return "editor.todo_entity_helper";
-        case "segments":
-          return "editor.segments_helper";
-        case "friction":
-          return "editor.friction_helper";
-        case "theme":
-          return "editor.theme_helper";
-        case "labels_csv":
-          return "editor.labels_helper";
-        case "weights_csv":
-          return "editor.weights_helper";
-        case "colors_csv":
-          return "editor.colors_helper";
-        case "label_colors_csv":
-          return "editor.label_colors_helper";
-        case "hub_text":
-          return "editor.hub_text_helper";
-        case "hub_color":
-          return "editor.hub_color_helper";
-        case "text_orientation":
-          return "editor.text_orientation_helper";
-        case "sound":
-          return "editor.sound_helper";
-        case "show_status":
-          return "editor.show_status_helper";
-        case "actions":
-          return "editor.actions_helper";
-        case "disable_confirm_actions":
-          return "editor.disable_confirm_actions_helper";
-        case "disable_boost":
-          return "editor.disable_boost_helper";
-        case "raw_arrays":
-          return "editor.advanced_helper";
-        default:
-          return null;
-      }
-    })();
-    return key ? localize(key, lang) : undefined;
+    const entry = SpinningWheelCardEditor.FIELD_I18N.get(field.name);
+    return entry?.helper ? localize(entry.helper, this._lang()) : undefined;
   };
 
-  /** Prefill defaults for first open. hub_text is intentionally NOT
-   *  prefilled — otherwise ha-form would re-fill it with the localised
-   *  default after every render, making "no hub label" impossible. */
+  /** hub_text is NOT prefilled — otherwise ha-form would re-fill it
+   *  with the localised default after every render, making "no hub
+   *  label" impossible. */
   private _formDefaults(): Record<string, unknown> {
     return { ...STATIC_DEFAULTS };
   }
 
-  /** Snapshot of the last projection passed to ha-form. Used by
-   *  _onFormChanged to detect which surface (bindings panel vs Advanced
-   *  CSV vs Advanced multi-picker) produced a change — only that surface's
-   *  delta is applied, so a stale projection on another surface doesn't
-   *  silently overwrite a fresh edit. */
+  /** Last projection given to ha-form. _onFormChanged diffs against it
+   *  to detect which surface (bindings panel / Advanced CSV / Advanced
+   *  multi-picker) produced the change, so a stale projection on one
+   *  surface can't overwrite a fresh edit on another. */
   private _lastProjection: {
     bindings: Record<string, unknown>;
     actionsStrings: ReadonlyArray<string>;
@@ -754,7 +617,7 @@ export class SpinningWheelCardEditor
     const next: EditorData = { ...ev.detail.value };
     const proj = this._lastProjection;
 
-    // ── 1. Pull off CSV synthetics ────────────────────────────────────
+    // 1. CSV synthetics.
     const labelsCsv = (next.labels_csv as string | undefined) ?? "";
     const weightsCsv = (next.weights_csv as string | undefined) ?? "";
     const colorsCsvNext = (next.colors_csv as string | undefined) ?? "";
@@ -765,11 +628,8 @@ export class SpinningWheelCardEditor
     delete next.colors_csv;
     delete next.label_colors_csv;
 
-    // ── 2. Pull off bindings-panel synthetics ─────────────────────────
-    // Strip every binding_* and the wrapper key from `next` (defensive,
-    // so a stray expandable-name doesn't reach the saved YAML), and
-    // capture only the keys whose values *differ* from the last
-    // projection — those are the user's edits.
+    // 2. Bindings synthetics — strip from `next`, capture only the
+    // values that differ from the last projection (= user edits).
     const bindingDeltas: Record<string, unknown> = {};
     for (const key of Object.keys(next)) {
       if (key.startsWith("binding_") || key === "bindings") {
@@ -780,7 +640,7 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // ── 3. Labels ────────────────────────────────────────────────────
+    // 3. Labels.
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
     const parsedLabels = parseStringList(labelsCsv);
     if (parsedLabels.length === 0) {
@@ -789,7 +649,7 @@ export class SpinningWheelCardEditor
       next.labels = parsedLabels.slice(0, segments);
     }
 
-    // ── 3b. Weights: CSV edit > bindings edit > unchanged ────────────
+    // 3b. Weights: CSV edit > bindings edit > unchanged.
     const weightsCsvChanged =
       proj !== null && weightsCsv !== proj.weightsCsv;
     if (weightsCsvChanged) {
@@ -812,13 +672,13 @@ export class SpinningWheelCardEditor
             out[i] = v;
           }
         }
-        // All-1 → drop the array entirely (default-equal cycling).
+        // All-1 → drop entirely (default-equal cycling).
         if (out.every((w) => w === 1)) delete next.weights;
         else next.weights = out;
       }
     }
 
-    // ── 4. Colours: CSV edit > bindings edit > unchanged ─────────────
+    // 4. Colours: CSV edit > bindings edit > unchanged.
     const colorsCsvChanged =
       proj !== null && colorsCsvNext !== proj.colorsCsv;
     if (colorsCsvChanged) {
@@ -830,7 +690,6 @@ export class SpinningWheelCardEditor
         ([k]) => /^binding_\d+_color$/.test(k),
       );
       if (colorDeltas.length > 0) {
-        // Materialise to length = uniqueLabel count, then splice deltas.
         const resolved = this._resolvedColors();
         const out: string[] = resolved.slice();
         for (const [k, v] of colorDeltas) {
@@ -844,7 +703,7 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // ── 5. Label colours: same diff strategy as colours ──────────────
+    // 5. Label colours: same strategy as colours.
     const labelColorsCsvChanged =
       proj !== null && labelColorsCsvNext !== proj.labelColorsCsv;
     if (labelColorsCsvChanged) {
@@ -869,11 +728,9 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // ── 6. Actions: multi-picker > bindings > unchanged ──────────────
-    // Multi-picker output (string[]) replaces the string slots; object-
-    // form ActionConfig entries from old _config.actions are appended
-    // at the end so they survive a multi-picker save (documented in
-    // editor.actions_helper).
+    // 6. Actions: multi-picker > bindings > unchanged. Object-form
+    // ActionConfig entries are appended after the picker's strings so
+    // they survive a multi-picker save.
     const pickerNext = Array.isArray(next.actions)
       ? (next.actions as ReadonlyArray<unknown>).filter(
           (a): a is string => typeof a === "string",
@@ -901,9 +758,8 @@ export class SpinningWheelCardEditor
         /^binding_\d+_action$/.test(k),
       );
       if (actionDeltas.length > 0) {
-        // Start from the current array, materialise to uniqueLabel
-        // count by padding with null, then splice deltas. Object
-        // entries at non-edited indices survive.
+        // Pad with nulls then splice deltas; object entries at
+        // non-edited indices survive via the spread.
         const uniqueCount = this._uniqueLabels().length;
         const out: Array<string | ActionConfig | null> = [...oldActions];
         while (out.length < uniqueCount) out.push(null);
@@ -915,33 +771,29 @@ export class SpinningWheelCardEditor
           if (typeof v === "string" && v.length > 0) {
             out[i] = v;
           } else if (
-            // Empty/cleared, but the slot used to hold an object — keep
-            // the object (the picker can't represent it; clearing isn't
-            // an explicit "delete the YAML action" gesture).
+            // Cleared, but the slot held an object — keep the object
+            // (the picker can't represent it; clearing isn't a delete).
             i < oldActions.length &&
             typeof oldActions[i] === "object" &&
             oldActions[i] !== null
           ) {
-            // No-op: out[i] still references the original object via
-            // the spread above.
+            // No-op: out[i] still references the object via spread.
           } else {
             out[i] = null;
           }
         }
-        // Trim trailing nulls so the saved YAML stays compact.
         while (out.length > 0 && out[out.length - 1] === null) out.pop();
         if (out.length === 0) delete next.actions;
         else next.actions = out;
       } else if (next.actions === undefined || next.actions === null) {
-        // Multi-picker was empty in projection AND no binding edit —
-        // preserve any object-only config (e.g. fresh setConfig from
-        // YAML with object actions only).
+        // Empty picker AND no binding edit — preserve object-only
+        // config from a fresh YAML setConfig.
         if (oldObjects.length > 0) next.actions = [...oldObjects];
         else delete next.actions;
       }
     }
 
-    // ── 7. hub_text + defaults stripping ─────────────────────────────
+    // 7. hub_text + defaults stripping.
     const hadHubText = typeof this._config.hub_text === "string";
     const formClearedHubText =
       next.hub_text === undefined || next.hub_text === null;
@@ -967,23 +819,26 @@ export class SpinningWheelCardEditor
     if (next.disable_boost === STATIC_DEFAULTS.disable_boost) {
       delete next.disable_boost;
     }
+    if (next.half_circle === STATIC_DEFAULTS.half_circle) {
+      delete next.half_circle;
+    }
+    if (next.selector_mode === STATIC_DEFAULTS.selector_mode) {
+      delete next.selector_mode;
+    }
     if (next.language === "auto") delete next.language;
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
     }
-    // result_entity is NOT routed through ha-form (see schema comment
-    // in _buildGeneralBlock). Whatever the form emits for it is stale
-    // / leaky — explicitly preserve from `_config` so the standalone
-    // widget below ha-form is the single source of truth.
+    // result_entity is owned by the standalone widget — preserve from
+    // _config; whatever ha-form emits here is stale.
     if (this._config.result_entity) {
       next.result_entity = this._config.result_entity;
     } else {
       delete next.result_entity;
     }
 
-    // ── 8. Cache CSV verbatim where applicable; regenerate when the
-    //       binding side authored the change so the next render's CSV
-    //       view stays in sync with the underlying array. ─────────────
+    // 8. Cache CSV verbatim; regenerate when the binding side authored
+    // the change so the next render's CSV view stays in sync.
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsvChanged
       ? weightsCsv
@@ -1001,18 +856,14 @@ export class SpinningWheelCardEditor
 
   protected override render(): TemplateResult {
     const lang = this._lang();
-    // Spread order: defaults first, then user config (overrides),
-    // then CSV synthetics (editor-only, never saved), then bindings-
-    // panel synthetics derived from the resolved arrays.
+    // Spread order: defaults < user config < CSV synthetics < bindings.
     const data: EditorData = {
       ...this._formDefaults(),
       ...this._config,
       // Map "no override" to the Auto sentinel so the dropdown isn't blank.
       language: this._config.language ?? "auto",
-      // ha-form's entity selector with multiple:true expects string[];
-      // strip object-form ActionConfig entries here so the selector
-      // doesn't choke on them. They stay in `_config.actions` and get
-      // re-merged on save (see _onFormChanged).
+      // multi:true entity selector expects string[]; object-form
+      // ActionConfigs stay in _config.actions and re-merge on save.
       actions: (this._config.actions ?? []).filter(
         (a): a is string => typeof a === "string",
       ),
@@ -1021,10 +872,6 @@ export class SpinningWheelCardEditor
       colors_csv: this._colorsText,
       label_colors_csv: this._labelColorsText,
     };
-    // Project resolved per-unique-label values into binding_<i>_<suffix>
-    // synthetic keys so the bindings panel shows pre-filled pickers.
-    // Pickers fall back to fallback grey when a stored colour is a
-    // CSS keyword / var(--…) the boundary helper can't parse.
     const uniques = this._uniqueLabels();
     const colors = this._resolvedColors();
     const labelColors = this._resolvedLabelColors();
@@ -1047,9 +894,7 @@ export class SpinningWheelCardEditor
       bindingsSnapshot[wKey] = data[wKey];
       bindingsSnapshot[aKey] = data[aKey];
     }
-    // Snapshot what we just gave ha-form so _onFormChanged can diff
-    // against it. Mutating before the await chain is safe — value-changed
-    // fires synchronously after the user input.
+    // Snapshot for _onFormChanged to diff against.
     this._lastProjection = {
       bindings: bindingsSnapshot,
       actionsStrings: data.actions as ReadonlyArray<string>,
@@ -1057,15 +902,7 @@ export class SpinningWheelCardEditor
       labelColorsCsv: this._labelColorsText,
       weightsCsv: this._weightsText,
     };
-    // The "Create dedicated helper" button is admin-only — `input_text/
-    // create` is wrapped in `require_admin` upstream. Hidden when a
-    // helper is already wired (`_config.result_entity` set) OR when
-    // creation succeeded earlier in this session
-    // (`_helperCreatedThisSession` — see field comment for the
-    // ha-form-strips-empty race), OR when the user isn't admin.
-    // Lives in the same custom-Lit slot as the footer hint — single
-    // bespoke widget alongside ha-form, per the skill's "ha-form +
-    // targeted custom template" pattern.
+    // Admin-only — `input_text/create` is `require_admin` upstream.
     const showCreateHelper =
       !this._helperCreatedThisSession &&
       !this._config.result_entity &&
@@ -1080,11 +917,8 @@ export class SpinningWheelCardEditor
           .computeHelper=${this._computeHelper}
           @value-changed=${this._onFormChanged}
         ></ha-form>
-        <!-- Result helper widget — managed standalone, NOT through
-             ha-form, to dodge the entity-selector-emits-empty-after-
-             programmatic-set race. The picker calls our own
-             @value-changed handler which writes _config directly and
-             fires config-changed up to the dashboard. -->
+        <!-- Standalone (not via ha-form) — dodges the entity-selector-
+             emits-empty-after-programmatic-set race. -->
         <div class="result-entity-row">
           <ha-selector
             .hass=${this.hass}
@@ -1116,25 +950,20 @@ export class SpinningWheelCardEditor
     `;
   }
 
-  /** Standalone result_entity picker handler. Bypasses ha-form
-   *  entirely so the racy entity-selector-emits-empty-after-
-   *  programmatic-set issue can't drop the value silently between
-   *  Create and Save. Writes `_config.result_entity` directly and
-   *  fires config-changed up to the dashboard's edit dialog. */
+  /** Standalone result_entity handler — bypasses ha-form so the racy
+   *  entity-selector-emits-empty-after-programmatic-set can't drop the
+   *  value between Create and Save. */
   private _onResultEntityChanged = (
     ev: CustomEvent<{ value: string }>,
   ): void => {
-    // Stop propagation — ha-form is a sibling, not a parent, but
-    // some HA frontend versions catch unhandled value-changed events
-    // at the dialog level and try to merge them. Cleaner to scope
-    // this event to our handler only.
+    // Some HA frontend versions catch unhandled value-changed events
+    // at the dialog level and try to merge them; scope to us only.
     ev.stopPropagation();
     const newValue = ev.detail.value;
     if (newValue && typeof newValue === "string") {
       this._config = { ...this._config, result_entity: newValue };
     } else {
-      // ha-form's entity picker emits "" when cleared. Drop the field
-      // from saved YAML rather than persisting an empty string.
+      // Picker emits "" when cleared — drop rather than persist "".
       const next = { ...this._config };
       delete next.result_entity;
       this._config = next;
@@ -1142,15 +971,11 @@ export class SpinningWheelCardEditor
     fireEvent(this, "config-changed", { config: this._config });
   };
 
-  /** Admin-only WS call to create a dedicated `input_text` helper for
-   *  this card. Auto-names "Spinning Wheel Result" (HA generates the
-   *  slug `spinning_wheel_result`, auto-incrementing on collision so
-   *  multi-instance dashboards Just Work); reply.id is the slug, full
-   *  entity_id is `input_text.<slug>`. The post-call `_config` mutation
-   *  has to happen BEFORE the config-changed event — the dashboard
-   *  catches the event to persist storage but does NOT re-invoke
-   *  setConfig on the live editor element (the `_config` lifecycle
-   *  gotcha in ha-lovelace-card SKILL.md). */
+  /** Admin-only WS call to provision a dedicated `input_text` helper.
+   *  HA auto-increments slug collisions so multi-instance dashboards
+   *  work. _config mutation MUST happen before config-changed — the
+   *  dashboard persists storage but does NOT re-invoke setConfig on
+   *  the live editor (ha-lovelace-card SKILL § _config lifecycle). */
   private async _createResultHelper(): Promise<void> {
     if (!this.hass?.callWS) return;
     const lang = this._lang();
@@ -1169,12 +994,8 @@ export class SpinningWheelCardEditor
         this._config = { ...this._config, result_entity: entityId };
         this._helperCreatedThisSession = true;
         fireEvent(this, "config-changed", { config: this._config });
-        // HA's standard toast slot — fire-and-forget, dashboard's
-        // <notification-manager> picks it up via the bubbling +
-        // composed CustomEvent. Carries the entity_id so the user
-        // can copy it for automation wiring without re-checking the
-        // helpers list. Same channel HA core's `showToast` helper
-        // uses (frontend/src/util/toast.ts on `dev`).
+        // HA's standard toast channel (frontend/src/util/toast.ts) —
+        // <notification-manager> catches the bubbling+composed event.
         fireEvent(this, "hass-notification", {
           message: localize("editor.result_entity_created", lang, {
             entity: entityId,
@@ -1195,11 +1016,9 @@ export class SpinningWheelCardEditor
   static override styles: CSSResultGroup = editorStyles;
 }
 
-// Idempotent registration — see the matching note at the bottom of
-// spinning-wheel-card.ts. Without the guard, a second bundle load
-// (duplicate Lovelace resource) throws here and aborts module init
-// before the card class registers, breaking the dashboard with an
-// "Unknown type encountered" error.
+// Idempotent registration — see the note at the bottom of
+// spinning-wheel-card.ts. Without the guard, a duplicate Lovelace
+// resource load aborts module init before the card class registers.
 if (!customElements.get("spinning-wheel-card-editor")) {
   customElements.define(
     "spinning-wheel-card-editor",

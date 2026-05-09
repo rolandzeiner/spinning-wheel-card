@@ -1,10 +1,5 @@
-// Built-in colour-theme palettes + the default segment-label colour.
-// Shared by the card (which renders them) and the editor (which projects
-// the active palette into the bindings-panel pickers as fallbacks).
-
 import type { Theme } from "./types";
 
-// 8 evenly-spaced HSL colours. Index modulo segments for >8.
 const SEGMENT_COLORS: ReadonlyArray<string> = [
   "#e63946", "#f4a261", "#e9c46a", "#a8dadc",
   "#457b9d", "#1d3557", "#9b5de5", "#06d6a0",
@@ -18,30 +13,21 @@ const PASTEL_PALETTE: ReadonlyArray<string> = [
 /** Gilbert Baker rainbow (6) + Helms transgender unique stripes (3) +
  *  bisexual purple. Ten colours; cycles for segments > 10. */
 const PRIDE_PALETTE: ReadonlyArray<string> = [
-  // Gilbert Baker rainbow
   "#E40303", // red
   "#FF8C00", // orange
   "#FFED00", // yellow
   "#008026", // green
   "#004DFF", // indigo
   "#750787", // violet
-  // Helms transgender flag — unique stripes
-  "#5BCEFA", // light blue
-  "#F5A9B8", // pink
-  "#FFFFFF", // white
-  // Bisexual-flag purple (rgb(128, 0, 128))
-  "#800080", // purple
+  "#5BCEFA", // trans light blue
+  "#F5A9B8", // trans pink
+  "#FFFFFF", // trans white
+  "#800080", // bi purple
 ];
 
 const NEON_PALETTE: ReadonlyArray<string> = [
-  "#FF14A6", // hot pink
-  "#FF6700", // orange
-  "#FFFF00", // yellow
-  "#39FF14", // green
-  "#00FFFF", // cyan
-  "#1F51FF", // electric blue
-  "#BF00FF", // purple
-  "#FF00FF", // magenta
+  "#FF14A6", "#FF6700", "#FFFF00", "#39FF14",
+  "#00FFFF", "#1F51FF", "#BF00FF", "#FF00FF",
 ];
 
 export const THEME_PALETTES: Record<Theme, ReadonlyArray<string>> = {
