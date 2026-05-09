@@ -169,6 +169,12 @@ export type Friction = "low" | "medium" | "high";
  *  user hasn't supplied a `colors` array. Custom `colors` always wins. */
 export type Theme = "default" | "pastel" | "pride" | "neon";
 
+/** Hub + indicator colour mode.
+ *  - `theme`: use the active HA `--primary-color` (default).
+ *  - `black`: solid black hub + indicator with white hub text.
+ *  - `white`: solid white hub + indicator with black hub text. */
+export type HubColor = "theme" | "black" | "white";
+
 export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   type: string;
   name?: string;
@@ -201,6 +207,10 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   label_colors?: ReadonlyArray<string>;
   /** Text rendered on the centre hub. Default "SPIN". Empty string to hide. */
   hub_text?: string;
+  /** Centre-hub fill + pointer-indicator fill. `theme` (default) uses
+   *  HA's `--primary-color`; `black` and `white` use solid colours
+   *  with auto-contrast hub text. */
+  hub_color?: HubColor;
   /** Play a peg-click sound on each segment crossing (volume scales with
    *  wheel speed). Default true. */
   sound?: boolean;

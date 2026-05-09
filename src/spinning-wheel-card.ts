@@ -20,6 +20,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type {
   Friction,
   HomeAssistant,
+  HubColor,
   LovelaceCardEditor,
   SpinningWheelCardConfig,
   TextOrientation,
@@ -349,6 +350,12 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.theme_value", lang));
     }
+    if (
+      config.hub_color !== undefined &&
+      !["theme", "black", "white"].includes(config.hub_color)
+    ) {
+      throw new Error(localize("errors.hub_color_value", lang));
+    }
     // Default `name` is set in render() rather than here, so the display
     // header stays reactive to language changes.
     this.config = { ...config };
@@ -542,22 +549,44 @@ export class SpinningWheelCard extends LitElement {
     hubStroke: string;
   } {
     const cs = getComputedStyle(this);
-    const primary =
-      cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
     const dividerColor =
       cs.getPropertyValue("--divider-color").trim() ||
       "rgba(0,0,0,0.45)";
 
-    const rgb = this._cssColorToRgb(primary, ctx);
-    const light = this._adjustLightness(rgb, 0.18);
-    const dark = this._adjustLightness(rgb, -0.18);
+    const choice: HubColor = this.config.hub_color ?? "theme";
 
+    if (choice === "black") {
+      // Solid black hub + indicator with white hub text. The hub keeps
+      // a subtle radial gradient (dark grey highlight → pure black edge)
+      // so it still reads as a button rather than a flat disc.
+      return {
+        indicatorFill: "#000000",
+        hubLight: "#3a3a3a",
+        hubDark: "#000000",
+        hubText: "#ffffff",
+        hubStroke: dividerColor,
+      };
+    }
+
+    if (choice === "white") {
+      return {
+        indicatorFill: "#ffffff",
+        hubLight: "#ffffff",
+        hubDark: "#cccccc",
+        hubText: "#000000",
+        hubStroke: dividerColor,
+      };
+    }
+
+    // Default: theme accent — both indicator and hub use --primary-color,
+    // hub label auto-picks black/white via WCAG luminance.
+    const primary =
+      cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
+    const rgb = this._cssColorToRgb(primary, ctx);
     return {
-      // Indicator uses the same accent as the hub so they read as a
-      // unified "spin mechanism".
       indicatorFill: primary,
-      hubLight: light,
-      hubDark: dark,
+      hubLight: this._adjustLightness(rgb, 0.18),
+      hubDark: this._adjustLightness(rgb, -0.18),
       hubText: this._isLight(rgb) ? "#0a0a0a" : "#ffffff",
       hubStroke: dividerColor,
     };
