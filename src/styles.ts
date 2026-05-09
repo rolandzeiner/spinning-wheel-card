@@ -181,19 +181,34 @@ export const editorStyles = css`
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
   }
-  .labels-add-row {
+  .labels-add-stack {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--ha-space-2, 8px);
-    align-items: stretch;
   }
-  .labels-add-text {
-    flex: 1 1 200px;
-    min-width: 160px;
-  }
+  .labels-add-text,
   .labels-add-icon {
-    flex: 1 1 220px;
-    min-width: 200px;
+    width: 100%;
+  }
+  /* Divider between primary (text) and secondary (icon picker) inputs.
+     Reads "or pick an icon ↓" so users see the text input as the
+     default path; icon picker is the labelled side path below. */
+  .labels-add-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--ha-space-2, 8px);
+    font-size: var(--ha-font-size-xs, 11px);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--secondary-text-color);
+    margin-top: var(--ha-space-1, 4px);
+  }
+  .labels-add-divider::before,
+  .labels-add-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--divider-color, rgba(0, 0, 0, 0.12));
   }
 
   a:focus-visible,

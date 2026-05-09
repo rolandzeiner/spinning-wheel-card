@@ -988,11 +988,18 @@ export class SpinningWheelCardEditor
   ): void => {
     ev.stopPropagation();
     const value = ev.detail.value;
-    if (!value || typeof value !== "string") return;
-    this._addLabel(value);
-    // Reset the picker so the next pick fires another value-changed.
+    // Reset the picker first so the next pick fires another value-changed.
     const target = ev.target as { value?: string } | null;
     if (target) target.value = "";
+    if (!value || typeof value !== "string") return;
+    // Picker is icon-only — ha-icon-picker happens to allow free text
+    // (the literal "use exact text" suggestion at the bottom of its
+    // dropdown), which is buried below MDI matches and easy to misclick.
+    // Free text goes through the text input above; reject anything
+    // non-icon here so users can't pick e.g. "test" thinking it's the
+    // text option and silently get nothing.
+    if (!this._isIconLabel(value)) return;
+    this._addLabel(value);
   };
 
   private _renderLabelsSection(lang: string): TemplateResult {
@@ -1036,13 +1043,16 @@ export class SpinningWheelCardEditor
           : html`<div class="labels-empty">
               ${localize("editor.labels_empty", lang)}
             </div>`}
-        <div class="labels-add-row">
+        <div class="labels-add-stack">
           <ha-textfield
             class="labels-add-text"
             .placeholder=${localize("editor.label_text_placeholder", lang)}
             .disabled=${atCap}
             @keydown=${this._onLabelTextKeydown}
           ></ha-textfield>
+          <div class="labels-add-divider">
+            ${localize("editor.label_icon_divider", lang)}
+          </div>
           <ha-icon-picker
             class="labels-add-icon"
             .hass=${this.hass}
