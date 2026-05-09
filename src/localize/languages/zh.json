@@ -40,6 +40,7 @@
     "bindings": "扇区绑定",
     "binding_color": "填充颜色",
     "binding_label_color": "标签文字颜色",
+    "binding_weight": "权重(相对扇区大小)",
     "binding_action": "动作",
     "advanced": "高级(原始数组)",
     "language_helper": "为此卡片覆盖自动检测的显示语言。自动会跟随你的 HA 个人资料(以浏览器语言作为后备)。",

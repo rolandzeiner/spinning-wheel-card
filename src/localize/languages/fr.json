@@ -40,6 +40,7 @@
     "bindings": "Liaisons des segments",
     "binding_color": "Couleur de remplissage",
     "binding_label_color": "Couleur du texte",
+    "binding_weight": "Pondération (taille relative)",
     "binding_action": "Action",
     "advanced": "Avancé (tableaux bruts)",
     "language_helper": "Remplace la langue d'affichage détectée automatiquement pour cette carte. Automatique suit votre profil HA (avec la langue du navigateur en repli).",

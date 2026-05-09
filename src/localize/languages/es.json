@@ -40,6 +40,7 @@
     "bindings": "Asignaciones de segmentos",
     "binding_color": "Color de relleno",
     "binding_label_color": "Color del texto",
+    "binding_weight": "Peso (tamaño relativo)",
     "binding_action": "Acción",
     "advanced": "Avanzado (matrices crudas)",
     "language_helper": "Sobrescribe el idioma de visualización detectado automáticamente para esta tarjeta. Automático sigue tu perfil de HA (con el idioma del navegador como respaldo).",

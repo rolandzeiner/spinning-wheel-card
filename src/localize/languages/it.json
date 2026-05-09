@@ -40,6 +40,7 @@
     "bindings": "Associazioni dei segmenti",
     "binding_color": "Colore di riempimento",
     "binding_label_color": "Colore del testo",
+    "binding_weight": "Peso (dimensione relativa)",
     "binding_action": "Azione",
     "advanced": "Avanzate (array grezzi)",
     "language_helper": "Sovrascrive la lingua di visualizzazione rilevata automaticamente per questa scheda. Automatico segue il tuo profilo HA (con la lingua del browser come ripiego).",

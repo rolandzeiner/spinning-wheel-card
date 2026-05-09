@@ -40,6 +40,7 @@
     "bindings": "セグメント割り当て",
     "binding_color": "塗りつぶし色",
     "binding_label_color": "ラベル文字色",
+    "binding_weight": "重み(相対セグメントサイズ)",
     "binding_action": "アクション",
     "advanced": "詳細(生データ)",
     "language_helper": "このカードに対して、自動検出された表示言語を上書きします。自動は HA プロフィール (ブラウザ言語をフォールバック) に従います。",

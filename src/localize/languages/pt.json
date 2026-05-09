@@ -40,6 +40,7 @@
     "bindings": "Vínculos dos segmentos",
     "binding_color": "Cor de preenchimento",
     "binding_label_color": "Cor do texto",
+    "binding_weight": "Peso (tamanho relativo)",
     "binding_action": "Ação",
     "advanced": "Avançado (arrays brutos)",
     "language_helper": "Substitui o idioma de exibição detetado automaticamente para este cartão. Automático segue o seu perfil HA (com o idioma do navegador como recurso).",

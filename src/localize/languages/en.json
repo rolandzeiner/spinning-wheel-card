@@ -40,6 +40,7 @@
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",
     "binding_label_color": "Label text colour",
+    "binding_weight": "Weight (relative slice size)",
     "binding_action": "Action",
     "advanced": "Advanced (raw arrays)",
     "language_helper": "Override the auto-detected display language for this card. Auto follows your HA profile (or browser language as a fallback).",

@@ -40,6 +40,7 @@
     "bindings": "Segment-Bindungen",
     "binding_color": "Füllfarbe",
     "binding_label_color": "Beschriftungsfarbe",
+    "binding_weight": "Gewichtung (relative Größe)",
     "binding_action": "Aktion",
     "advanced": "Erweitert (Rohdaten)",
     "language_helper": "Überschreibt die automatisch erkannte Anzeigesprache für diese Karte. Automatisch folgt deinem HA-Profil (mit Browsersprache als Fallback).",

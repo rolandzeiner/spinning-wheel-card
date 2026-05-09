@@ -222,6 +222,22 @@ export class SpinningWheelCardEditor
     });
   }
 
+  /** Per-unique-label weight (default 1). Cycles short weight arrays.
+   *  Note: the card's underlying model cycles weights per-segment-
+   *  position, not per-unique-label — so this projection captures the
+   *  common case "label X is bigger than label Y" but loses the rarer
+   *  "the second occurrence of X is smaller than the first" pattern.
+   *  Power users with per-position weight needs use Advanced > Weights. */
+  private _resolvedWeights(): ReadonlyArray<number> {
+    const uniques = this._uniqueLabels();
+    const src = this._config.weights ?? [];
+    return uniques.map((_, i) => {
+      if (src.length === 0) return 1;
+      const v = src[i % src.length];
+      return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 1;
+    });
+  }
+
   /** Rebuilt per render so option labels translate when language changes —
    *  ha-form bakes label text into the schema. */
   private _buildSchema(): ReadonlyArray<HaFormSchema> {
@@ -302,10 +318,6 @@ export class SpinningWheelCardEditor
         name: "labels_csv",
         selector: { text: { multiline: true } },
       },
-      {
-        name: "weights_csv",
-        selector: { text: {} },
-      },
       { name: "hub_text", selector: { text: {} } },
       {
         name: "hub_color",
@@ -358,8 +370,10 @@ export class SpinningWheelCardEditor
       // and the write-back fails silently — see ha-lovelace-card SKILL.md).
       ...this._buildBindingsBlock(),
       // Advanced wrapper — the raw arrays for paste-from-YAML / power
-      // users wanting CSS keywords or var(--…) for colours, or full
-      // ActionConfig objects for actions. Defaults closed.
+      // users wanting CSS keywords or var(--…) for colours, full
+      // ActionConfig objects for actions, or per-segment-position
+      // weight cycling that the per-unique-label bindings panel
+      // can't express. Defaults closed.
       {
         type: "expandable" as const,
         name: "raw_arrays",
@@ -373,6 +387,10 @@ export class SpinningWheelCardEditor
           {
             name: "label_colors_csv",
             selector: { text: { multiline: true } },
+          },
+          {
+            name: "weights_csv",
+            selector: { text: {} },
           },
           {
             name: "actions",
@@ -412,6 +430,12 @@ export class SpinningWheelCardEditor
           ],
         },
         {
+          name: `binding_${i}_weight`,
+          selector: {
+            number: { min: 0.1, max: 99, step: 0.1, mode: "box" },
+          },
+        },
+        {
           name: `binding_${i}_action`,
           selector: { entity: { domain: "script" } },
         },
@@ -438,6 +462,9 @@ export class SpinningWheelCardEditor
       }
       if (field.name.endsWith("_color")) {
         return localize("editor.binding_color", lang);
+      }
+      if (field.name.endsWith("_weight")) {
+        return localize("editor.binding_weight", lang);
       }
       if (field.name.endsWith("_action")) {
         return localize("editor.binding_action", lang);
@@ -548,6 +575,7 @@ export class SpinningWheelCardEditor
     actionsStrings: ReadonlyArray<string>;
     colorsCsv: string;
     labelColorsCsv: string;
+    weightsCsv: string;
   } | null = null;
 
   private _onFormChanged = (
@@ -582,7 +610,7 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // ── 3. Labels / weights ───────────────────────────────────────────
+    // ── 3. Labels ────────────────────────────────────────────────────
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
     const parsedLabels = parseStringList(labelsCsv);
     if (parsedLabels.length === 0) {
@@ -590,11 +618,34 @@ export class SpinningWheelCardEditor
     } else {
       next.labels = parsedLabels.slice(0, segments);
     }
-    const parsedWeights = parseWeights(weightsCsv);
-    if (parsedWeights.length === 0) {
-      delete next.weights;
+
+    // ── 3b. Weights: CSV edit > bindings edit > unchanged ────────────
+    const weightsCsvChanged =
+      proj !== null && weightsCsv !== proj.weightsCsv;
+    if (weightsCsvChanged) {
+      const parsed = parseWeights(weightsCsv);
+      if (parsed.length === 0) delete next.weights;
+      else next.weights = parsed.slice(0, segments);
     } else {
-      next.weights = parsedWeights.slice(0, segments);
+      const wDeltas = Object.entries(bindingDeltas).filter(([k]) =>
+        /^binding_\d+_weight$/.test(k),
+      );
+      if (wDeltas.length > 0) {
+        const resolved = this._resolvedWeights();
+        const out: number[] = resolved.slice();
+        for (const [k, v] of wDeltas) {
+          const m = /^binding_(\d+)_weight$/.exec(k);
+          if (!m) continue;
+          const i = parseInt(m[1] ?? "0", 10);
+          if (i < 0 || i >= out.length) continue;
+          if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+            out[i] = v;
+          }
+        }
+        // All-1 → drop the array entirely (default-equal cycling).
+        if (out.every((w) => w === 1)) delete next.weights;
+        else next.weights = out;
+      }
     }
 
     // ── 4. Colours: CSV edit > bindings edit > unchanged ─────────────
@@ -752,7 +803,9 @@ export class SpinningWheelCardEditor
     //       binding side authored the change so the next render's CSV
     //       view stays in sync with the underlying array. ─────────────
     this._labelsText = labelsCsv;
-    this._weightsText = weightsCsv;
+    this._weightsText = weightsCsvChanged
+      ? weightsCsv
+      : (next.weights ?? []).join(", ");
     this._colorsText = colorsCsvChanged
       ? colorsCsvNext
       : (next.colors ?? []).join(", ");
@@ -794,18 +847,22 @@ export class SpinningWheelCardEditor
     const colors = this._resolvedColors();
     const labelColors = this._resolvedLabelColors();
     const actions = this._resolvedActions();
+    const weights = this._resolvedWeights();
     const bindingsSnapshot: Record<string, unknown> = {};
     for (let i = 0; i < uniques.length; i++) {
       const c = cssToRgb(colors[i]);
       const lc = cssToRgb(labelColors[i]);
       const cKey = `binding_${i}_color`;
       const lcKey = `binding_${i}_label_color`;
+      const wKey = `binding_${i}_weight`;
       const aKey = `binding_${i}_action`;
       data[cKey] = c ?? undefined;
       data[lcKey] = lc ?? undefined;
+      data[wKey] = weights[i] ?? 1;
       data[aKey] = actions[i] ?? "";
       bindingsSnapshot[cKey] = data[cKey];
       bindingsSnapshot[lcKey] = data[lcKey];
+      bindingsSnapshot[wKey] = data[wKey];
       bindingsSnapshot[aKey] = data[aKey];
     }
     // Snapshot what we just gave ha-form so _onFormChanged can diff
@@ -816,6 +873,7 @@ export class SpinningWheelCardEditor
       actionsStrings: data.actions as ReadonlyArray<string>,
       colorsCsv: this._colorsText,
       labelColorsCsv: this._labelColorsText,
+      weightsCsv: this._weightsText,
     };
     return html`
       <div class="editor">
