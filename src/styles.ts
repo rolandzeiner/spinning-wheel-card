@@ -45,6 +45,14 @@ export const editorStyles = css`
      has no native button-in-schema slot, so this is the documented
      path. Skill ref: ha-lovelace-card SKILL.md § "@material/mwc-* is
      being phased out of HA's frontend". */
+  /* Standalone result_entity picker rendered below ha-form. Lives
+     outside the form to dodge ha-form's entity-selector-emits-empty
+     race after programmatic value updates (see editor.ts comments).
+     Visual gap matches ha-form's natural row spacing. */
+  .result-entity-row {
+    display: block;
+    margin-top: var(--ha-space-2, 8px);
+  }
   .create-helper-row {
     display: flex;
     flex-direction: column;

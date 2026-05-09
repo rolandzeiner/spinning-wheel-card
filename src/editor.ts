@@ -561,10 +561,14 @@ export class SpinningWheelCardEditor
           { name: "show_status", selector: { boolean: {} } },
           { name: "sound", selector: { boolean: {} } },
           { name: "disable_boost", selector: { boolean: {} } },
-          {
-            name: "result_entity",
-            selector: { entity: { domain: "input_text" } },
-          },
+          // result_entity is managed OUTSIDE ha-form — see the
+          // standalone <ha-selector> in render(). ha-form's entity
+          // selector emits a stale value-changed shortly after a
+          // programmatic update (the just-created input_text isn't in
+          // hass.states yet, selector reconciles to "") which racing
+          // with _onFormChanged was dropping the value silently.
+          // Keeping it out of the schema entirely sidesteps that
+          // class of bug; the standalone widget renders identically.
         ],
       },
     ];
@@ -669,8 +673,6 @@ export class SpinningWheelCardEditor
         return localize("editor.disable_confirm_actions", lang);
       case "disable_boost":
         return localize("editor.disable_boost", lang);
-      case "result_entity":
-        return localize("editor.result_entity", lang);
       default:
         return field.name;
     }
@@ -717,8 +719,6 @@ export class SpinningWheelCardEditor
           return "editor.disable_confirm_actions_helper";
         case "disable_boost":
           return "editor.disable_boost_helper";
-        case "result_entity":
-          return "editor.result_entity_helper";
         case "raw_arrays":
           return "editor.advanced_helper";
         default:
@@ -971,23 +971,14 @@ export class SpinningWheelCardEditor
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
     }
-    // result_entity has a quirk that todo_entity doesn't: ha-form's
-    // entity selector emits an empty value-changed shortly after we
-    // programmatically set `_config.result_entity` (the just-created
-    // input_text isn't in `hass.states` yet, so the selector reconciles
-    // the "unknown" id to ""). If we naively strip on empty, the
-    // dashboard's pending config loses `result_entity` between Create
-    // and Save — user thinks the click did nothing, clicks again,
-    // accumulates orphan helpers. Preserve the prior value when it
-    // was set; only strip when it never existed.
-    const formClearedResult =
-      next.result_entity === "" || next.result_entity == null;
-    if (formClearedResult) {
-      if (this._config.result_entity) {
-        next.result_entity = this._config.result_entity;
-      } else {
-        delete next.result_entity;
-      }
+    // result_entity is NOT routed through ha-form (see schema comment
+    // in _buildGeneralBlock). Whatever the form emits for it is stale
+    // / leaky — explicitly preserve from `_config` so the standalone
+    // widget below ha-form is the single source of truth.
+    if (this._config.result_entity) {
+      next.result_entity = this._config.result_entity;
+    } else {
+      delete next.result_entity;
     }
 
     // ── 8. Cache CSV verbatim where applicable; regenerate when the
@@ -1089,6 +1080,21 @@ export class SpinningWheelCardEditor
           .computeHelper=${this._computeHelper}
           @value-changed=${this._onFormChanged}
         ></ha-form>
+        <!-- Result helper widget — managed standalone, NOT through
+             ha-form, to dodge the entity-selector-emits-empty-after-
+             programmatic-set race. The picker calls our own
+             @value-changed handler which writes _config directly and
+             fires config-changed up to the dashboard. -->
+        <div class="result-entity-row">
+          <ha-selector
+            .hass=${this.hass}
+            .selector=${{ entity: { domain: "input_text" } }}
+            .value=${this._config.result_entity ?? ""}
+            .label=${localize("editor.result_entity", lang)}
+            .helper=${localize("editor.result_entity_helper", lang)}
+            @value-changed=${this._onResultEntityChanged}
+          ></ha-selector>
+        </div>
         ${showCreateHelper
           ? html`
               <div class="create-helper-row">
@@ -1109,6 +1115,32 @@ export class SpinningWheelCardEditor
       </div>
     `;
   }
+
+  /** Standalone result_entity picker handler. Bypasses ha-form
+   *  entirely so the racy entity-selector-emits-empty-after-
+   *  programmatic-set issue can't drop the value silently between
+   *  Create and Save. Writes `_config.result_entity` directly and
+   *  fires config-changed up to the dashboard's edit dialog. */
+  private _onResultEntityChanged = (
+    ev: CustomEvent<{ value: string }>,
+  ): void => {
+    // Stop propagation — ha-form is a sibling, not a parent, but
+    // some HA frontend versions catch unhandled value-changed events
+    // at the dialog level and try to merge them. Cleaner to scope
+    // this event to our handler only.
+    ev.stopPropagation();
+    const newValue = ev.detail.value;
+    if (newValue && typeof newValue === "string") {
+      this._config = { ...this._config, result_entity: newValue };
+    } else {
+      // ha-form's entity picker emits "" when cleared. Drop the field
+      // from saved YAML rather than persisting an empty string.
+      const next = { ...this._config };
+      delete next.result_entity;
+      this._config = next;
+    }
+    fireEvent(this, "config-changed", { config: this._config });
+  };
 
   /** Admin-only WS call to create a dedicated `input_text` helper for
    *  this card. Auto-names "Spinning Wheel Result" (HA generates the
