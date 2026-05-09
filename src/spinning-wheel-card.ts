@@ -13,7 +13,7 @@
 //
 // Standalone — no integration backing, no entities consumed.
 
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
@@ -355,6 +355,12 @@ export class SpinningWheelCard extends LitElement {
       !["theme", "black", "white"].includes(config.hub_color)
     ) {
       throw new Error(localize("errors.hub_color_value", lang));
+    }
+    if (
+      config.show_status !== undefined &&
+      typeof config.show_status !== "boolean"
+    ) {
+      throw new Error(localize("errors.show_status_type", lang));
     }
     // Default `name` is set in render() rather than here, so the display
     // header stays reactive to language changes.
@@ -1360,7 +1366,9 @@ export class SpinningWheelCard extends LitElement {
             @keydown=${this._onKeyDown}
             @pointercancel=${this._onPointerCancel}
           ></canvas>
-          <div class="status" aria-live="polite">${status}</div>
+          ${this.config.show_status === false
+            ? nothing
+            : html`<div class="status" aria-live="polite">${status}</div>`}
         </div>
       </ha-card>
     `;

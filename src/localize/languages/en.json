@@ -27,6 +27,7 @@
     "hub_color": "Hub & indicator color",
     "text_orientation": "Label orientation",
     "sound": "Click sound",
+    "show_status": "Show status line",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
     "friction_helper": "How quickly the wheel decelerates after a spin or release.",
     "theme_helper": "Built-in colour palette used when Colors is empty. Custom Colors always overrides this.",
@@ -45,6 +46,7 @@
     "hub_color_white": "White — black text",
     "text_orientation_helper": "How segment labels are oriented. Tangent (default) wraps the text around the rim; Radial rotates labels 90° clockwise so they read along the spoke from rim to centre.",
     "sound_helper": "Play a peg-click sound on each segment crossing. Volume scales with wheel speed.",
+    "show_status_helper": "Show the text line beneath the wheel (\"Spinning…\" / \"Result: X\" / the click-to-spin idle hint). Off for a more minimal look.",
     "friction_low": "Low — long, lazy spins",
     "friction_medium": "Medium — classic",
     "friction_high": "High — stops quickly",
@@ -72,6 +74,7 @@
     "sound_type": "sound must be a boolean",
     "text_orientation_value": "text_orientation must be \"tangent\" or \"radial\"",
     "theme_value": "theme must be one of: default, pastel, pride, neon",
-    "hub_color_value": "hub_color must be one of: theme, black, white"
+    "hub_color_value": "hub_color must be one of: theme, black, white",
+    "show_status_type": "show_status must be a boolean"
   }
 }
