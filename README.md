@@ -89,7 +89,7 @@ Decay is frame-rate independent — `ω *= friction^(60·dt)` — so the wall-cl
 | --------- | --- |
 | `default` | 8-colour rainbow (red, orange, yellow, mint, slate-blue, navy, purple, teal). |
 | `pastel`  | 8 soft, low-saturation tones — pink, peach, butter, mint, sky, periwinkle, lavender, rose. |
-| `pride`   | 6-stripe Pride flag (red, orange, yellow, green, indigo, violet). Cycles for `segments > 6`. |
+| `pride`   | 10-colour inclusive Pride palette: 6-stripe Gilbert Baker rainbow (red, orange, yellow, green, indigo, violet) + 3 unique stripes from the Helms transgender flag (light blue, pink, white) + bisexual-flag purple (`#800080`). Cycles for `segments > 10`. |
 | `neon`    | 8 vivid, fully-saturated tones — hot pink, orange, yellow, green, cyan, electric blue, purple, magenta. Pair with `label_colors: ["#ffffff"]` for the best contrast. |
 
 A custom `colors` array (or single CSS colour) always wins over the active `theme`. Same-label-same-colour mapping applies regardless of where the palette comes from — segments labelled `Yes` are always one shade, `No` another, no matter how many of each there are.
