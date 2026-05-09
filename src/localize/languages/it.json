@@ -41,6 +41,8 @@
     "result_entity": "Helper del risultato",
     "result_entity_create": "Crea un helper dedicato",
     "result_entity_default_name": "Risultato della ruota",
+    "result_entity_created": "Helper del risultato creato: {entity}",
+    "result_entity_create_failed": "Creazione dell'helper del risultato non riuscita. Vedi la console del browser per i dettagli.",
     "general": "Generale",
     "bindings": "Associazioni dei segmenti",
     "binding_color": "Colore di riempimento",

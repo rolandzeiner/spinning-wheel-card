@@ -41,6 +41,8 @@
     "result_entity": "Ergebnis-Helfer",
     "result_entity_create": "Dedizierten Helfer erstellen",
     "result_entity_default_name": "Glücksrad-Ergebnis",
+    "result_entity_created": "Ergebnis-Helfer erstellt: {entity}",
+    "result_entity_create_failed": "Erstellung des Ergebnis-Helfers fehlgeschlagen. Details in der Browser-Konsole.",
     "general": "Allgemein",
     "bindings": "Segment-Bindungen",
     "binding_color": "Füllfarbe",

@@ -41,6 +41,8 @@
     "result_entity": "Result helper",
     "result_entity_create": "Create dedicated helper",
     "result_entity_default_name": "Spinning Wheel Result",
+    "result_entity_created": "Result helper created: {entity}",
+    "result_entity_create_failed": "Failed to create result helper. See browser console for details.",
     "general": "General",
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",

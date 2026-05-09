@@ -1093,16 +1093,14 @@ export class SpinningWheelCardEditor
    *  gotcha in ha-lovelace-card SKILL.md). */
   private async _createResultHelper(): Promise<void> {
     if (!this.hass?.callWS) return;
+    const lang = this._lang();
     try {
       const reply = await this.hass.callWS<{
         id: string;
         name: string;
       }>({
         type: "input_text/create",
-        name: localize(
-          "editor.result_entity_default_name",
-          this._lang(),
-        ),
+        name: localize("editor.result_entity_default_name", lang),
         max: 255,
         icon: "mdi:dharmachakra",
       });
@@ -1110,12 +1108,26 @@ export class SpinningWheelCardEditor
         const entityId = `input_text.${reply.id}`;
         this._config = { ...this._config, result_entity: entityId };
         fireEvent(this, "config-changed", { config: this._config });
+        // HA's standard toast slot — fire-and-forget, dashboard's
+        // <notification-manager> picks it up via the bubbling +
+        // composed CustomEvent. Carries the entity_id so the user
+        // can copy it for automation wiring without re-checking the
+        // helpers list. Same channel HA core's `showToast` helper
+        // uses (frontend/src/util/toast.ts on `dev`).
+        fireEvent(this, "hass-notification", {
+          message: localize("editor.result_entity_created", lang, {
+            entity: entityId,
+          }),
+        });
       }
     } catch (err) {
       console.warn(
         "[spinning-wheel-card editor] input_text/create failed:",
         err,
       );
+      fireEvent(this, "hass-notification", {
+        message: localize("editor.result_entity_create_failed", lang),
+      });
     }
   }
 

@@ -41,6 +41,8 @@
     "result_entity": "Helper de resultado",
     "result_entity_create": "Crear helper dedicado",
     "result_entity_default_name": "Resultado de la ruleta",
+    "result_entity_created": "Helper de resultado creado: {entity}",
+    "result_entity_create_failed": "Error al crear el helper de resultado. Consulta la consola del navegador para más detalles.",
     "general": "General",
     "bindings": "Asignaciones de segmentos",
     "binding_color": "Color de relleno",

@@ -41,6 +41,8 @@
     "result_entity": "结果助手",
     "result_entity_create": "创建专用助手",
     "result_entity_default_name": "幸运转盘结果",
+    "result_entity_created": "已创建结果助手:{entity}",
+    "result_entity_create_failed": "创建结果助手失败,详情请查看浏览器控制台。",
     "general": "常规",
     "bindings": "扇区绑定",
     "binding_color": "填充颜色",
