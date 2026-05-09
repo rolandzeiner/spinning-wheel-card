@@ -1232,6 +1232,14 @@ export class SpinningWheelCard extends LitElement {
         entity_id: entity,
         value,
       });
+      // Diagnostic so users can confirm the write path is wired when
+      // they open DevTools after a spin. Cheap (one console line per
+      // spin), quiet for users who never open the console, and
+      // self-evident when troubleshooting "the spin doesn't update
+      // my helper" — they see either this line or the warn below.
+      console.info(
+        `[spinning-wheel-card] result written: ${entity} = ${JSON.stringify(value)}`,
+      );
     } catch (err) {
       console.warn(
         "[spinning-wheel-card] input_text.set_value failed:",

@@ -136,6 +136,46 @@ const DEFAULT_THEME: Theme = "default";
  *  reach across the const declaration order). */
 const DEFAULT_SEGMENTS = 8;
 
+/** localStorage key for the entity_id of the most recently
+ *  created-but-not-yet-saved result helper. Survives an editor remount
+ *  (close-without-save → reopen) so the user can't accidentally create
+ *  multiple helpers by clicking Create repeatedly across sessions —
+ *  the second mount picks up the existing helper instead. Cleared
+ *  when the wired entity_id is no longer present in `hass.states`
+ *  (the user deleted the helper from Settings). */
+const RECENT_HELPER_LS_KEY = "swc-recent-result-helper";
+
+/** Read the localStorage helper-cache, swallowing access errors
+ *  (Safari private-mode / quota / disabled-storage). Returns null
+ *  when nothing's stashed or when the read fails. */
+const readRecentHelper = (): string | null => {
+  try {
+    return window.localStorage.getItem(RECENT_HELPER_LS_KEY);
+  } catch {
+    return null;
+  }
+};
+
+/** Write the localStorage helper-cache, no-op on failure. */
+const writeRecentHelper = (entityId: string): void => {
+  try {
+    window.localStorage.setItem(RECENT_HELPER_LS_KEY, entityId);
+  } catch {
+    /* ignore — stash is best-effort */
+  }
+};
+
+/** Clear the localStorage helper-cache (used when the cached entity
+ *  no longer exists in `hass.states`, so we don't recommend a stale
+ *  helper that's been deleted from Settings). */
+const clearRecentHelper = (): void => {
+  try {
+    window.localStorage.removeItem(RECENT_HELPER_LS_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 @customElement("spinning-wheel-card-editor")
 export class SpinningWheelCardEditor
   extends LitElement
@@ -201,6 +241,25 @@ export class SpinningWheelCardEditor
       if (stateNow !== this._todoLastEntityState) {
         this._todoLastEntityState = stateNow;
         if (stateNow !== null) void this._fetchTodoItems();
+      }
+    }
+
+    // Recent-helper recovery: when the YAML config has no
+    // `result_entity` but localStorage still carries a helper from a
+    // prior unsaved Create, auto-pick it up so a second click on
+    // Create can't accidentally create a duplicate. Only kicks in once
+    // hass.states is populated and the cached helper actually exists
+    // there — if the user deleted the helper manually, drop the cache
+    // and fall through to the normal flow.
+    if (!this._config.result_entity && this.hass?.states) {
+      const recent = readRecentHelper();
+      if (recent) {
+        if (recent in this.hass.states) {
+          this._config = { ...this._config, result_entity: recent };
+          fireEvent(this, "config-changed", { config: this._config });
+        } else {
+          clearRecentHelper();
+        }
       }
     }
   }
@@ -1108,6 +1167,11 @@ export class SpinningWheelCardEditor
         const entityId = `input_text.${reply.id}`;
         this._config = { ...this._config, result_entity: entityId };
         fireEvent(this, "config-changed", { config: this._config });
+        // Stash so a close-without-save → reopen sequence picks up
+        // the just-created helper instead of letting the user create
+        // another one. Cleared in `updated()` when the cached entity
+        // disappears from `hass.states` (user deleted it manually).
+        writeRecentHelper(entityId);
         // HA's standard toast slot — fire-and-forget, dashboard's
         // <notification-manager> picks it up via the bubbling +
         // composed CustomEvent. Carries the entity_id so the user
