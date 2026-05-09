@@ -383,10 +383,24 @@ export class SpinningWheelCard extends LitElement {
     rows: number | "auto";
     min_columns: number;
     min_rows: number;
+    max_columns?: number | "full";
+    max_rows?: number;
   } {
-    // Canvas is fluid (ResizeObserver-driven, capped at MAX_SIZE px).
-    // Default to 6 cols but let the user stretch all the way to "full".
-    return { columns: 6, rows: "auto", min_columns: 4, min_rows: 5 };
+    // Canvas is fluid (ResizeObserver-driven, capped at MAX_SIZE px),
+    // and the .wheel-wrap container query sizes it to the smaller of
+    // available width / height — so user drags on either handle land
+    // somewhere visible. `rows: "auto"` was the original default; it
+    // ignored vertical drags because ha-card auto-sized to content.
+    // Numeric default + max_rows binds the row handle to a real value
+    // the layout can shrink the canvas into.
+    return {
+      columns: 6,
+      rows: 5,
+      min_columns: 4,
+      min_rows: 4,
+      max_columns: "full",
+      max_rows: 12,
+    };
   }
 
   /** Effective open-item summaries when a todo_entity is wired AND
@@ -1782,19 +1796,21 @@ export class SpinningWheelCard extends LitElement {
     return html`
       <ha-card .header=${header}>
         <div class="card-content">
-          <canvas
-            id="wheel"
-            width=${DEFAULT_SIZE}
-            height=${DEFAULT_SIZE}
-            role="img"
-            tabindex="0"
-            aria-label=${localize("status.idle", lang)}
-            @pointerdown=${this._onPointerDown}
-            @pointermove=${this._onPointerMove}
-            @pointerup=${this._onPointerUp}
-            @keydown=${this._onKeyDown}
-            @pointercancel=${this._onPointerCancel}
-          ></canvas>
+          <div class="wheel-wrap">
+            <canvas
+              id="wheel"
+              width=${DEFAULT_SIZE}
+              height=${DEFAULT_SIZE}
+              role="img"
+              tabindex="0"
+              aria-label=${localize("status.idle", lang)}
+              @pointerdown=${this._onPointerDown}
+              @pointermove=${this._onPointerMove}
+              @pointerup=${this._onPointerUp}
+              @keydown=${this._onKeyDown}
+              @pointercancel=${this._onPointerCancel}
+            ></canvas>
+          </div>
           ${this.config.show_status === false
             ? nothing
             : html`<div class="status" aria-live="polite">${status}</div>`}
@@ -1804,27 +1820,56 @@ export class SpinningWheelCard extends LitElement {
   }
 
   static override styles: CSSResultGroup = css`
+    /* Section-view grid cells are fixed-size containers; the height
+       has to flow through :host → ha-card → card-content → wheel-wrap
+       so the canvas can size to the smaller of width / height. Without
+       this cascade, ha-card would collapse to its natural content
+       height and the row-drag handle in the dashboard editor binds to
+       nothing. */
     :host {
       display: block;
       color-scheme: light dark;
+      height: 100%;
     }
     ha-card {
       overflow: hidden;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
     }
     .card-content {
       padding: var(--ha-space-4, 16px);
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: var(--ha-space-2, 8px);
+      flex: 1 1 auto;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    /* Container-query scope for the canvas. container-type:size lets
+       the child query both inline-size (cqi = width) and block-size
+       (cqb = height); min(100cqi, 100cqb) sizes the canvas to the
+       smaller dimension so it stays square inside any cell shape —
+       wide-and-short, narrow-and-tall, or square. */
+    .wheel-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      container-type: size;
+      container-name: wheel-area;
     }
     #wheel {
-      /* Fluid: fills the card width up to MAX_SIZE; aspect-ratio keeps
-         the canvas square as the card grows. The HTML width/height attrs
-         only set the drawing-buffer; the rendered size comes from CSS. */
-      width: 100%;
-      max-width: 600px;
+      display: block;
+      width: min(100cqi, 100cqb);
       height: auto;
+      max-width: 600px;
+      max-height: 600px;
       aspect-ratio: 1 / 1;
       touch-action: none;        /* let our pointer handler own gestures */
       cursor: grab;
@@ -1847,6 +1892,7 @@ export class SpinningWheelCard extends LitElement {
       font-variant-numeric: tabular-nums;
       color: var(--secondary-text-color);
       min-height: 1.4em;
+      flex-shrink: 0;
     }
 
     /* ── Accessibility primitives ────────────────────────────────────
