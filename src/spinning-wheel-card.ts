@@ -1046,6 +1046,19 @@ export class SpinningWheelCard extends LitElement {
     ) {
       this._spinning = true;
       this._startAnim();
+    } else if (this._rafId === null) {
+      // Insufficient release velocity to spin — typical case is a
+      // drag-to-stop where the user grabs a fast-spinning wheel and
+      // bleeds momentum off through the cursor. The drag-commit path
+      // already called `_stopAnim()` but left `_spinning = true`
+      // (the previous RAF loop owned that flag); without resetting it
+      // here the status line stays stuck on "Spinning…" indefinitely.
+      // Snap to a clean rest, announce the result, repaint.
+      this._omega = 0;
+      this._spinning = false;
+      this._lastTickSeg = -1;
+      this._announceResult();
+      this._draw();
     }
   };
 
