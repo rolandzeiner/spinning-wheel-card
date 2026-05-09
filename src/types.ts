@@ -119,24 +119,7 @@ declare global {
     "hui-error-card": LovelaceCard;
     "ha-form": HaFormElement;
     "ha-selector": HaSelectorElement;
-    "ha-textfield": HaTextfieldElement;
-    "ha-icon-picker": HaIconPickerElement;
   }
-}
-
-interface HaTextfieldElement extends HTMLElement {
-  value?: string;
-  placeholder?: string;
-  label?: string;
-  disabled?: boolean;
-}
-
-interface HaIconPickerElement extends HTMLElement {
-  hass?: HomeAssistant;
-  value?: string;
-  label?: string;
-  placeholder?: string;
-  disabled?: boolean;
 }
 
 interface HaFormElement extends HTMLElement {

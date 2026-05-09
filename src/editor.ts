@@ -314,11 +314,20 @@ export class SpinningWheelCardEditor
                 number: { min: 4, max: 24, step: 1, mode: "slider" },
               },
             } satisfies HaFormSchema,
-            // labels lives outside ha-form — see _renderLabelsSection.
-            // Mixing free text + an icon picker into the same chip list
-            // (with live MDI previews) doesn't fit the chip selector,
-            // and the schema-driven path would force every entry through
-            // a single input mode.
+            {
+              name: "labels",
+              // Chip-style selector — type a label, press Enter, X to
+              // remove. `options: []` + `custom_value: true` lets every
+              // entry be user-typed (no fixed dropdown). MDI icon
+              // strings (`mdi:home`) round-trip as bare text.
+              selector: {
+                select: {
+                  multiple: true,
+                  custom_value: true,
+                  options: [],
+                },
+              },
+            } satisfies HaFormSchema,
             {
               name: "text_orientation",
               selector: {
@@ -547,6 +556,7 @@ export class SpinningWheelCardEditor
     ["segments", { label: "editor.segments", helper: "editor.segments_helper" }],
     ["friction", { label: "editor.friction", helper: "editor.friction_helper" }],
     ["theme", { label: "editor.theme", helper: "editor.theme_helper" }],
+    ["labels", { label: "editor.labels", helper: "editor.labels_helper" }],
     ["weights_csv", { label: "editor.weights", helper: "editor.weights_helper" }],
     ["colors_csv", { label: "editor.colors", helper: "editor.colors_helper" }],
     ["label_colors_csv", { label: "editor.label_colors", helper: "editor.label_colors_helper" }],
@@ -635,12 +645,21 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // labels are managed by the custom widget below ha-form; preserve
-    // the existing config value verbatim so a form-only edit doesn't
-    // wipe them.
+    // 3. Labels — chip selector emits string[] directly. Trim each chip
+    // and drop empties (paste of a trailing comma can leave one), clamp
+    // to the wheel's segment count.
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
-    if (this._config.labels) next.labels = this._config.labels;
-    else delete next.labels;
+    const rawLabels = next.labels;
+    if (Array.isArray(rawLabels)) {
+      const cleaned = rawLabels
+        .filter((l): l is string => typeof l === "string")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      if (cleaned.length === 0) delete next.labels;
+      else next.labels = cleaned.slice(0, segments);
+    } else {
+      delete next.labels;
+    }
 
     // 3b. Weights: CSV edit > bindings edit > unchanged.
     const weightsCsvChanged =
@@ -908,7 +927,6 @@ export class SpinningWheelCardEditor
           .computeHelper=${this._computeHelper}
           @value-changed=${this._onFormChanged}
         ></ha-form>
-        ${this._config.todo_entity ? nothing : this._renderLabelsSection(lang)}
         <!-- Standalone (not via ha-form) — dodges the entity-selector-
              emits-empty-after-programmatic-set race. -->
         <div class="result-entity-row">
@@ -938,130 +956,6 @@ export class SpinningWheelCardEditor
             `
           : nothing}
         <div class="editor-hint">${localize("editor.footer_hint", lang)}</div>
-      </div>
-    `;
-  }
-
-  /** Same namespaced-icon regex the card uses at runtime
-   *  (`spinning-wheel-card.ts::_looksLikeIcon`) — keeps chip preview
-   *  and segment paint in lockstep on what counts as an icon string. */
-  private _isIconLabel(s: string): boolean {
-    return /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i.test(s);
-  }
-
-  /** Append a chip to the labels list. Trims, drops empties, dedupes
-   *  the trailing duplicate (rapid double-click on Add), caps at the
-   *  configured segment count (`_onFormChanged` matches this slice). */
-  private _addLabel(value: string): void {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    const segments = this._config.segments ?? STATIC_DEFAULTS.segments;
-    const current = this._config.labels ?? [];
-    if (current.length >= segments) return;
-    if (current[current.length - 1] === trimmed) return;
-    const next = [...current, trimmed];
-    this._config = { ...this._config, labels: next };
-    fireEvent(this, "config-changed", { config: this._config });
-  }
-
-  private _removeLabel(index: number): void {
-    const current = this._config.labels ?? [];
-    if (index < 0 || index >= current.length) return;
-    const next = current.filter((_, i) => i !== index);
-    const cfg: SpinningWheelCardConfig = { ...this._config };
-    if (next.length > 0) cfg.labels = next;
-    else delete cfg.labels;
-    this._config = cfg;
-    fireEvent(this, "config-changed", { config: this._config });
-  }
-
-  private _onLabelTextKeydown = (ev: KeyboardEvent): void => {
-    if (ev.key !== "Enter") return;
-    ev.preventDefault();
-    const target = ev.target as HTMLInputElement;
-    this._addLabel(target.value);
-    target.value = "";
-  };
-
-  private _onLabelIconPicked = (
-    ev: CustomEvent<{ value: string }>,
-  ): void => {
-    ev.stopPropagation();
-    const value = ev.detail.value;
-    // Reset the picker first so the next pick fires another value-changed.
-    const target = ev.target as { value?: string } | null;
-    if (target) target.value = "";
-    if (!value || typeof value !== "string") return;
-    // Picker is icon-only — ha-icon-picker happens to allow free text
-    // (the literal "use exact text" suggestion at the bottom of its
-    // dropdown), which is buried below MDI matches and easy to misclick.
-    // Free text goes through the text input above; reject anything
-    // non-icon here so users can't pick e.g. "test" thinking it's the
-    // text option and silently get nothing.
-    if (!this._isIconLabel(value)) return;
-    this._addLabel(value);
-  };
-
-  private _renderLabelsSection(lang: string): TemplateResult {
-    const labels = this._config.labels ?? [];
-    const segments = this._config.segments ?? STATIC_DEFAULTS.segments;
-    const atCap = labels.length >= segments;
-    return html`
-      <div class="labels-section">
-        <div class="labels-section-head">
-          <span class="labels-section-label"
-            >${localize("editor.labels", lang)}</span
-          >
-          <span class="labels-section-count">${labels.length}/${segments}</span>
-        </div>
-        <div class="labels-helper">
-          ${localize("editor.labels_helper", lang)}
-        </div>
-        ${labels.length > 0
-          ? html`<div class="labels-chips">
-              ${labels.map((label, i) => {
-                const isIcon = this._isIconLabel(label);
-                return html`<span
-                  class=${`label-chip${isIcon ? " label-chip-icon" : ""}`}
-                  title=${label}
-                >
-                  ${isIcon
-                    ? html`<ha-icon icon=${label}></ha-icon>
-                        <span class="label-chip-tag">${label}</span>`
-                    : html`<span class="label-chip-text">${label}</span>`}
-                  <button
-                    type="button"
-                    class="label-chip-remove"
-                    aria-label=${localize("editor.label_remove", lang)}
-                    @click=${() => this._removeLabel(i)}
-                  >
-                    ×
-                  </button>
-                </span>`;
-              })}
-            </div>`
-          : html`<div class="labels-empty">
-              ${localize("editor.labels_empty", lang)}
-            </div>`}
-        <div class="labels-add-stack">
-          <ha-textfield
-            class="labels-add-text"
-            .placeholder=${localize("editor.label_text_placeholder", lang)}
-            .disabled=${atCap}
-            @keydown=${this._onLabelTextKeydown}
-          ></ha-textfield>
-          <div class="labels-add-divider">
-            ${localize("editor.label_icon_divider", lang)}
-          </div>
-          <ha-icon-picker
-            class="labels-add-icon"
-            .hass=${this.hass}
-            .value=${""}
-            .label=${localize("editor.label_icon_picker", lang)}
-            .disabled=${atCap}
-            @value-changed=${this._onLabelIconPicked}
-          ></ha-icon-picker>
-        </div>
       </div>
     `;
   }
