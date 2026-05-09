@@ -20,9 +20,11 @@ A Lovelace custom card with a click-to-spin / drag-to-flick wheel for Home Assis
 - **Same-label-same-colour** — segments sharing a label automatically share a fill colour and label-text colour, so cycling labels (e.g. `Yes / No`) read consistently across the wheel.
 - **Two label orientations** — *tangent* (text wraps around the rim, arched per-glyph along the segment arc) and *radial* (text reads along the spoke from rim to centre).
 - **Theme-aware indicator + hub** — pointer triangle and centre hub use HA's `--primary-color`. Hub label auto-picks black or white text via WCAG relative luminance, so it stays readable against any theme accent.
-- **Peg-click sound** — synthesised in the browser via Web Audio (no asset file). Each segment crossing fires a softened click; volume scales with `|ω|`, so faster spins click louder. Stops automatically when the wheel rests. Toggle off in config.
+- **Peg-click sound** — synthesised in the browser via Web Audio (no asset file). Each segment crossing fires a softened click; volume follows a bell-curve (peaks around 12 rad/s, tapers at high speed) and rate-limits at ~33 Hz so a fast spin doesn't pile into a noisy wash. Stops automatically when the wheel rests. Toggle off in config.
 - **Responsive canvas** — `ResizeObserver`-driven, scales 140–600 px to fill whatever grid cell the dashboard gives it. High-DPI aware.
 - **Translatable** — English and German bundled, falls back to English for any other HA language. UI strings, validation errors, default card title, and default hub text all translate.
+- **Keyboard support** — focus the wheel, press `Space` or `Enter` to spin. Same impulse / boost behaviour as a pointer click.
+- **Honours `prefers-reduced-motion`** — the multi-second decay is skipped at the physics layer for users who have asked the OS to reduce motion. The wheel still spins (the spin *is* the feature) but only an instant snap to the result; no per-frame animation, no audio.
 - **No runtime dependencies beyond `lit`** (~15 KB gzipped). Rollup-bundled into a single `dist/spinning-wheel-card.js` (~50 KB unminified, ~17 KB gzipped).
 
 ## Installation
@@ -139,6 +141,7 @@ sound: false
 | Click while spinning | **Boost** — adds an impulse in the wheel's current direction, capped at MAX_VELOCITY. |
 | Click + drag | Wheel follows cursor while held; releases with the angular velocity sampled over the last 100 ms. |
 | Drag past ~3 px before releasing | Treated as a drag (commandeers the wheel). Below that — including pointer jitter during a click — stays a click. |
+| Tab to focus, then `Space` / `Enter` | Keyboard equivalent of a click — same impulse-or-boost behaviour. |
 
 ## Translations
 
