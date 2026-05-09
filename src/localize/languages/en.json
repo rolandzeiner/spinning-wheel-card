@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Card title",
+    "language": "Language",
+    "language_auto": "Auto (HA language)",
     "segments": "Segments",
     "friction": "Friction",
     "theme": "Color theme",
@@ -28,6 +30,7 @@
     "text_orientation": "Label orientation",
     "sound": "Click sound",
     "show_status": "Show status line",
+    "language_helper": "Override the auto-detected display language for this card. Auto follows your HA profile (or browser language as a fallback).",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
     "friction_helper": "How quickly the wheel decelerates after a spin or release.",
     "theme_helper": "Built-in colour palette used when Colors is empty. Custom Colors always overrides this.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Invalid configuration",
     "name_type": "name must be a string",
+    "language_type": "language must be a string",
     "segments_range": "segments must be an integer between 4 and 24",
     "friction_value": "friction must be one of: low, medium, high",
     "labels_type": "labels must be an array of strings",

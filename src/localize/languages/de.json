@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Kartentitel",
+    "language": "Sprache",
+    "language_auto": "Automatisch (HA-Sprache)",
     "segments": "Segmente",
     "friction": "Reibung",
     "theme": "Farbthema",
@@ -28,6 +30,7 @@
     "text_orientation": "Textausrichtung",
     "sound": "Klickgeräusch",
     "show_status": "Statuszeile anzeigen",
+    "language_helper": "Überschreibt die automatisch erkannte Anzeigesprache für diese Karte. Automatisch folgt deinem HA-Profil (mit Browsersprache als Fallback).",
     "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
     "friction_helper": "Wie schnell das Rad nach einer Drehung abbremst.",
     "theme_helper": "Eingebaute Farbpalette, die verwendet wird, wenn Farben leer ist. Benutzerdefinierte Farben überschreiben dies immer.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Ungültige Konfiguration",
     "name_type": "name muss eine Zeichenkette sein",
+    "language_type": "language muss eine Zeichenkette sein",
     "segments_range": "segments muss eine ganze Zahl zwischen 4 und 24 sein",
     "friction_value": "friction muss low, medium oder high sein",
     "labels_type": "labels muss ein Array von Zeichenketten sein",

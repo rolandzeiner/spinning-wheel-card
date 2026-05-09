@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Titolo della scheda",
+    "language": "Lingua",
+    "language_auto": "Automatico (lingua HA)",
     "segments": "Segmenti",
     "friction": "Attrito",
     "theme": "Tema colore",
@@ -28,6 +30,7 @@
     "text_orientation": "Orientamento etichette",
     "sound": "Suono del clic",
     "show_status": "Mostra riga di stato",
+    "language_helper": "Sovrascrive la lingua di visualizzazione rilevata automaticamente per questa scheda. Automatico segue il tuo profilo HA (con la lingua del browser come ripiego).",
     "segments_helper": "In quante fette viene divisa la ruota. Da 4 a 24.",
     "friction_helper": "Quanto velocemente la ruota rallenta dopo una rotazione o un rilascio.",
     "theme_helper": "Tavolozza incorporata usata quando Colori è vuoto. Colori personalizzati ha sempre la precedenza.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Configurazione non valida",
     "name_type": "name deve essere una stringa",
+    "language_type": "language deve essere una stringa",
     "segments_range": "segments deve essere un intero compreso tra 4 e 24",
     "friction_value": "friction deve essere uno tra: low, medium, high",
     "labels_type": "labels deve essere un array di stringhe",

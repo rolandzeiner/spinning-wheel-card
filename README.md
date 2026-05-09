@@ -62,6 +62,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | string | localised "Spinning Wheel" | Card header text. |
+| `language` | ISO-639-1 string (`en` / `de` / `fr` / `it` / `es` / `pt` / `zh` / `ja`) or unset | unset (auto) | Override the auto-detected display language for this card. Unset (or `auto` in the visual editor) follows your HA profile. Unsupported codes fall back to English. |
 | `segments` | integer 4–24 | `8` | How many slices the wheel is divided into. |
 | `friction` | `low` / `medium` / `high` | `medium` | Deceleration preset — see [Friction presets](#friction-presets). |
 | `theme` | `default` / `pastel` / `pride` / `neon` | `default` | Built-in colour palette used when `colors` is empty. **Always overridden by an explicit `colors` array** — see [Theme presets](#theme-presets). |
@@ -191,6 +192,8 @@ Bundled languages:
 | `ja` | Japanese (日本語) |
 
 The active language follows `hass.locale.language` (HA profile) and falls back through `hass.language` → `navigator.language` → `en`. BCP-47 region codes (`en-GB`, `de-AT`, `pt-BR`, `zh-CN`) are normalised to the ISO-639-1 base — so any regional variant of a supported language picks up the matching translation. Switching language in HA re-renders the card live; no reload needed.
+
+You can also **set the language per card** with the `language` config field (or the **Language** dropdown in the visual editor) — useful when you want one card in a different language from your HA profile. Use `auto` (default) to follow HA's language detection.
 
 Adding another language is mechanical:
 

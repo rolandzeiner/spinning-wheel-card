@@ -93,7 +93,9 @@ export class SpinningWheelCardEditor
   }
 
   private _lang(): string {
-    return resolveLang(this.hass);
+    // Mirror the card's per-card language override so the editor
+    // re-renders in the chosen language as soon as the user picks it.
+    return this._config?.language ?? resolveLang(this.hass);
   }
 
   /** Schema is rebuilt per render so option labels (Friction presets,
@@ -104,6 +106,26 @@ export class SpinningWheelCardEditor
     const lang = this._lang();
     return [
       { name: "name", selector: { text: {} } },
+      {
+        name: "language",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "auto", label: localize("editor.language_auto", lang) },
+              // Native names — they shouldn't translate.
+              { value: "en", label: "English" },
+              { value: "de", label: "Deutsch" },
+              { value: "fr", label: "Français" },
+              { value: "it", label: "Italiano" },
+              { value: "es", label: "Español" },
+              { value: "pt", label: "Português" },
+              { value: "zh", label: "简体中文" },
+              { value: "ja", label: "日本語" },
+            ],
+          },
+        },
+      },
       {
         name: "segments",
         selector: { number: { min: 4, max: 24, step: 1, mode: "slider" } },
@@ -217,6 +239,8 @@ export class SpinningWheelCardEditor
     switch (field.name) {
       case "name":
         return localize("editor.name", lang);
+      case "language":
+        return localize("editor.language", lang);
       case "segments":
         return localize("editor.segments", lang);
       case "friction":
@@ -250,6 +274,8 @@ export class SpinningWheelCardEditor
     const lang = this._lang();
     const key = (() => {
       switch (field.name) {
+        case "language":
+          return "editor.language_helper";
         case "segments":
           return "editor.segments_helper";
         case "friction":
@@ -363,6 +389,10 @@ export class SpinningWheelCardEditor
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
     if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
     if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
+    // "auto" is the Auto sentinel for the language dropdown — strip so
+    // the saved YAML doesn't carry a non-language string and the card
+    // falls through to the auto-detect chain.
+    if (next.language === "auto") delete next.language;
 
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;
@@ -381,6 +411,9 @@ export class SpinningWheelCardEditor
     const data: EditorData = {
       ...this._formDefaults(),
       ...this._config,
+      // Map "no override" to the Auto sentinel so the dropdown shows
+      // "Auto (HA language)" rather than blank when nothing is set.
+      language: this._config.language ?? "auto",
       labels_csv: this._labelsText,
       weights_csv: this._weightsText,
       colors_csv: this._colorsText,

@@ -16,6 +16,8 @@
   },
   "editor": {
     "name": "Título de la tarjeta",
+    "language": "Idioma",
+    "language_auto": "Automático (idioma de HA)",
     "segments": "Segmentos",
     "friction": "Fricción",
     "theme": "Tema de color",
@@ -28,6 +30,7 @@
     "text_orientation": "Orientación de etiquetas",
     "sound": "Sonido del clic",
     "show_status": "Mostrar línea de estado",
+    "language_helper": "Sobrescribe el idioma de visualización detectado automáticamente para esta tarjeta. Automático sigue tu perfil de HA (con el idioma del navegador como respaldo).",
     "segments_helper": "En cuántas porciones se divide la ruleta. De 4 a 24.",
     "friction_helper": "Con qué rapidez la ruleta desacelera tras un giro o suelta.",
     "theme_helper": "Paleta integrada usada cuando Colores está vacío. Colores personalizados siempre prevalece.",
@@ -57,6 +60,7 @@
   "errors": {
     "invalid_config": "Configuración no válida",
     "name_type": "name debe ser una cadena de caracteres",
+    "language_type": "language debe ser una cadena de caracteres",
     "segments_range": "segments debe ser un entero entre 4 y 24",
     "friction_value": "friction debe ser uno de: low, medium, high",
     "labels_type": "labels debe ser un array de cadenas",
