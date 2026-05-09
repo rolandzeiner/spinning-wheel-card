@@ -3,24 +3,33 @@ import type { TemplateResult, CSSResultGroup } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type {
+  ActionConfig,
   HaFormSchema,
   HomeAssistant,
   LovelaceCardEditor,
   SpinningWheelCardConfig,
+  Theme,
 } from "./types";
 import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
 import { localize, resolveLang } from "./localize/localize";
+import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
-// Editor exposes labels/weights/colors/actions arrays as comma-separated
-// *_csv fields (no ha-form array selector). _onFormChanged parses CSV
-// → array at the boundary.
+// Editor exposes labels/weights/colors arrays as comma-separated *_csv
+// fields. The bindings panel projects per-unique-label values into
+// synthetic `binding_<i>_<color|label_color|action>` keys; both shapes
+// strip from `next` in _onFormChanged before firing config-changed so
+// they never reach saved YAML. `actions` is a real config field
+// (string[]) — ha-form's entity selector with multiple:true round-trips
+// it directly. The synthetic-keys index signature is permissive
+// (`unknown`) because ha-form's data prop is loosely typed and the
+// per-binding values are read back via narrow runtime guards.
 type EditorData = SpinningWheelCardConfig & {
   labels_csv?: string;
   weights_csv?: string;
   colors_csv?: string;
   label_colors_csv?: string;
-  actions_csv?: string;
+  [syntheticKey: string]: unknown;
 };
 
 // Form prefill so first-open dropdowns/toggles reflect the actual
@@ -60,6 +69,71 @@ const parseWeights = (csv: string): ReadonlyArray<number> => {
   return out;
 };
 
+/** Parse a CSS colour string into an [r, g, b] tuple for ha-form's
+ *  color_rgb selector. Handles `#RRGGBB`, `#RGB`, and `rgb(r, g, b)` —
+ *  the three forms the editor itself emits. Returns null for anything
+ *  else (named colours, `var(--…)`, hsl(), etc.) — those keep working
+ *  in YAML / Advanced > Colours but show as undefined in the picker
+ *  (defaults to fallback). */
+const cssToRgb = (
+  s: string | undefined,
+): readonly [number, number, number] | null => {
+  if (!s) return null;
+  const t = s.trim();
+  let m = /^#([0-9a-f]{6})$/i.exec(t);
+  if (m) {
+    const hex = m[1] ?? "";
+    return [
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16),
+    ] as const;
+  }
+  m = /^#([0-9a-f]{3})$/i.exec(t);
+  if (m) {
+    const hex = m[1] ?? "";
+    const a = hex[0] ?? "0";
+    const b = hex[1] ?? "0";
+    const c = hex[2] ?? "0";
+    return [
+      parseInt(a + a, 16),
+      parseInt(b + b, 16),
+      parseInt(c + c, 16),
+    ] as const;
+  }
+  m = /^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(t);
+  if (m) {
+    return [
+      parseInt(m[1] ?? "0", 10),
+      parseInt(m[2] ?? "0", 10),
+      parseInt(m[3] ?? "0", 10),
+    ] as const;
+  }
+  return null;
+};
+
+/** Tuple → "rgb(r, g, b)". Canonical, parses cleanly back via cssToRgb. */
+const rgbToCss = (rgb: readonly [number, number, number]): string =>
+  `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+
+/** Type guard for the tuple shape ha-form's color_rgb selector emits. */
+const isRgbTuple = (v: unknown): v is readonly [number, number, number] =>
+  Array.isArray(v) &&
+  v.length === 3 &&
+  typeof v[0] === "number" &&
+  typeof v[1] === "number" &&
+  typeof v[2] === "number";
+
+/** Default Theme used in resolution fallbacks (matches the card's
+ *  `THEME_PALETTES[this.config.theme ?? "default"]` pattern). */
+const DEFAULT_THEME: Theme = "default";
+
+/** Default segment count when not configured. Mirrors the card's
+ *  `this.config.segments ?? 8` (and matches STATIC_DEFAULTS.segments
+ *  below — kept as a separate const so the resolution helpers don't
+ *  reach across the const declaration order). */
+const DEFAULT_SEGMENTS = 8;
+
 @customElement("spinning-wheel-card-editor")
 export class SpinningWheelCardEditor
   extends LitElement
@@ -75,7 +149,6 @@ export class SpinningWheelCardEditor
   @state() private _weightsText = "";
   @state() private _colorsText = "";
   @state() private _labelColorsText = "";
-  @state() private _actionsText = "";
 
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
@@ -83,18 +156,70 @@ export class SpinningWheelCardEditor
     this._weightsText = (config.weights ?? []).join(", ");
     this._colorsText = (config.colors ?? []).join(", ");
     this._labelColorsText = (config.label_colors ?? []).join(", ");
-    // Only round-trip string-shorthand actions through the CSV editor —
-    // full ActionConfig objects (set via YAML) aren't representable here.
-    // Object entries stay in `_config.actions`; if the user then edits
-    // the CSV, the resulting save replaces `actions` wholesale, so power
-    // users mixing both shapes need to use YAML directly.
-    this._actionsText = (config.actions ?? [])
-      .filter((a): a is string => typeof a === "string")
-      .join(", ");
   }
 
   private _lang(): string {
     return this._config?.language ?? resolveLang(this.hass);
+  }
+
+  // ── Bindings-panel resolution (mirrors card's same-label-same-X) ─────
+
+  /** Unique labels in order of first appearance — the binding key for
+   *  the per-row panel. Mirrors the walk in spinning-wheel-card.ts's
+   *  `_mapPaletteToLabels` so the editor and card agree on which label
+   *  occupies which slot. Empty `labels` config defaults to "1".."N". */
+  private _uniqueLabels(): ReadonlyArray<string> {
+    const segments = this._config.segments ?? DEFAULT_SEGMENTS;
+    const src = this._config.labels;
+    const expanded =
+      src && src.length > 0
+        ? Array.from({ length: segments }, (_, i) => src[i % src.length] ?? "")
+        : Array.from({ length: segments }, (_, i) => String(i + 1));
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const lbl of expanded) {
+      if (!seen.has(lbl)) {
+        seen.add(lbl);
+        out.push(lbl);
+      }
+    }
+    return out;
+  }
+
+  /** Resolve the active fill-colour palette: explicit `colors` if set,
+   *  otherwise the active `theme`'s palette, otherwise the default
+   *  rainbow. Aligned to unique-label indices, cycling shorter sources. */
+  private _resolvedColors(): ReadonlyArray<string> {
+    const uniques = this._uniqueLabels();
+    const themeName = this._config.theme ?? DEFAULT_THEME;
+    const fallback = THEME_PALETTES[themeName] ?? THEME_PALETTES.default;
+    const custom = this._config.colors;
+    const src = custom && custom.length > 0 ? custom : fallback;
+    return uniques.map(
+      (_, i) => src[i % src.length] ?? fallback[i % fallback.length] ?? "#888888",
+    );
+  }
+
+  /** Resolve the active label-text palette. Defaults to a single dark
+   *  grey for every unique label when `label_colors` is unset. */
+  private _resolvedLabelColors(): ReadonlyArray<string> {
+    const uniques = this._uniqueLabels();
+    const custom = this._config.label_colors;
+    const src = custom && custom.length > 0 ? custom : [DEFAULT_LABEL_COLOR];
+    return uniques.map((_, i) => src[i % src.length] ?? DEFAULT_LABEL_COLOR);
+  }
+
+  /** Per-unique-label string-shorthand action (or empty). Object-form
+   *  ActionConfig entries (set via YAML) are projected as empty in the
+   *  picker — they remain in `_config.actions` and are preserved across
+   *  per-row edits at indices the user does not touch. */
+  private _resolvedActions(): ReadonlyArray<string> {
+    const uniques = this._uniqueLabels();
+    const src = this._config.actions ?? [];
+    return uniques.map((_, i) => {
+      const raw = src[i];
+      return typeof raw === "string" ? raw : "";
+    });
   }
 
   /** Rebuilt per render so option labels translate when language changes —
@@ -181,14 +306,6 @@ export class SpinningWheelCardEditor
         name: "weights_csv",
         selector: { text: {} },
       },
-      {
-        name: "colors_csv",
-        selector: { text: { multiline: true } },
-      },
-      {
-        name: "label_colors_csv",
-        selector: { text: { multiline: true } },
-      },
       { name: "hub_text", selector: { text: {} } },
       {
         name: "hub_color",
@@ -232,16 +349,100 @@ export class SpinningWheelCardEditor
       },
       { name: "sound", selector: { boolean: {} } },
       { name: "show_status", selector: { boolean: {} } },
-      {
-        name: "actions_csv",
-        selector: { text: { multiline: true } },
-      },
       { name: "disable_confirm_actions", selector: { boolean: {} } },
+      // Bindings panel — one expandable per unique label, dynamically
+      // generated each render so adding/renaming labels reshapes the
+      // form. flatten:true on every layer so binding_<i>_<suffix> keys
+      // surface at the top level of `data` (the ha-form expandable
+      // footgun: without flatten, ha-form nests them under data["bindings"]
+      // and the write-back fails silently — see ha-lovelace-card SKILL.md).
+      ...this._buildBindingsBlock(),
+      // Advanced wrapper — the raw arrays for paste-from-YAML / power
+      // users wanting CSS keywords or var(--…) for colours, or full
+      // ActionConfig objects for actions. Defaults closed.
+      {
+        type: "expandable" as const,
+        name: "raw_arrays",
+        title: localize("editor.advanced", lang),
+        flatten: true,
+        schema: [
+          {
+            name: "colors_csv",
+            selector: { text: { multiline: true } },
+          },
+          {
+            name: "label_colors_csv",
+            selector: { text: { multiline: true } },
+          },
+          {
+            name: "actions",
+            selector: {
+              entity: { domain: "script", multiple: true },
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  /** Per-unique-label expandables for the bindings panel. Each carries
+   *  the unique label as its title, two color_rgb pickers in a grid,
+   *  and a single-script entity picker. Empty when there are no labels
+   *  (which can't happen in practice — segments default to 8 → 8
+   *  unique numeric labels). */
+  private _buildBindingsBlock(): ReadonlyArray<HaFormSchema> {
+    const lang = this._lang();
+    const uniques = this._uniqueLabels();
+    if (uniques.length === 0) return [];
+    const inner: HaFormSchema[] = uniques.map((label, i) => ({
+      type: "expandable" as const,
+      name: `binding_${i}`,
+      title: label,
+      flatten: true,
+      schema: [
+        {
+          type: "grid" as const,
+          name: "" as const,
+          schema: [
+            { name: `binding_${i}_color`, selector: { color_rgb: {} } },
+            {
+              name: `binding_${i}_label_color`,
+              selector: { color_rgb: {} },
+            },
+          ],
+        },
+        {
+          name: `binding_${i}_action`,
+          selector: { entity: { domain: "script" } },
+        },
+      ],
+    }));
+    return [
+      {
+        type: "expandable" as const,
+        name: "bindings",
+        title: localize("editor.bindings", lang),
+        flatten: true,
+        schema: inner,
+      },
     ];
   }
 
   private _computeLabel = (field: { name: string }): string => {
     const lang = this._lang();
+    // Bindings-panel synthetics — `binding_<i>_<suffix>`. Match by
+    // suffix so the per-row labels translate without a per-index case.
+    if (field.name.startsWith("binding_")) {
+      if (field.name.endsWith("_label_color")) {
+        return localize("editor.binding_label_color", lang);
+      }
+      if (field.name.endsWith("_color")) {
+        return localize("editor.binding_color", lang);
+      }
+      if (field.name.endsWith("_action")) {
+        return localize("editor.binding_action", lang);
+      }
+    }
     switch (field.name) {
       case "name":
         return localize("editor.name", lang);
@@ -273,7 +474,7 @@ export class SpinningWheelCardEditor
         return localize("editor.sound", lang);
       case "show_status":
         return localize("editor.show_status", lang);
-      case "actions_csv":
+      case "actions":
         return localize("editor.actions", lang);
       case "disable_confirm_actions":
         return localize("editor.disable_confirm_actions", lang);
@@ -284,6 +485,9 @@ export class SpinningWheelCardEditor
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     const lang = this._lang();
+    // Per-row binding inputs are self-explanatory inside the
+    // unique-label expandable — no helper text per field.
+    if (field.name.startsWith("binding_")) return undefined;
     const key = (() => {
       switch (field.name) {
         case "language":
@@ -314,10 +518,12 @@ export class SpinningWheelCardEditor
           return "editor.sound_helper";
         case "show_status":
           return "editor.show_status_helper";
-        case "actions_csv":
+        case "actions":
           return "editor.actions_helper";
         case "disable_confirm_actions":
           return "editor.disable_confirm_actions_helper";
+        case "raw_arrays":
+          return "editor.advanced_helper";
         default:
           return null;
       }
@@ -332,30 +538,58 @@ export class SpinningWheelCardEditor
     return { ...STATIC_DEFAULTS };
   }
 
+  /** Snapshot of the last projection passed to ha-form. Used by
+   *  _onFormChanged to detect which surface (bindings panel vs Advanced
+   *  CSV vs Advanced multi-picker) produced a change — only that surface's
+   *  delta is applied, so a stale projection on another surface doesn't
+   *  silently overwrite a fresh edit. */
+  private _lastProjection: {
+    bindings: Record<string, unknown>;
+    actionsStrings: ReadonlyArray<string>;
+    colorsCsv: string;
+    labelColorsCsv: string;
+  } | null = null;
+
   private _onFormChanged = (
     ev: CustomEvent<{ value: EditorData }>,
   ): void => {
-    const next = { ...ev.detail.value };
-    const labelsCsv = next.labels_csv ?? "";
-    const weightsCsv = next.weights_csv ?? "";
-    const colorsCsv = next.colors_csv ?? "";
-    const labelColorsCsv = next.label_colors_csv ?? "";
-    const actionsCsv = next.actions_csv ?? "";
+    const next: EditorData = { ...ev.detail.value };
+    const proj = this._lastProjection;
+
+    // ── 1. Pull off CSV synthetics ────────────────────────────────────
+    const labelsCsv = (next.labels_csv as string | undefined) ?? "";
+    const weightsCsv = (next.weights_csv as string | undefined) ?? "";
+    const colorsCsvNext = (next.colors_csv as string | undefined) ?? "";
+    const labelColorsCsvNext =
+      (next.label_colors_csv as string | undefined) ?? "";
     delete next.labels_csv;
     delete next.weights_csv;
     delete next.colors_csv;
     delete next.label_colors_csv;
-    delete next.actions_csv;
 
+    // ── 2. Pull off bindings-panel synthetics ─────────────────────────
+    // Strip every binding_* and the wrapper key from `next` (defensive,
+    // so a stray expandable-name doesn't reach the saved YAML), and
+    // capture only the keys whose values *differ* from the last
+    // projection — those are the user's edits.
+    const bindingDeltas: Record<string, unknown> = {};
+    for (const key of Object.keys(next)) {
+      if (key.startsWith("binding_") || key === "bindings") {
+        if (proj && next[key] !== proj.bindings[key]) {
+          bindingDeltas[key] = next[key];
+        }
+        delete next[key];
+      }
+    }
+
+    // ── 3. Labels / weights ───────────────────────────────────────────
     const segments = next.segments ?? STATIC_DEFAULTS.segments;
-
     const parsedLabels = parseStringList(labelsCsv);
     if (parsedLabels.length === 0) {
       delete next.labels;
     } else {
       next.labels = parsedLabels.slice(0, segments);
     }
-
     const parsedWeights = parseWeights(weightsCsv);
     if (parsedWeights.length === 0) {
       delete next.weights;
@@ -363,53 +597,136 @@ export class SpinningWheelCardEditor
       next.weights = parsedWeights.slice(0, segments);
     }
 
-    const parsedColors = parseStringList(colorsCsv);
-    if (parsedColors.length === 0) {
-      delete next.colors;
+    // ── 4. Colours: CSV edit > bindings edit > unchanged ─────────────
+    const colorsCsvChanged =
+      proj !== null && colorsCsvNext !== proj.colorsCsv;
+    if (colorsCsvChanged) {
+      const parsed = parseStringList(colorsCsvNext);
+      if (parsed.length === 0) delete next.colors;
+      else next.colors = parsed.slice(0, segments);
     } else {
-      next.colors = parsedColors.slice(0, segments);
-    }
-
-    const parsedLabelColors = parseStringList(labelColorsCsv);
-    if (parsedLabelColors.length === 0) {
-      delete next.label_colors;
-    } else {
-      next.label_colors = parsedLabelColors.slice(0, segments);
-    }
-
-    const parsedActions = parseStringList(actionsCsv);
-    if (parsedActions.length === 0) {
-      // Preserve any object-form actions that were set in YAML — the
-      // CSV editor only round-trips strings, so an empty CSV could
-      // either mean "no actions" (drop) or "untouched while object
-      // entries exist" (keep). The setConfig hydration filtered to
-      // strings, so a freshly-empty CSV here means the user cleared
-      // the visible string entries; objects persist intact.
-      const existing = this._config.actions ?? [];
-      const objectsOnly = existing.filter(
-        (a): a is Exclude<typeof a, string> => typeof a !== "string",
+      const colorDeltas = Object.entries(bindingDeltas).filter(
+        ([k]) => /^binding_\d+_color$/.test(k),
       );
-      if (objectsOnly.length === 0) {
-        delete next.actions;
-      } else {
-        next.actions = objectsOnly;
+      if (colorDeltas.length > 0) {
+        // Materialise to length = uniqueLabel count, then splice deltas.
+        const resolved = this._resolvedColors();
+        const out: string[] = resolved.slice();
+        for (const [k, v] of colorDeltas) {
+          const m = /^binding_(\d+)_color$/.exec(k);
+          if (!m) continue;
+          const i = parseInt(m[1] ?? "0", 10);
+          if (i < 0 || i >= out.length) continue;
+          if (isRgbTuple(v)) out[i] = rgbToCss(v);
+        }
+        next.colors = out;
       }
-    } else {
-      next.actions = parsedActions.slice(0, segments);
     }
 
-    // Distinguish "explicit clear" (hide label) from "never set"
-    // (use localised default). ha-form may emit undefined for empty
-    // inputs; pin to "" only when there *was* a previous string.
+    // ── 5. Label colours: same diff strategy as colours ──────────────
+    const labelColorsCsvChanged =
+      proj !== null && labelColorsCsvNext !== proj.labelColorsCsv;
+    if (labelColorsCsvChanged) {
+      const parsed = parseStringList(labelColorsCsvNext);
+      if (parsed.length === 0) delete next.label_colors;
+      else next.label_colors = parsed.slice(0, segments);
+    } else {
+      const lcDeltas = Object.entries(bindingDeltas).filter(([k]) =>
+        /^binding_\d+_label_color$/.test(k),
+      );
+      if (lcDeltas.length > 0) {
+        const resolved = this._resolvedLabelColors();
+        const out: string[] = resolved.slice();
+        for (const [k, v] of lcDeltas) {
+          const m = /^binding_(\d+)_label_color$/.exec(k);
+          if (!m) continue;
+          const i = parseInt(m[1] ?? "0", 10);
+          if (i < 0 || i >= out.length) continue;
+          if (isRgbTuple(v)) out[i] = rgbToCss(v);
+        }
+        next.label_colors = out;
+      }
+    }
+
+    // ── 6. Actions: multi-picker > bindings > unchanged ──────────────
+    // Multi-picker output (string[]) replaces the string slots; object-
+    // form ActionConfig entries from old _config.actions are appended
+    // at the end so they survive a multi-picker save (documented in
+    // editor.actions_helper).
+    const pickerNext = Array.isArray(next.actions)
+      ? (next.actions as ReadonlyArray<unknown>).filter(
+          (a): a is string => typeof a === "string",
+        )
+      : null;
+    const projActions = proj?.actionsStrings ?? [];
+    const pickerChanged =
+      pickerNext !== null &&
+      (pickerNext.length !== projActions.length ||
+        pickerNext.some((v, i) => v !== projActions[i]));
+    const oldActions = this._config.actions ?? [];
+    const oldObjects = oldActions.filter(
+      (a): a is Exclude<(typeof oldActions)[number], string | null> =>
+        a !== null && typeof a !== "string",
+    );
+    if (pickerChanged && pickerNext) {
+      const merged: Array<string | ActionConfig> = [
+        ...pickerNext,
+        ...oldObjects,
+      ];
+      if (merged.length === 0) delete next.actions;
+      else next.actions = merged;
+    } else {
+      const actionDeltas = Object.entries(bindingDeltas).filter(([k]) =>
+        /^binding_\d+_action$/.test(k),
+      );
+      if (actionDeltas.length > 0) {
+        // Start from the current array, materialise to uniqueLabel
+        // count by padding with null, then splice deltas. Object
+        // entries at non-edited indices survive.
+        const uniqueCount = this._uniqueLabels().length;
+        const out: Array<string | ActionConfig | null> = [...oldActions];
+        while (out.length < uniqueCount) out.push(null);
+        for (const [k, v] of actionDeltas) {
+          const m = /^binding_(\d+)_action$/.exec(k);
+          if (!m) continue;
+          const i = parseInt(m[1] ?? "0", 10);
+          if (i < 0 || i >= uniqueCount) continue;
+          if (typeof v === "string" && v.length > 0) {
+            out[i] = v;
+          } else if (
+            // Empty/cleared, but the slot used to hold an object — keep
+            // the object (the picker can't represent it; clearing isn't
+            // an explicit "delete the YAML action" gesture).
+            i < oldActions.length &&
+            typeof oldActions[i] === "object" &&
+            oldActions[i] !== null
+          ) {
+            // No-op: out[i] still references the original object via
+            // the spread above.
+          } else {
+            out[i] = null;
+          }
+        }
+        // Trim trailing nulls so the saved YAML stays compact.
+        while (out.length > 0 && out[out.length - 1] === null) out.pop();
+        if (out.length === 0) delete next.actions;
+        else next.actions = out;
+      } else if (next.actions === undefined || next.actions === null) {
+        // Multi-picker was empty in projection AND no binding edit —
+        // preserve any object-only config (e.g. fresh setConfig from
+        // YAML with object actions only).
+        if (oldObjects.length > 0) next.actions = [...oldObjects];
+        else delete next.actions;
+      }
+    }
+
+    // ── 7. hub_text + defaults stripping ─────────────────────────────
     const hadHubText = typeof this._config.hub_text === "string";
     const formClearedHubText =
       next.hub_text === undefined || next.hub_text === null;
     if (hadHubText && formClearedHubText) {
       next.hub_text = "";
     }
-
-    // Strip prefilled defaults so saved YAML stays minimal. hub_text
-    // isn't stripped — anything the user typed (including "") is meant.
     if (next.segments === STATIC_DEFAULTS.segments) delete next.segments;
     if (next.friction === STATIC_DEFAULTS.friction) delete next.friction;
     if (next.text_orientation === STATIC_DEFAULTS.text_orientation) {
@@ -418,24 +735,31 @@ export class SpinningWheelCardEditor
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
     if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
-    if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
-    if (next.disable_confirm_actions === STATIC_DEFAULTS.disable_confirm_actions) {
+    if (next.show_status === STATIC_DEFAULTS.show_status) {
+      delete next.show_status;
+    }
+    if (
+      next.disable_confirm_actions === STATIC_DEFAULTS.disable_confirm_actions
+    ) {
       delete next.disable_confirm_actions;
     }
-    // "auto" is the editor sentinel — strip so saved YAML stays clean.
     if (next.language === "auto") delete next.language;
-    // Empty entity selector emits "" — drop so the saved YAML stays
-    // minimal (and so setConfig's regex check doesn't see an empty
-    // string and complain).
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
     }
 
+    // ── 8. Cache CSV verbatim where applicable; regenerate when the
+    //       binding side authored the change so the next render's CSV
+    //       view stays in sync with the underlying array. ─────────────
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;
-    this._colorsText = colorsCsv;
-    this._labelColorsText = labelColorsCsv;
-    this._actionsText = actionsCsv;
+    this._colorsText = colorsCsvChanged
+      ? colorsCsvNext
+      : (next.colors ?? []).join(", ");
+    this._labelColorsText = labelColorsCsvChanged
+      ? labelColorsCsvNext
+      : (next.label_colors ?? []).join(", ");
+
     this._config = next;
     fireEvent(this, "config-changed", { config: next });
   };
@@ -443,17 +767,55 @@ export class SpinningWheelCardEditor
   protected override render(): TemplateResult {
     const lang = this._lang();
     // Spread order: defaults first, then user config (overrides),
-    // then CSV synthetics (editor-only, never saved).
+    // then CSV synthetics (editor-only, never saved), then bindings-
+    // panel synthetics derived from the resolved arrays.
     const data: EditorData = {
       ...this._formDefaults(),
       ...this._config,
       // Map "no override" to the Auto sentinel so the dropdown isn't blank.
       language: this._config.language ?? "auto",
+      // ha-form's entity selector with multiple:true expects string[];
+      // strip object-form ActionConfig entries here so the selector
+      // doesn't choke on them. They stay in `_config.actions` and get
+      // re-merged on save (see _onFormChanged).
+      actions: (this._config.actions ?? []).filter(
+        (a): a is string => typeof a === "string",
+      ),
       labels_csv: this._labelsText,
       weights_csv: this._weightsText,
       colors_csv: this._colorsText,
       label_colors_csv: this._labelColorsText,
-      actions_csv: this._actionsText,
+    };
+    // Project resolved per-unique-label values into binding_<i>_<suffix>
+    // synthetic keys so the bindings panel shows pre-filled pickers.
+    // Pickers fall back to fallback grey when a stored colour is a
+    // CSS keyword / var(--…) the boundary helper can't parse.
+    const uniques = this._uniqueLabels();
+    const colors = this._resolvedColors();
+    const labelColors = this._resolvedLabelColors();
+    const actions = this._resolvedActions();
+    const bindingsSnapshot: Record<string, unknown> = {};
+    for (let i = 0; i < uniques.length; i++) {
+      const c = cssToRgb(colors[i]);
+      const lc = cssToRgb(labelColors[i]);
+      const cKey = `binding_${i}_color`;
+      const lcKey = `binding_${i}_label_color`;
+      const aKey = `binding_${i}_action`;
+      data[cKey] = c ?? undefined;
+      data[lcKey] = lc ?? undefined;
+      data[aKey] = actions[i] ?? "";
+      bindingsSnapshot[cKey] = data[cKey];
+      bindingsSnapshot[lcKey] = data[lcKey];
+      bindingsSnapshot[aKey] = data[aKey];
+    }
+    // Snapshot what we just gave ha-form so _onFormChanged can diff
+    // against it. Mutating before the await chain is safe — value-changed
+    // fires synchronously after the user input.
+    this._lastProjection = {
+      bindings: bindingsSnapshot,
+      actionsStrings: data.actions as ReadonlyArray<string>,
+      colorsCsv: this._colorsText,
+      labelColorsCsv: this._labelColorsText,
     };
     return html`
       <div class="editor">
