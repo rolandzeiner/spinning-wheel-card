@@ -73,6 +73,7 @@ All options are optional. Use the visual editor (Add Card → Spinning Wheel Car
 | `hub_text` | string | localised "SPIN" / "DREH" | Centre-hub label. Auto-shrinks for long strings. Empty string hides it. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub fill + indicator triangle colour. `theme` uses HA's `--primary-color` (hub label auto-picks black/white via WCAG luminance). `black` is solid black with white hub label. `white` is solid white with black hub label. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
+| `show_status` | boolean | `true` | Show the text line beneath the wheel (`Spinning…` / `Result: X` / the click-to-spin idle hint). Set `false` for a more minimal look. |
 
 ### Friction presets
 

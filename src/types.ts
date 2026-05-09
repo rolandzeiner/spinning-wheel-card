@@ -214,6 +214,10 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   /** Play a peg-click sound on each segment crossing (volume scales with
    *  wheel speed). Default true. */
   sound?: boolean;
+  /** Show the status line beneath the wheel ("Spinning…" / "Result: X" /
+   *  the click-to-spin idle hint). Default true. Set false to hide it
+   *  for a more minimal look. */
+  show_status?: boolean;
   /** "tangent" (default) — labels wrap around the rim, perpendicular to
    *  the spoke. "radial" — labels rotated 90° CW; reads along the spoke
    *  from rim toward centre. */

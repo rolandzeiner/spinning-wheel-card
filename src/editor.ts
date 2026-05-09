@@ -41,6 +41,7 @@ const STATIC_DEFAULTS = {
   sound: true,
   theme: "default" as const,
   hub_color: "theme" as const,
+  show_status: true,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split a comma- or newline-separated text field into trimmed,
@@ -207,6 +208,7 @@ export class SpinningWheelCardEditor
         },
       },
       { name: "sound", selector: { boolean: {} } },
+      { name: "show_status", selector: { boolean: {} } },
     ];
   }
 
@@ -237,6 +239,8 @@ export class SpinningWheelCardEditor
         return localize("editor.text_orientation", lang);
       case "sound":
         return localize("editor.sound", lang);
+      case "show_status":
+        return localize("editor.show_status", lang);
       default:
         return field.name;
     }
@@ -268,6 +272,8 @@ export class SpinningWheelCardEditor
           return "editor.text_orientation_helper";
         case "sound":
           return "editor.sound_helper";
+        case "show_status":
+          return "editor.show_status_helper";
         default:
           return null;
       }
@@ -356,6 +362,7 @@ export class SpinningWheelCardEditor
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
     if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
+    if (next.show_status === STATIC_DEFAULTS.show_status) delete next.show_status;
 
     this._labelsText = labelsCsv;
     this._weightsText = weightsCsv;

@@ -27,6 +27,7 @@
     "hub_color": "Naben- & Anzeigerfarbe",
     "text_orientation": "Textausrichtung",
     "sound": "Klickgeräusch",
+    "show_status": "Statuszeile anzeigen",
     "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
     "friction_helper": "Wie schnell das Rad nach einer Drehung abbremst.",
     "theme_helper": "Eingebaute Farbpalette, die verwendet wird, wenn Farben leer ist. Benutzerdefinierte Farben überschreiben dies immer.",
@@ -45,6 +46,7 @@
     "hub_color_white": "Weiß — schwarzer Text",
     "text_orientation_helper": "Wie Segmentbeschriftungen ausgerichtet werden. Tangential (Standard) legt den Text entlang des Randes; Radial dreht ihn 90° im Uhrzeigersinn, sodass er entlang der Speiche von außen nach innen liest.",
     "sound_helper": "Klickgeräusch bei jedem Segmentübergang abspielen. Lautstärke skaliert mit der Drehzahl.",
+    "show_status_helper": "Textzeile unter dem Rad anzeigen („Dreht …“ / „Ergebnis: X“ / der Klick-zum-Drehen-Hinweis). Aus für ein minimaleres Aussehen.",
     "friction_low": "Niedrig — lange, gemächliche Drehungen",
     "friction_medium": "Mittel — klassisch",
     "friction_high": "Hoch — stoppt schnell",
@@ -72,6 +74,7 @@
     "sound_type": "sound muss ein Boolean sein",
     "text_orientation_value": "text_orientation muss \"tangent\" oder \"radial\" sein",
     "theme_value": "theme muss default, pastel, pride oder neon sein",
-    "hub_color_value": "hub_color muss theme, black oder white sein"
+    "hub_color_value": "hub_color muss theme, black oder white sein",
+    "show_status_type": "show_status muss ein Boolean sein"
   }
 }
