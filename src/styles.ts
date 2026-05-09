@@ -1,12 +1,5 @@
 import { css } from "lit";
 
-// Editor-side styles. Live in the editor's shadow root.
-// HA form components (ha-textfield, ha-switch, etc.) bring their own
-// theming — keep editor CSS to layout + spacing.
-//
-// `<ha-form>` owns its own focus rings, but custom widgets inside the
-// editor (chips, picker buttons, ...) need the same a11y catch-all the
-// card carries. Ship the three blocks here too.
 export const editorStyles = css`
   :host {
     color-scheme: light dark;
@@ -38,13 +31,61 @@ export const editorStyles = css`
     color: var(--secondary-text-color);
     line-height: 1.4;
   }
+
+  /* Native <button> rather than <mwc-button> — mwc-* is being phased
+     out of HA's frontend (ha-lovelace-card SKILL.md). */
+  .result-entity-row {
+    display: block;
+    margin-top: var(--ha-space-2, 8px);
+  }
+  .create-helper-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ha-space-2, 8px);
+    align-items: flex-end;
+  }
+  .create-helper-hint {
+    margin: 0;
+    width: 100%;
+    font-size: var(--ha-font-size-s, 12px);
+    line-height: 1.4;
+    color: var(--secondary-text-color);
+  }
+  .create-helper-btn {
+    appearance: none;
+    cursor: pointer;
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+    border: 0;
+    border-radius: var(--ha-border-radius-md, 8px);
+    padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+    font-size: var(--ha-font-size-s, 12px);
+    font-weight: 500;
+    line-height: 1.2;
+    transition:
+      background-color 0.16s ease,
+      transform 0.08s ease;
+  }
+  .create-helper-btn:hover {
+    background: color-mix(
+      in srgb,
+      var(--primary-color) 88%,
+      black
+    );
+  }
+  .create-helper-btn:active {
+    transform: translateY(1px);
+  }
+  .create-helper-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
   .toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
 
-  /* ── Accessibility primitives ───────────────────────────────────── */
   a:focus-visible,
   button:focus-visible {
     outline: 2px solid var(--primary-color);
