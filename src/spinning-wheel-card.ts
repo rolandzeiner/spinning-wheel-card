@@ -84,13 +84,15 @@ const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
 const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
 
 /** Static velocity decrement on each segment-under-pointer change when
- *  `pegs: true`. Sized so an 8-peg wheel at 40 rad/s loses ~1.4 rad/s
- *  per revolution from pegs alone — meaningful but never stuttery —
- *  while at low speed each click meaningfully chips away ("click click
- *  click stop" settling feel). Capped at zero so it can't reverse the
- *  spin direction. Independent of the continuous friction multiplier;
- *  both compose. */
-const PEG_DRAG_RAD_PER_S = 0.18;
+ *  `pegs: true`. Sized so the per-peg brake is tactile but composes
+ *  cleanly with the user's `friction` preset — at higher peg densities
+ *  (peg_density 2–4) the original 0.18 was eating most of the
+ *  `friction: low` headroom, dropping multi-revolution spins to ~4 s.
+ *  0.08 keeps the per-click feel while letting low-friction setups
+ *  spin closer to their pegs-off stop time. Capped at zero so the
+ *  brake can't reverse the spin direction. Independent of the
+ *  continuous friction multiplier; both compose. */
+const PEG_DRAG_RAD_PER_S = 0.08;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
  *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
