@@ -192,58 +192,30 @@ labels: [Living room, Kitchen, Bedroom]
 actions: [script.lights_living, script.lights_kitchen, script.lights_bedroom]
 ```
 
-**Wheel context — pick a colour, set a light:**
+**Wheel context — one script, every segment:**
 
-`wheel_context: true` injects the winning segment into the action's `data`, so a single generic script handles every segment. The example below sets a ceiling light to whichever colour you spin to. No per-colour scripts.
+`wheel_context: true` merges the winning segment into the action's `data`. One script handles every segment.
 
 ```yaml
 type: custom:spinning-wheel-card
-labels: [Red, Orange, Yellow, Green, Blue, Indigo, Violet]
-colors: ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787", "#9b5de5"]
+labels: [Red, Green, Blue]
+colors: ["#e40303", "#008026", "#004dff"]
 wheel_context: true
 actions:
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
-  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.set_light_colour
+  - perform_action: script.set_light_colour
+  - perform_action: script.set_light_colour
 ```
 
 ```yaml
-# script.spin_to_ceiling_light
-alias: Spin → ceiling light colour
-mode: restart
-fields:
-  wheel_color_rgb:
-    description: "[r, g, b] auto-injected by the wheel card."
-    example: "[228, 3, 3]"
-  wheel_color:
-    description: "CSS hex (#RRGGBB) fallback when wheel_color_rgb is absent."
-    example: "#e40303"
+# script.set_light_colour
 sequence:
   - action: light.turn_on
     target:
-      entity_id: light.ceiling
-  - delay: { milliseconds: 200 }   # WiZ bulbs ignore colour on the first turn_on after off
-  - action: light.turn_on
-    target:
-      entity_id: light.ceiling
+      entity_id: light.living_room
     data:
-      rgb_color: >-
-        {% if wheel_color_rgb is defined and wheel_color_rgb | count == 3 -%}
-          {{ wheel_color_rgb }}
-        {%- elif wheel_color is defined and wheel_color | regex_match('^#[0-9A-Fa-f]{6}$') -%}
-          [{{ wheel_color[1:3] | int(base=16) }}, {{ wheel_color[3:5] | int(base=16) }}, {{ wheel_color[5:7] | int(base=16) }}]
-        {%- else -%}
-          [255, 255, 255]
-        {%- endif %}
-      brightness: 255
-      transition: 1
+      rgb_color: "{{ wheel_color_rgb }}"
 ```
-
-`wheel_color_rgb` is sent only for hex / `rgb()` colours; for named colours, `var(--…)`, or `hsl()` use `wheel_color` plus your own template. User-supplied `data` keys (e.g. a fixed `brightness`) override the auto-injected ones.
 
 **Real-prize-wheel** — densely studded rim, click + brake on every peg:
 
