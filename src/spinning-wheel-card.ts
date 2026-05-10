@@ -94,10 +94,9 @@ const PEG_DRAG_RAD_PER_S = 0.18;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
  *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
- *  smaller pulls it inward. 0.99 keeps pegs hugging the rim while
- *  letting the outer-ring stroke just kiss the inner edge of each
- *  peg — they read as fixed to the rim, not skewered through it. */
-const PEG_RADIUS_FRAC = 0.99;
+ *  smaller pulls it inward. 0.96 nudges them visibly into the disc
+ *  while still clearly belonging to the rim band. */
+const PEG_RADIUS_FRAC = 0.96;
 
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
@@ -848,6 +847,63 @@ export class SpinningWheelCard extends LitElement {
     return this.config.pegs === true;
   }
 
+  /** Nudge `_angle` so the indicator clears any peg by ~1.5× the
+   *  peg's angular half-width. No-op when pegs are off, when no peg is
+   *  within the deadzone, or when the resulting angle would push the
+   *  indicator into a different segment (i.e., the result decision is
+   *  always preserved). Direction follows whichever side the indicator
+   *  was already on. Called from every wheel-stop branch in pegs mode
+   *  so a "stops on a peg" landing always resolves to a clear result. */
+  private _nudgeOffPeg(): void {
+    if (!this._pegsEnabled()) return;
+    const arcs = this._arcs();
+    const n = arcs.length;
+    if (n === 0) return;
+    const a0 = arcs[0] ?? TWO_PI / n;
+    const target = wrapAngle(-this._angle + a0 / 2);
+    const k = this._pegsPerSegment();
+    const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
+    const pegPx = Math.max(2, (this._size * 3) / DEFAULT_SIZE);
+    // 1.5 × angular half-width — clears the peg's pixel footprint
+    // with a small breathing buffer. Scales with wheel size since
+    // pegPx scales with size.
+    const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
+
+    let nearestSigned = 0;
+    let nearestAbs = Infinity;
+    let nearestAngle = 0;
+    let cursor = 0;
+    for (let i = 0; i < n; i++) {
+      const arc = arcs[i] ?? 0;
+      if (arc <= 0) {
+        cursor += arc;
+        continue;
+      }
+      const slice = arc / k;
+      for (let j = 0; j < k; j++) {
+        const pegAngle = cursor + slice * j;
+        let d = target - pegAngle;
+        if (d > Math.PI) d -= TWO_PI;
+        else if (d <= -Math.PI) d += TWO_PI;
+        const ad = Math.abs(d);
+        if (ad < nearestAbs) {
+          nearestAbs = ad;
+          nearestSigned = d;
+          nearestAngle = pegAngle;
+        }
+      }
+      cursor += arc;
+    }
+
+    if (nearestAbs >= deadzone) return;
+    // Push away from the peg in the direction the indicator was
+    // naturally on. Tie (signed === 0) goes positive — arbitrary but
+    // consistent.
+    const sign = nearestSigned >= 0 ? 1 : -1;
+    const newTarget = wrapAngle(nearestAngle + sign * deadzone);
+    this._angle = wrapAngle(a0 / 2 - newTarget);
+  }
+
   /** Pegs per segment when `pegs` is on: 1 boundary + N mid pegs. The
    *  mid count is the `peg_density` slider (0–4, default 1). Returns 1
    *  when pegs are off (callers gate on `_pegsEnabled` first; this is
@@ -1144,6 +1200,7 @@ export class SpinningWheelCard extends LitElement {
       this._omega = 0;
       this._spinning = false;
       this._lastTickSeg = -1;
+      this._nudgeOffPeg();
       this._announceResult();
       this._draw();
       return;
@@ -1187,6 +1244,7 @@ export class SpinningWheelCard extends LitElement {
         this._spinning = false;
         this._rafId = null;
         this._lastTickSeg = -1;
+        this._nudgeOffPeg();
         this._announceResult();
         return;
       }
@@ -1619,6 +1677,7 @@ export class SpinningWheelCard extends LitElement {
       this._omega = 0;
       this._spinning = false;
       this._lastTickSeg = -1;
+      this._nudgeOffPeg();
       this._announceResult();
       this._draw();
     }
