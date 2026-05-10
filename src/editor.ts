@@ -47,12 +47,19 @@ const STATIC_DEFAULTS = {
   peg_density: 1,
 } satisfies Partial<SpinningWheelCardConfig>;
 
-/** Split CSV / newline-separated text into trimmed, non-empty entries. */
-const parseStringList = (csv: string): ReadonlyArray<string> =>
-  csv
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+/** Parse CSV / newline-separated colour list. Empty positions become
+ *  `null` sentinels so `#a,,#c` produces `["#a", null, "#c"]` — the
+ *  middle slot falls through to the active theme palette per
+ *  `_mapPaletteToLabels`. Trailing empties are trimmed so a user
+ *  typing `#a, #b, ` doesn't accumulate phantom theme slots. */
+const parseColorList = (csv: string): ReadonlyArray<string | null> => {
+  const parts: (string | null)[] = csv.split(/[,\n]/).map((s) => {
+    const t = s.trim();
+    return t.length > 0 ? t : null;
+  });
+  while (parts.length > 0 && parts[parts.length - 1] === null) parts.pop();
+  return parts;
+};
 
 /** Parse CSV / whitespace-separated positive numbers; skips invalid
  *  tokens silently rather than throwing. */
@@ -152,8 +159,10 @@ export class SpinningWheelCardEditor
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
     this._weightsText = (config.weights ?? []).join(", ");
-    this._colorsText = (config.colors ?? []).join(", ");
-    this._labelColorsText = (config.label_colors ?? []).join(", ");
+    this._colorsText = (config.colors ?? []).map((c) => c ?? "").join(", ");
+    this._labelColorsText = (config.label_colors ?? [])
+      .map((c) => c ?? "")
+      .join(", ");
   }
 
   private _lang(): string {
@@ -718,20 +727,34 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // 4. Colours: CSV edit > bindings edit > unchanged.
+    // 4. Colours: CSV edit > bindings edit > unchanged. Sparse model —
+    // unedited positions stay `null` so a `theme:` change still pulls
+    // them from the new palette. Only positions the user actually
+    // picked (or typed in CSV) become explicit strings.
     const colorsCsvChanged =
       proj !== null && colorsCsvNext !== proj.colorsCsv;
     if (colorsCsvChanged) {
-      const parsed = parseStringList(colorsCsvNext);
-      if (parsed.length === 0) delete next.colors;
-      else next.colors = parsed.slice(0, segments);
+      const parsed = parseColorList(colorsCsvNext);
+      if (parsed.length === 0 || parsed.every((c) => c === null)) {
+        delete next.colors;
+      } else {
+        next.colors = parsed.slice(0, segments);
+      }
     } else {
       const colorDeltas = Object.entries(bindingDeltas).filter(
         ([k]) => /^binding_\d+_color$/.test(k),
       );
       if (colorDeltas.length > 0) {
-        const resolved = this._resolvedColors();
-        const out: string[] = resolved.slice();
+        const uniqueCount = this._uniqueLabels().length;
+        const existing = this._config.colors ?? [];
+        // Start from existing entries (preserving null where set);
+        // pad to unique-label length with null so theme-derived
+        // positions stay theme-derived after this edit.
+        const out: (string | null)[] = [];
+        for (let i = 0; i < uniqueCount; i++) {
+          const e = existing[i];
+          out.push(typeof e === "string" && e.length > 0 ? e : null);
+        }
         for (const [k, v] of colorDeltas) {
           const m = /^binding_(\d+)_color$/.exec(k);
           if (!m) continue;
@@ -739,24 +762,33 @@ export class SpinningWheelCardEditor
           if (i < 0 || i >= out.length) continue;
           if (isRgbTuple(v)) out[i] = rgbToCss(v);
         }
-        next.colors = out;
+        if (out.every((c) => c === null)) delete next.colors;
+        else next.colors = out;
       }
     }
 
-    // 5. Label colours: same strategy as colours.
+    // 5. Label colours: same sparse strategy as colours.
     const labelColorsCsvChanged =
       proj !== null && labelColorsCsvNext !== proj.labelColorsCsv;
     if (labelColorsCsvChanged) {
-      const parsed = parseStringList(labelColorsCsvNext);
-      if (parsed.length === 0) delete next.label_colors;
-      else next.label_colors = parsed.slice(0, segments);
+      const parsed = parseColorList(labelColorsCsvNext);
+      if (parsed.length === 0 || parsed.every((c) => c === null)) {
+        delete next.label_colors;
+      } else {
+        next.label_colors = parsed.slice(0, segments);
+      }
     } else {
       const lcDeltas = Object.entries(bindingDeltas).filter(([k]) =>
         /^binding_\d+_label_color$/.test(k),
       );
       if (lcDeltas.length > 0) {
-        const resolved = this._resolvedLabelColors();
-        const out: string[] = resolved.slice();
+        const uniqueCount = this._uniqueLabels().length;
+        const existing = this._config.label_colors ?? [];
+        const out: (string | null)[] = [];
+        for (let i = 0; i < uniqueCount; i++) {
+          const e = existing[i];
+          out.push(typeof e === "string" && e.length > 0 ? e : null);
+        }
         for (const [k, v] of lcDeltas) {
           const m = /^binding_(\d+)_label_color$/.exec(k);
           if (!m) continue;
@@ -764,7 +796,8 @@ export class SpinningWheelCardEditor
           if (i < 0 || i >= out.length) continue;
           if (isRgbTuple(v)) out[i] = rgbToCss(v);
         }
-        next.label_colors = out;
+        if (out.every((c) => c === null)) delete next.label_colors;
+        else next.label_colors = out;
       }
     }
 
@@ -893,12 +926,15 @@ export class SpinningWheelCardEditor
     this._weightsText = weightsCsvChanged
       ? weightsCsv
       : (next.weights ?? []).join(", ");
+    // null entries (= "use theme palette here") render as an empty
+    // slot between commas so the CSV round-trips faithfully. The
+    // parser turns those empties back into null.
     this._colorsText = colorsCsvChanged
       ? colorsCsvNext
-      : (next.colors ?? []).join(", ");
+      : (next.colors ?? []).map((c) => c ?? "").join(", ");
     this._labelColorsText = labelColorsCsvChanged
       ? labelColorsCsvNext
-      : (next.label_colors ?? []).join(", ");
+      : (next.label_colors ?? []).map((c) => c ?? "").join(", ");
 
     this._config = next;
     fireEvent(this, "config-changed", { config: next });

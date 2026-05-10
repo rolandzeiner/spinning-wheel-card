@@ -241,13 +241,16 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   weights?: ReadonlyArray<number>;
   /** Fallback palette preset, used when `colors` is unset. */
   theme?: Theme;
-  /** Per-segment fill colours (any CSS colour string). Mapped to UNIQUE
-   *  LABELS in order of first appearance, so segments sharing a label
-   *  always share a colour. Length 1..segments. Overrides `theme`. */
-  colors?: ReadonlyArray<string>;
-  /** Per-segment label text colours. Same unique-label mapping rule as
-   *  `colors`. Length 1..segments. Default: dark grey for every segment. */
-  label_colors?: ReadonlyArray<string>;
+  /** Per-unique-label fill colours (any CSS colour string). Mapped to
+   *  UNIQUE LABELS in order of first appearance, so segments sharing a
+   *  label always share a colour. Length 1..segments. `null` entries
+   *  (or empty strings in CSV) fall through to the active `theme`
+   *  palette at that position — set explicit colours where you care
+   *  and leave the rest themed so a `theme:` change still updates them. */
+  colors?: ReadonlyArray<string | null>;
+  /** Per-unique-label text colours. Same `null`-falls-through rule
+   *  as `colors`. Default: dark grey for every label. */
+  label_colors?: ReadonlyArray<string | null>;
   /** Centre hub text. Empty string hides it. */
   hub_text?: string;
   /** Centre-hub + pointer fill mode. */

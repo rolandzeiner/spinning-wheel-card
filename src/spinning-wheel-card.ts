@@ -243,7 +243,11 @@ export class SpinningWheelCard extends LitElement {
     if (config.colors !== undefined) {
       if (
         !Array.isArray(config.colors) ||
-        !config.colors.every((c) => typeof c === "string" && c.length > 0)
+        // null entries are theme-passthrough sentinels — only reject
+        // entries that are neither null nor a non-empty string.
+        !config.colors.every(
+          (c) => c === null || (typeof c === "string" && c.length > 0),
+        )
       ) {
         throw new Error(localize("errors.colors_type", lang));
       }
@@ -263,7 +267,7 @@ export class SpinningWheelCard extends LitElement {
       if (
         !Array.isArray(config.label_colors) ||
         !config.label_colors.every(
-          (c) => typeof c === "string" && c.length > 0,
+          (c) => c === null || (typeof c === "string" && c.length > 0),
         )
       ) {
         throw new Error(localize("errors.label_colors_type", lang));
@@ -578,14 +582,17 @@ export class SpinningWheelCard extends LitElement {
     ]);
   }
 
-  /** Palette cycled across unique labels in order of first appearance;
-   *  falls back to `defaults` when the user palette is empty. */
+  /** Palette cycled across unique labels in order of first appearance.
+   *  When the user palette is empty, falls back to `defaults` entirely.
+   *  When a per-position entry in `custom` is `null` (or empty), THAT
+   *  position falls through to the theme `defaults` at the same index
+   *  — explicit colours stay user-set; nulls track the active theme. */
   private _mapPaletteToLabels(
-    custom: ReadonlyArray<string> | undefined,
+    custom: ReadonlyArray<string | null> | undefined,
     defaults: ReadonlyArray<string>,
   ): ReadonlyArray<string> {
     const labels = this._expandedLabels();
-    const palette: ReadonlyArray<string> =
+    const palette: ReadonlyArray<string | null> =
       custom && custom.length > 0 ? custom : defaults;
     const map = new Map<string, string>();
     let assigned = 0;
@@ -594,7 +601,13 @@ export class SpinningWheelCard extends LitElement {
       const lbl = labels[i] ?? "";
       let c = map.get(lbl);
       if (c === undefined) {
-        c = palette[assigned % palette.length] ?? defaults[0] ?? "#888";
+        const candidate = palette[assigned % palette.length];
+        c =
+          typeof candidate === "string" && candidate.length > 0
+            ? candidate
+            : (defaults[assigned % defaults.length] ??
+              defaults[0] ??
+              "#888");
         map.set(lbl, c);
         assigned += 1;
       }
