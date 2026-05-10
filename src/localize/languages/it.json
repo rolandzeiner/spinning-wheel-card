@@ -78,7 +78,7 @@
     "disable_boost_helper": "Off (predefinito) — cliccando mentre la ruota gira si aggiunge un altro impulso; una sequenza di clic può mantenerla in movimento. On — i clic durante il giro vengono ignorati. Utile per dashboard a misura di bambino. Il trascina-e-lancia non è influenzato.",
     "half_circle_helper": "Mostra solo la metà superiore della ruota come una cupola — indicatore in alto, mozzo in basso al centro. La fisica della rotazione rimane invariata.",
     "selector_mode_helper": "Trascina la ruota per allineare un segmento all'indicatore; al rilascio scatta in posizione e attiva l'azione. Niente rotazione, niente inerzia, niente clic-per-girare; il testo del mozzo è nascosto. Sostituisce «Disattiva l'accelerazione al clic».",
-    "pegs_helper": "Decora il bordo con piccoli perni, come in una vera ruota della fortuna. La ruota frena leggermente a ogni passaggio di segmento. Il suono del clic è controllato separatamente da «Suono del clic».",
+    "pegs_helper": "Decora il bordo con piccoli perni, come in una vera ruota della fortuna. Ogni perno frena la ruota di un piccolo scatto quando passa davanti all'indicatore. Il suono del clic è controllato separatamente da «Suono del clic».",
     "result_entity_helper": "Helper `input_text.*` opzionale che riceve l'etichetta vincente dopo ogni giro. Attiva automazioni su `platform: state, entity_id: …`. Clicca «Crea helper dedicato» qui sotto (solo admin) per crearne uno fresco — ogni giro lo sovrascrive.",
     "advanced_helper": "Array grezzi per incollare da YAML, parole chiave CSS, `var(--…)` o oggetti Lovelace ActionConfig completi. Le modifiche in Associazioni di segmenti li mantengono sincronizzati.",
     "friction_low": "Basso — giri lunghi e tranquilli",

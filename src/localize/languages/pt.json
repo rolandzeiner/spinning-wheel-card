@@ -78,7 +78,7 @@
     "disable_boost_helper": "Off (predefinido) — clicar enquanto a roda gira adiciona outro impulso; uma rajada de cliques pode mantê-la em movimento. On — cliques durante o giro são ignorados. Útil para dashboards adequados a crianças. Arrastar-para-lançar não é afetado.",
     "half_circle_helper": "Mostra apenas a metade superior da roda como uma cúpula — ponteiro no topo, eixo no centro inferior. A física da rotação permanece inalterada.",
     "selector_mode_helper": "Arraste a roda para alinhar um segmento com o indicador; ao soltar encaixa e dispara a sua ação. Sem rotação, sem inércia, sem clique-para-girar; o texto do eixo está oculto. Substitui «Desativar o impulso ao clicar».",
-    "pegs_helper": "Decora o bordo com pequenos pinos, como numa verdadeira roda da sorte. A roda trava ligeiramente a cada passagem de segmento. O som do clique é controlado em separado por «Som do clique».",
+    "pegs_helper": "Decora o bordo com pequenos pinos, como numa verdadeira roda da sorte. Cada pino trava a roda um pouco ao passar pelo indicador. O som do clique é controlado em separado por «Som do clique».",
     "result_entity_helper": "Helper `input_text.*` opcional que recebe a etiqueta vencedora após cada giro. Dispara automações em `platform: state, entity_id: …`. Clique em «Criar helper dedicado» abaixo (apenas admin) para criar um novo — cada giro sobrescreve-o.",
     "advanced_helper": "Arrays brutos para colar de YAML, palavras-chave CSS, `var(--…)` ou objetos Lovelace ActionConfig completos. Edições em Associações de segmentos mantêm-nos sincronizados.",
     "friction_low": "Baixo — giros longos e tranquilos",

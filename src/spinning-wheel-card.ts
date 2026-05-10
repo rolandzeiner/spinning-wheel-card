@@ -373,6 +373,13 @@ export class SpinningWheelCard extends LitElement {
       this._todoItems = null;
       this._todoLastEntityState = null;
     }
+    // Pegs toggle changes the tick index space (N segments ↔ 2N pegs).
+    // Reset the baseline so the next crossing detection re-seeds in
+    // the new scale instead of comparing across scales (would fire a
+    // spurious click on the next frame).
+    if ((this.config.pegs ?? false) !== (config.pegs ?? false)) {
+      this._lastTickSeg = -1;
+    }
     this.config = { ...config };
     this._result = null;
   }
@@ -1105,8 +1112,12 @@ export class SpinningWheelCard extends LitElement {
       return;
     }
     this._lastFrameMs = performance.now();
-    // Baseline — so the first frame doesn't tick spuriously.
-    this._lastTickSeg = this._segmentIndexUnderPointer();
+    // Baseline — so the first frame doesn't tick spuriously. Match the
+    // index space `_onSegmentCrossing` will use (2N peg intervals when
+    // pegs on, N segment intervals otherwise).
+    this._lastTickSeg = this._pegsEnabled()
+      ? this._pegIntervalIndex()
+      : this._segmentIndexUnderPointer();
     const tick = (now: number): void => {
       const dt = Math.min(0.05, (now - this._lastFrameMs) / 1000);
       this._lastFrameMs = now;
@@ -1185,6 +1196,29 @@ export class SpinningWheelCard extends LitElement {
       cursor = next;
     }
     return arcs.length - 1;
+  }
+
+  /** Index of the half-segment "peg interval" under the indicator,
+   *  0..2N-1. Used by the audio + drag path when `pegs: true` so each
+   *  visible peg (boundary AND mid-segment) fires its own click and
+   *  brake bump. Even index = boundary half, odd = mid half. */
+  private _pegIntervalIndex(): number {
+    const arcs = this._arcs();
+    const n = arcs.length;
+    if (n === 0) return 0;
+    const a0 = arcs[0] ?? TWO_PI / n;
+    const target = wrapAngle(-this._angle + a0 / 2);
+    let cursor = 0;
+    let pegIdx = 0;
+    for (let i = 0; i < n; i++) {
+      const arc = arcs[i] ?? 0;
+      if (target < cursor + arc / 2) return pegIdx;
+      pegIdx++;
+      if (target < cursor + arc) return pegIdx;
+      pegIdx++;
+      cursor += arc;
+    }
+    return n * 2 - 1;
   }
 
   private _announceResult(): void {
@@ -1322,12 +1356,15 @@ export class SpinningWheelCard extends LitElement {
     src.stop(t0 + dur + 0.01);
   }
 
-  /** Detect a segment-under-pointer change and react: fire the audio
-   *  click (rate-limited to TICK_RATE_LIMIT_MS, gated on `sound`) and /
-   *  or apply the per-peg drag (gated on `pegs`). The crossing detection
-   *  itself runs unconditionally so a `sound: false` + `pegs: true`
-   *  user still gets the brake on each peg. The seg cursor advances even
-   *  when audio is rate-limited so the next crossing isn't spurious. */
+  /** Detect a peg or segment crossing and react: fire the audio click
+   *  (rate-limited to TICK_RATE_LIMIT_MS, gated on `sound`) and / or
+   *  apply the per-peg drag (gated on `pegs`). When `pegs: true` the
+   *  detector runs at 2N peg intervals so every visible peg (boundary
+   *  AND mid-segment) fires; otherwise it runs at N segment intervals
+   *  (the original v1.0 audio cadence). Detection runs unconditionally
+   *  so a `sound: false` + `pegs: true` user still gets the brake on
+   *  each peg. The cursor advances even when audio is rate-limited so
+   *  the next crossing isn't spurious. */
   private _onSegmentCrossing(intensity: number): void {
     const audioOn = this._soundEnabled();
     const pegsOn = this._pegsEnabled();
@@ -1335,7 +1372,9 @@ export class SpinningWheelCard extends LitElement {
       this._lastTickSeg = -1;
       return;
     }
-    const cur = this._segmentIndexUnderPointer();
+    const cur = pegsOn
+      ? this._pegIntervalIndex()
+      : this._segmentIndexUnderPointer();
     if (this._lastTickSeg === -1) {
       this._lastTickSeg = cur;
       return;
@@ -1400,9 +1439,13 @@ export class SpinningWheelCard extends LitElement {
           .catch(() => {});
       }
       // Only seed when RAF isn't running — otherwise the loop owns
-      // _lastTickSeg and reseeding would race the next tick.
+      // _lastTickSeg and reseeding would race the next tick. Same
+      // index-space split as `_onSegmentCrossing` (peg intervals when
+      // pegs on, segment intervals otherwise).
       if (this._rafId === null) {
-        this._lastTickSeg = this._segmentIndexUnderPointer();
+        this._lastTickSeg = this._pegsEnabled()
+          ? this._pegIntervalIndex()
+          : this._segmentIndexUnderPointer();
       }
     }
     (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
