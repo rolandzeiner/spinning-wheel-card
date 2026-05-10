@@ -39,6 +39,7 @@
     "half_circle": "Modo semicírculo",
     "selector_mode": "Modo selector",
     "pegs": "Pasadores del borde",
+    "peg_density": "Pasadores por segmento",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Crear helper dedicado",
     "result_entity_create_hint": "Crea un helper input_text dedicado. La ruleta escribe en él la etiqueta ganadora tras cada giro para que las automatizaciones de HA puedan dispararse en `platform: state, entity_id: …`.",
@@ -79,6 +80,7 @@
     "half_circle_helper": "Muestra solo la mitad superior de la ruleta como una cúpula: indicador arriba, eje en la parte inferior central. La física del giro no cambia.",
     "selector_mode_helper": "Arrastra la ruleta para alinear un segmento con el indicador; al soltarla encaja y dispara su acción. Sin giro, sin inercia, sin clic-para-girar; el texto del eje está oculto. Sustituye a «Desactivar el impulso al hacer clic».",
     "pegs_helper": "Adorna el borde con pequeños pasadores, como en una ruleta de premios real. Cada pasador frena la ruleta un poquito al pasar por el indicador. El sonido del clic se controla por separado mediante «Sonido del clic».",
+    "peg_density_helper": "Pasadores adicionales dentro de cada segmento, además del pasador del borde. 0 = solo pasadores de borde; 1 = borde + 1 en el medio (por defecto); 4 = densamente tachonado. Más pasadores = más clics y más frenado total por giro.",
     "result_entity_helper": "Helper `input_text.*` opcional que recibe la etiqueta ganadora tras cada giro. Dispara automatizaciones en `platform: state, entity_id: …`. Haz clic en «Crear helper dedicado» abajo (solo admin) para uno nuevo — cada giro lo sobrescribe.",
     "advanced_helper": "Arrays sin procesar para pegar desde YAML, palabras clave CSS, `var(--…)` u objetos Lovelace ActionConfig completos. Las ediciones en Asignaciones de segmentos los mantienen sincronizados.",
     "friction_low": "Baja — giros largos y tranquilos",
@@ -121,6 +123,7 @@
     "half_circle_type": "half_circle debe ser un booleano",
     "selector_mode_type": "selector_mode debe ser un booleano",
     "pegs_type": "pegs debe ser un booleano",
+    "peg_density_range": "peg_density debe ser un entero entre 0 y 4",
     "result_entity_type": "result_entity debe ser una cadena",
     "result_entity_invalid": "result_entity debe ser un entity_id input_text.*"
   }

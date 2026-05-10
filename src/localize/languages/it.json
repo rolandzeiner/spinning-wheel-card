@@ -39,6 +39,7 @@
     "half_circle": "Modalità semicerchio",
     "selector_mode": "Modalità selettore",
     "pegs": "Perni del bordo",
+    "peg_density": "Perni per segmento",
     "result_entity": "Helper di risultato",
     "result_entity_create": "Crea helper dedicato",
     "result_entity_create_hint": "Crea un helper input_text dedicato. La ruota vi scrive l'etichetta vincente dopo ogni giro così le automazioni HA possono attivarsi su `platform: state, entity_id: …`.",
@@ -79,6 +80,7 @@
     "half_circle_helper": "Mostra solo la metà superiore della ruota come una cupola — indicatore in alto, mozzo in basso al centro. La fisica della rotazione rimane invariata.",
     "selector_mode_helper": "Trascina la ruota per allineare un segmento all'indicatore; al rilascio scatta in posizione e attiva l'azione. Niente rotazione, niente inerzia, niente clic-per-girare; il testo del mozzo è nascosto. Sostituisce «Disattiva l'accelerazione al clic».",
     "pegs_helper": "Decora il bordo con piccoli perni, come in una vera ruota della fortuna. Ogni perno frena la ruota di un piccolo scatto quando passa davanti all'indicatore. Il suono del clic è controllato separatamente da «Suono del clic».",
+    "peg_density_helper": "Perni aggiuntivi all'interno di ogni segmento, oltre al perno di confine. 0 = solo perni di confine; 1 = confine + 1 al centro (predefinito); 4 = densamente costellato. Più perni = più clic e più frenata totale per giro.",
     "result_entity_helper": "Helper `input_text.*` opzionale che riceve l'etichetta vincente dopo ogni giro. Attiva automazioni su `platform: state, entity_id: …`. Clicca «Crea helper dedicato» qui sotto (solo admin) per crearne uno fresco — ogni giro lo sovrascrive.",
     "advanced_helper": "Array grezzi per incollare da YAML, parole chiave CSS, `var(--…)` o oggetti Lovelace ActionConfig completi. Le modifiche in Associazioni di segmenti li mantengono sincronizzati.",
     "friction_low": "Basso — giri lunghi e tranquilli",
@@ -121,6 +123,7 @@
     "half_circle_type": "half_circle deve essere un booleano",
     "selector_mode_type": "selector_mode deve essere un booleano",
     "pegs_type": "pegs deve essere un booleano",
+    "peg_density_range": "peg_density deve essere un intero tra 0 e 4",
     "result_entity_type": "result_entity deve essere una stringa",
     "result_entity_invalid": "result_entity deve essere un entity_id input_text.*"
   }

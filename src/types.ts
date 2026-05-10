@@ -291,6 +291,12 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  crossing — the "real prize wheel" feel. The peg-click sound is
    *  controlled separately via `sound`. Default false. */
   pegs?: boolean;
+  /** Number of EXTRA pegs to drop inside each segment, on top of the
+   *  always-present boundary peg. 0 = boundary pegs only (N pegs);
+   *  1 = boundary + 1 mid (2N pegs, default); 4 = boundary + 4 mids
+   *  (5N pegs). Each peg fires its own click + brake bump. Ignored
+   *  when `pegs: false`. Default 1. */
+  peg_density?: number;
 }
 
 export type TextOrientation = "tangent" | "radial";

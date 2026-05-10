@@ -354,6 +354,16 @@ export class SpinningWheelCard extends LitElement {
     if (config.pegs !== undefined && typeof config.pegs !== "boolean") {
       throw new Error(localize("errors.pegs_type", lang));
     }
+    if (config.peg_density !== undefined) {
+      if (
+        typeof config.peg_density !== "number" ||
+        !Number.isInteger(config.peg_density) ||
+        config.peg_density < 0 ||
+        config.peg_density > 4
+      ) {
+        throw new Error(localize("errors.peg_density_range", lang));
+      }
+    }
     if (config.result_entity !== undefined) {
       if (typeof config.result_entity !== "string") {
         throw new Error(localize("errors.result_entity_type", lang));
@@ -373,11 +383,16 @@ export class SpinningWheelCard extends LitElement {
       this._todoItems = null;
       this._todoLastEntityState = null;
     }
-    // Pegs toggle changes the tick index space (N segments ↔ 2N pegs).
-    // Reset the baseline so the next crossing detection re-seeds in
-    // the new scale instead of comparing across scales (would fire a
-    // spurious click on the next frame).
-    if ((this.config.pegs ?? false) !== (config.pegs ?? false)) {
+    // Pegs toggle and density slider both change the tick index space
+    // ((density+1)*N intervals when on, N segments when off). Reset the
+    // baseline so the next crossing detection re-seeds in the new
+    // scale instead of comparing across scales (would fire a spurious
+    // click on the next frame).
+    const prevPegsOn = this.config.pegs ?? false;
+    const nextPegsOn = config.pegs ?? false;
+    const prevDensity = this.config.peg_density ?? 1;
+    const nextDensity = config.peg_density ?? 1;
+    if (prevPegsOn !== nextPegsOn || prevDensity !== nextDensity) {
       this._lastTickSeg = -1;
     }
     this.config = { ...config };
@@ -822,6 +837,17 @@ export class SpinningWheelCard extends LitElement {
     return this.config.pegs === true;
   }
 
+  /** Pegs per segment when `pegs` is on: 1 boundary + N mid pegs. The
+   *  mid count is the `peg_density` slider (0–4, default 1). Returns 1
+   *  when pegs are off (callers gate on `_pegsEnabled` first; this is
+   *  defensive). */
+  private _pegsPerSegment(): number {
+    if (!this._pegsEnabled()) return 1;
+    const d = this.config.peg_density;
+    const density = typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 4 ? d : 1;
+    return density + 1;
+  }
+
   private _canvasCssHeight(): number {
     return this._isHalfMode()
       ? Math.round(this._size * HALF_ASPECT)
@@ -1198,27 +1224,29 @@ export class SpinningWheelCard extends LitElement {
     return arcs.length - 1;
   }
 
-  /** Index of the half-segment "peg interval" under the indicator,
-   *  0..2N-1. Used by the audio + drag path when `pegs: true` so each
-   *  visible peg (boundary AND mid-segment) fires its own click and
-   *  brake bump. Even index = boundary half, odd = mid half. */
+  /** Index of the peg interval under the indicator, 0..(K*N - 1) where
+   *  K = `_pegsPerSegment()`. Used by the audio + drag path when
+   *  `pegs: true` so every visible peg (boundary + each mid) fires its
+   *  own click and brake bump. */
   private _pegIntervalIndex(): number {
     const arcs = this._arcs();
     const n = arcs.length;
     if (n === 0) return 0;
+    const k = this._pegsPerSegment();
     const a0 = arcs[0] ?? TWO_PI / n;
     const target = wrapAngle(-this._angle + a0 / 2);
     let cursor = 0;
     let pegIdx = 0;
     for (let i = 0; i < n; i++) {
       const arc = arcs[i] ?? 0;
-      if (target < cursor + arc / 2) return pegIdx;
-      pegIdx++;
-      if (target < cursor + arc) return pegIdx;
-      pegIdx++;
+      const slice = arc / k;
+      for (let j = 1; j <= k; j++) {
+        if (target < cursor + slice * j) return pegIdx;
+        pegIdx++;
+      }
       cursor += arc;
     }
-    return n * 2 - 1;
+    return k * n - 1;
   }
 
   private _announceResult(): void {
@@ -1839,38 +1867,34 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
-    // Rim pegs — opt-in. Two pegs per slice (boundary + mid-segment) so
-    // the rim reads as densely studded like a real prize wheel. Painted
-    // in the rotated context so each peg follows the wheel's spin, AFTER
-    // segment fills and BEFORE the outer ring. Half-circle clip handles
-    // the lower half automatically. Colour matches the indicator/hub
-    // accent so the pegs read against any segment fill.
+    // Rim pegs — opt-in. K pegs per slice (1 boundary + `peg_density`
+    // mids, K = density + 1) so the rim reads as a real prize wheel.
+    // Painted in the rotated context so each peg follows the wheel's
+    // spin, AFTER segment fills and BEFORE the outer ring. Half-circle
+    // clip handles the lower half automatically. Colour matches the
+    // indicator/hub accent so the pegs read against any segment fill.
     if (this._pegsEnabled()) {
       const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
+      const k = this._pegsPerSegment();
       ctx.fillStyle = theme.indicatorFill;
       let pegCursor = 0;
       for (let i = 0; i < n; i++) {
         const arc = arcs[i] ?? 0;
-        const boundary = pegCursor;
-        ctx.beginPath();
-        ctx.arc(
-          Math.cos(boundary) * radius,
-          Math.sin(boundary) * radius,
-          pegSize,
-          0,
-          TWO_PI,
-        );
-        ctx.fill();
-        const mid = pegCursor + arc / 2;
-        ctx.beginPath();
-        ctx.arc(
-          Math.cos(mid) * radius,
-          Math.sin(mid) * radius,
-          pegSize,
-          0,
-          TWO_PI,
-        );
-        ctx.fill();
+        const slice = arc / k;
+        // K pegs per segment at j*slice for j=0..K-1 (boundary at j=0,
+        // then K-1 mids evenly spaced inside the slice).
+        for (let j = 0; j < k; j++) {
+          const a = pegCursor + slice * j;
+          ctx.beginPath();
+          ctx.arc(
+            Math.cos(a) * radius,
+            Math.sin(a) * radius,
+            pegSize,
+            0,
+            TWO_PI,
+          );
+          ctx.fill();
+        }
         pegCursor += arc;
       }
     }

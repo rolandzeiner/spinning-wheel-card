@@ -43,6 +43,7 @@ const STATIC_DEFAULTS = {
   half_circle: false,
   selector_mode: false,
   pegs: false,
+  peg_density: 1,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split CSV / newline-separated text into trimmed, non-empty entries. */
@@ -493,6 +494,26 @@ export class SpinningWheelCardEditor
           { name: "half_circle", selector: { boolean: {} } },
           { name: "selector_mode", selector: { boolean: {} } },
           { name: "pegs", selector: { boolean: {} } },
+          // Mid-segment peg slider only when pegs are on — splice
+          // pattern per ha-lovelace-card SKILL § conditional fields.
+          // Spliced-out values are dropped on save (see _onFormChanged
+          // strip block) so a quick toggle off→on doesn't leak a
+          // stored density into the YAML.
+          ...(this._config.pegs === true
+            ? [
+                {
+                  name: "peg_density",
+                  selector: {
+                    number: {
+                      min: 0,
+                      max: 4,
+                      step: 1,
+                      mode: "slider",
+                    },
+                  },
+                } satisfies HaFormSchema,
+              ]
+            : []),
           // result_entity rendered standalone (see render()) to dodge
           // ha-form's entity-selector-emits-empty-after-programmatic-set
           // race that was dropping the just-created helper.
@@ -573,6 +594,7 @@ export class SpinningWheelCardEditor
     ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
     ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
     ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
+    ["peg_density", { label: "editor.peg_density", helper: "editor.peg_density_helper" }],
     ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
   ]);
 
@@ -840,7 +862,14 @@ export class SpinningWheelCardEditor
     if (next.selector_mode === STATIC_DEFAULTS.selector_mode) {
       delete next.selector_mode;
     }
-    if (next.pegs === STATIC_DEFAULTS.pegs) delete next.pegs;
+    if (next.pegs === STATIC_DEFAULTS.pegs) {
+      delete next.pegs;
+      // Density is meaningless when pegs are off — strip too so it
+      // doesn't leak into saved YAML after a toggle-on / toggle-off.
+      delete next.peg_density;
+    } else if (next.peg_density === STATIC_DEFAULTS.peg_density) {
+      delete next.peg_density;
+    }
     if (next.language === "auto") delete next.language;
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;

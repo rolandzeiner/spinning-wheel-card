@@ -39,6 +39,7 @@
     "half_circle": "Mode demi-cercle",
     "selector_mode": "Mode sélecteur",
     "pegs": "Picots de bord",
+    "peg_density": "Picots par segment",
     "result_entity": "Helper de résultat",
     "result_entity_create": "Créer un helper dédié",
     "result_entity_create_hint": "Créez un helper input_text dédié. La roue y inscrit l'étiquette gagnante après chaque tour, pour que les automatisations HA puissent se déclencher sur `platform: state, entity_id: …`.",
@@ -79,6 +80,7 @@
     "half_circle_helper": "Affiche uniquement la moitié supérieure de la roue en forme de dôme — pointeur en haut, moyeu en bas au centre. La physique de rotation reste inchangée.",
     "selector_mode_helper": "Faites glisser la roue pour aligner un segment avec l'indicateur ; au relâchement, l'action correspondante se déclenche. Pas de rotation, pas d'inertie, pas de clic-pour-tourner ; le texte du moyeu est masqué. Remplace « Désactiver le boost au clic ».",
     "pegs_helper": "Garnit le bord de petits picots, comme sur une vraie roue de la fortune. Chaque picot freine la roue d'un petit cran lorsqu'il passe devant l'indicateur. Le son du clic est contrôlé séparément via « Son du clic ».",
+    "peg_density_helper": "Picots supplémentaires à l'intérieur de chaque segment, en plus du picot à la limite. 0 = uniquement les limites ; 1 = limite + 1 au milieu (par défaut) ; 4 = densément garni. Plus de picots = plus de clics et de freinage total par rotation.",
     "result_entity_helper": "Helper `input_text.*` optionnel qui reçoit l'étiquette gagnante après chaque tour. Déclenche les automatisations sur `platform: state, entity_id: …`. Cliquez sur « Créer un helper dédié » ci-dessous (admin uniquement) pour en créer un — chaque tour l'écrase.",
     "advanced_helper": "Tableaux bruts pour coller depuis YAML, mots-clés CSS, `var(--…)` ou objets Lovelace ActionConfig complets. Les modifications dans Liaisons de segments ci-dessus restent synchronisées.",
     "friction_low": "Faible — tours longs et tranquilles",
@@ -121,6 +123,7 @@
     "half_circle_type": "half_circle doit être un booléen",
     "selector_mode_type": "selector_mode doit être un booléen",
     "pegs_type": "pegs doit être un booléen",
+    "peg_density_range": "peg_density doit être un entier entre 0 et 4",
     "result_entity_type": "result_entity doit être une chaîne",
     "result_entity_invalid": "result_entity doit être une entity_id input_text.*"
   }

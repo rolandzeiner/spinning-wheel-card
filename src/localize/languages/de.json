@@ -39,6 +39,7 @@
     "half_circle": "Halbkreismodus",
     "selector_mode": "Auswahlmodus",
     "pegs": "Randstifte",
+    "peg_density": "Stifte je Segment",
     "result_entity": "Ergebnis-Helfer",
     "result_entity_create": "Dedizierten Helfer erstellen",
     "result_entity_create_hint": "Erstelle einen dedizierten input_text-Helfer. Das Rad schreibt die gewinnende Beschriftung nach jedem Dreh hier hinein, sodass HA-Automationen auf `platform: state, entity_id: …` auslösen können.",
@@ -79,6 +80,7 @@
     "half_circle_helper": "Zeigt nur die obere Hälfte des Rads als Kuppel — Anzeiger oben, Nabe unten Mitte. Drehphysik bleibt unverändert.",
     "selector_mode_helper": "Rad ziehen, um ein Segment mit dem Anzeiger auszurichten; beim Loslassen rastet das Segment ein und löst seine Aktion aus. Kein Drehen, kein Schwung, kein Klick-zum-Drehen; Nabentext ausgeblendet. Überschreibt „Klick-Boost deaktivieren\".",
     "pegs_helper": "Versieht den Rand mit kleinen Stiften, wie bei einem echten Glücksrad. Jeder Stift bremst das Rad ein wenig, wenn er am Anzeiger vorbeikommt. Das Klickgeräusch wird separat über „Klickgeräusch\" gesteuert.",
+    "peg_density_helper": "Zusätzliche Stifte pro Segment, zusätzlich zum Stift an der Segmentgrenze. 0 = nur Grenzstifte; 1 = Grenze + 1 in der Mitte (Standard); 4 = dicht besetzt. Mehr Stifte = mehr Klicks und stärkere Gesamtbremsung pro Drehung.",
     "result_entity_helper": "Optionaler `input_text.*`-Helfer, der die gewinnende Beschriftung nach jedem Dreh erhält. Löst Automationen auf `platform: state, entity_id: …` aus. Klick auf „Dedizierten Helfer erstellen\" unten (nur Admin) für einen frischen — jeder Dreh überschreibt ihn.",
     "advanced_helper": "Rohe Arrays für YAML-Einfügen, CSS-Schlüsselwörter, `var(--…)` oder vollständige Lovelace-ActionConfig-Objekte. Bearbeitungen in Segment-Bindungen oben halten diese synchron.",
     "friction_low": "Niedrig — lange, gemächliche Drehungen",
@@ -121,6 +123,7 @@
     "half_circle_type": "half_circle muss ein Boolean sein",
     "selector_mode_type": "selector_mode muss ein Boolean sein",
     "pegs_type": "pegs muss ein Boolean sein",
+    "peg_density_range": "peg_density muss eine Ganzzahl zwischen 0 und 4 sein",
     "result_entity_type": "result_entity muss ein String sein",
     "result_entity_invalid": "result_entity muss eine input_text.*-entity_id sein"
   }
