@@ -1871,12 +1871,20 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
+    // Soft outer ring — CSS drop-shadow carries the depth.
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
+    ctx.stroke();
+
     // Rim pegs — opt-in. K pegs per slice (1 boundary + `peg_density`
     // mids, K = density + 1) so the rim reads as a real prize wheel.
-    // Painted in the rotated context so each peg follows the wheel's
-    // spin, AFTER segment fills and BEFORE the outer ring. Half-circle
-    // clip handles the lower half automatically. Colour matches the
-    // indicator/hub accent so the pegs read against any segment fill.
+    // Painted AFTER the outer ring so a light/white peg colour
+    // (`hub_color: white`) doesn't get tinted by the grey ring stroke
+    // overlapping it. Half-circle clip handles the lower half
+    // automatically. Colour matches the indicator/hub accent so the
+    // pegs read against any segment fill.
     if (this._pegsEnabled()) {
       const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
       const k = this._pegsPerSegment();
@@ -1902,13 +1910,6 @@ export class SpinningWheelCard extends LitElement {
         pegCursor += arc;
       }
     }
-
-    // Soft outer ring — CSS drop-shadow carries the depth.
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
-    ctx.stroke();
 
     ctx.restore();
 
