@@ -45,6 +45,7 @@ const STATIC_DEFAULTS = {
   segment_borders: true,
   pegs: false,
   peg_density: 1,
+  wheel_context: false,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Parse CSV / newline-separated colour list. Empty positions become
@@ -525,6 +526,7 @@ export class SpinningWheelCardEditor
                 } satisfies HaFormSchema,
               ]
             : []),
+          { name: "wheel_context", selector: { boolean: {} } },
           // result_entity rendered standalone (see render()) to dodge
           // ha-form's entity-selector-emits-empty-after-programmatic-set
           // race that was dropping the just-created helper.
@@ -607,6 +609,7 @@ export class SpinningWheelCardEditor
     ["segment_borders", { label: "editor.segment_borders", helper: "editor.segment_borders_helper" }],
     ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
     ["peg_density", { label: "editor.peg_density", helper: "editor.peg_density_helper" }],
+    ["wheel_context", { label: "editor.wheel_context", helper: "editor.wheel_context_helper" }],
     ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
   ]);
 
@@ -908,6 +911,9 @@ export class SpinningWheelCardEditor
       delete next.peg_density;
     } else if (next.peg_density === STATIC_DEFAULTS.peg_density) {
       delete next.peg_density;
+    }
+    if (next.wheel_context === STATIC_DEFAULTS.wheel_context) {
+      delete next.wheel_context;
     }
     if (next.language === "auto") delete next.language;
     if (next.todo_entity === "" || next.todo_entity == null) {

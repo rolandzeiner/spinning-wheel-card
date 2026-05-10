@@ -41,6 +41,7 @@
     "segment_borders": "Bordas de segmento",
     "pegs": "Pinos do bordo",
     "peg_density": "Pinos por segmento",
+    "wheel_context": "Enviar contexto do segmento às ações",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Criar helper dedicado",
     "result_entity_create_hint": "Crie um helper input_text dedicado. A roda escreve nele a etiqueta vencedora após cada giro para que as automações HA possam disparar em `platform: state, entity_id: …`.",
@@ -83,6 +84,7 @@
     "segment_borders_helper": "Mostra uma linha branca fina entre segmentos adjacentes. Off para um aspeto mais plano e sem rebordo.",
     "pegs_helper": "Decora o bordo com pequenos pinos, como numa verdadeira roda da sorte. Cada pino trava a roda um pouco ao passar pelo indicador. O som do clique é controlado em separado por «Som do clique».",
     "peg_density_helper": "Pinos adicionais dentro de cada segmento, além do pino de fronteira. 0 = só pinos de fronteira; 1 = fronteira + 1 ao meio (predefinido); 4 = densamente cravejado. Mais pinos = mais cliques e mais travagem total por giro.",
+    "wheel_context_helper": "Quando ativo, cada ação disparada recebe o segmento vencedor combinado no seu payload `data`: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Um único script genérico que leia estes campos consegue então tratar todos os segmentos. As chaves data fornecidas pelo utilizador têm prioridade sobre as injetadas automaticamente.",
     "result_entity_helper": "Helper `input_text.*` opcional que recebe a etiqueta vencedora após cada giro. Dispara automações em `platform: state, entity_id: …`. Clique em «Criar helper dedicado» abaixo (apenas admin) para criar um novo — cada giro sobrescreve-o.",
     "advanced_helper": "Arrays brutos para colar de YAML, palavras-chave CSS, `var(--…)` ou objetos Lovelace ActionConfig completos. Edições em Associações de segmentos mantêm-nos sincronizados.",
     "friction_low": "Baixo — giros longos e tranquilos",
@@ -127,6 +129,7 @@
     "segment_borders_type": "segment_borders deve ser um booleano",
     "pegs_type": "pegs deve ser um booleano",
     "peg_density_range": "peg_density deve ser um inteiro entre 0 e 4",
+    "wheel_context_type": "wheel_context deve ser um booleano",
     "result_entity_type": "result_entity deve ser uma string",
     "result_entity_invalid": "result_entity deve ser uma entity_id input_text.*"
   }

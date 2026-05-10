@@ -41,6 +41,7 @@
     "segment_borders": "Bordures de segment",
     "pegs": "Picots de bord",
     "peg_density": "Picots par segment",
+    "wheel_context": "Envoyer le contexte du segment aux actions",
     "result_entity": "Helper de résultat",
     "result_entity_create": "Créer un helper dédié",
     "result_entity_create_hint": "Créez un helper input_text dédié. La roue y inscrit l'étiquette gagnante après chaque tour, pour que les automatisations HA puissent se déclencher sur `platform: state, entity_id: …`.",
@@ -83,6 +84,7 @@
     "segment_borders_helper": "Affiche une fine ligne blanche entre les segments adjacents. Désactivé pour un rendu plus plat et sans liseré.",
     "pegs_helper": "Garnit le bord de petits picots, comme sur une vraie roue de la fortune. Chaque picot freine la roue d'un petit cran lorsqu'il passe devant l'indicateur. Le son du clic est contrôlé séparément via « Son du clic ».",
     "peg_density_helper": "Picots supplémentaires à l'intérieur de chaque segment, en plus du picot à la limite. 0 = uniquement les limites ; 1 = limite + 1 au milieu (par défaut) ; 4 = densément garni. Plus de picots = plus de clics et de freinage total par rotation.",
+    "wheel_context_helper": "Quand activé, chaque action déclenchée reçoit le segment gagnant fusionné dans son payload `data` : `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Un seul script générique lisant ces champs peut alors traiter tous les segments. Les clés data fournies par l'utilisateur ont la priorité sur celles injectées automatiquement.",
     "result_entity_helper": "Helper `input_text.*` optionnel qui reçoit l'étiquette gagnante après chaque tour. Déclenche les automatisations sur `platform: state, entity_id: …`. Cliquez sur « Créer un helper dédié » ci-dessous (admin uniquement) pour en créer un — chaque tour l'écrase.",
     "advanced_helper": "Tableaux bruts pour coller depuis YAML, mots-clés CSS, `var(--…)` ou objets Lovelace ActionConfig complets. Les modifications dans Liaisons de segments ci-dessus restent synchronisées.",
     "friction_low": "Faible — tours longs et tranquilles",
@@ -127,6 +129,7 @@
     "segment_borders_type": "segment_borders doit être un booléen",
     "pegs_type": "pegs doit être un booléen",
     "peg_density_range": "peg_density doit être un entier entre 0 et 4",
+    "wheel_context_type": "wheel_context doit être un booléen",
     "result_entity_type": "result_entity doit être une chaîne",
     "result_entity_invalid": "result_entity doit être une entity_id input_text.*"
   }

@@ -41,6 +41,7 @@
     "segment_borders": "Segment borders",
     "pegs": "Rim pegs",
     "peg_density": "Mid-segment pegs",
+    "wheel_context": "Send segment context to actions",
     "result_entity": "Result helper",
     "result_entity_create": "Create dedicated helper",
     "result_entity_create_hint": "Create a dedicated input_text helper. The wheel writes the winning label here after every spin so HA automations can trigger on `platform: state, entity_id: …`.",
@@ -83,6 +84,7 @@
     "segment_borders_helper": "Show a thin white line between adjacent segments. Off for a flatter, edge-to-edge look.",
     "pegs_helper": "Stud the rim with small pegs, like a real prize wheel. Each peg gives the wheel a tiny brake bump as it passes the indicator. The peg-click sound is controlled separately via Click sound.",
     "peg_density_helper": "Extra pegs to add inside each segment, on top of the boundary peg. 0 = boundary pegs only; 1 = boundary + 1 mid (default); 4 = densely studded. More pegs = more clicks and more total braking per spin.",
+    "wheel_context_helper": "When on, every fired action gets the winning segment merged into its `data` payload: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. A single generic script reading those fields can then handle every segment. User-supplied data keys override the auto-injected ones.",
     "result_entity_helper": "Optional `input_text.*` helper to receive the winning label after every spin. Triggers automations on `platform: state, entity_id: …`. Click \"Create dedicated helper\" below (admin only) for a fresh one — every spin overwrites it.",
     "advanced_helper": "Raw arrays for paste-from-YAML, CSS keywords, `var(--…)`, or full Lovelace ActionConfig objects. Edits in Segment bindings above keep these in sync.",
     "friction_low": "Low — long, lazy spins",
@@ -127,6 +129,7 @@
     "segment_borders_type": "segment_borders must be a boolean",
     "pegs_type": "pegs must be a boolean",
     "peg_density_range": "peg_density must be an integer between 0 and 4",
+    "wheel_context_type": "wheel_context must be a boolean",
     "result_entity_type": "result_entity must be a string",
     "result_entity_invalid": "result_entity must be an input_text.* entity_id"
   }

@@ -303,6 +303,14 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  (5N pegs). Each peg fires its own click + brake bump. Ignored
    *  when `pegs: false`. Default 1. */
   peg_density?: number;
+  /** When true, every fired action (perform-action / call-service)
+   *  gets the winning segment's data merged into its `data` payload:
+   *  `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`,
+   *  `wheel_label_color`, `wheel_label_color_rgb`. A single generic
+   *  script reading those fields can then handle every segment.
+   *  User-supplied `data` keys override the auto-injected ones.
+   *  Default false. */
+  wheel_context?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

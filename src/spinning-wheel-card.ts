@@ -397,6 +397,12 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.peg_density_range", lang));
       }
     }
+    if (
+      config.wheel_context !== undefined &&
+      typeof config.wheel_context !== "boolean"
+    ) {
+      throw new Error(localize("errors.wheel_context_type", lang));
+    }
     if (config.result_entity !== undefined) {
       if (typeof config.result_entity !== "string") {
         throw new Error(localize("errors.result_entity_type", lang));
@@ -700,8 +706,14 @@ export class SpinningWheelCard extends LitElement {
 
   /** Hand-rolled Lovelace ActionConfig dispatcher (avoids the
    *  `custom-card-helpers` dep). Accepts both `call-service` /
-   *  `service` and the modern `perform-action` / `perform_action`. */
-  private async _dispatchAction(cfg: ActionConfig): Promise<void> {
+   *  `service` and the modern `perform-action` / `perform_action`.
+   *  When `context` is supplied (wheel_context mode), its keys are
+   *  merged into the service `data` payload — user-supplied data
+   *  keys override the auto-injected ones so explicit config wins. */
+  private async _dispatchAction(
+    cfg: ActionConfig,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.hass) return;
     if (cfg.action === "none") return;
     if (!(await this._confirmAction(cfg))) return;
@@ -715,10 +727,12 @@ export class SpinningWheelCard extends LitElement {
         if (dot <= 0 || dot === svc.length - 1) return;
         const domain = svc.slice(0, dot);
         const name = svc.slice(dot + 1);
-        const data =
+        const userData =
           cfg.action === "call-service"
             ? (cfg.data ?? cfg.service_data ?? {})
             : (cfg.data ?? {});
+        const data =
+          context !== undefined ? { ...context, ...userData } : userData;
         const target = "target" in cfg ? cfg.target : undefined;
         await this.hass.callService?.(domain, name, data, target);
         return;
@@ -881,6 +895,66 @@ export class SpinningWheelCard extends LitElement {
 
   private _pegsEnabled(): boolean {
     return this.config.pegs === true;
+  }
+
+  private _wheelContextEnabled(): boolean {
+    return this.config.wheel_context === true;
+  }
+
+  /** Pure parser for `#RRGGBB`, `#RGB`, `rgb(r,g,b)`, `rgba(r,g,b,a)`.
+   *  Returns null for anything else (named colours, hsl(), CSS vars) —
+   *  callers send the CSS string as `wheel_color` and skip the triple. */
+  private _cssToRgbTriple(
+    css: string,
+  ): readonly [number, number, number] | null {
+    const s = css.trim();
+    if (s.startsWith("#")) {
+      if (s.length === 7) {
+        const r = parseInt(s.slice(1, 3), 16);
+        const g = parseInt(s.slice(3, 5), 16);
+        const b = parseInt(s.slice(5, 7), 16);
+        if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+          return [r, g, b];
+        }
+      }
+      if (s.length === 4) {
+        const r = parseInt(s[1]!.repeat(2), 16);
+        const g = parseInt(s[2]!.repeat(2), 16);
+        const b = parseInt(s[3]!.repeat(2), 16);
+        if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+          return [r, g, b];
+        }
+      }
+      return null;
+    }
+    const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (m) {
+      return [parseInt(m[1]!, 10), parseInt(m[2]!, 10), parseInt(m[3]!, 10)];
+    }
+    return null;
+  }
+
+  /** Build the auto-injected payload merged into action `data` when
+   *  `wheel_context: true`. Lets a single generic script branch on
+   *  `wheel_label` / `wheel_color` instead of one script per segment. */
+  private _buildWheelContext(idx: number): Record<string, unknown> {
+    const labels = this._expandedLabels();
+    const colors = this._segmentColors();
+    const labelColors = this._segmentLabelColors();
+    const label = labels[idx] ?? "";
+    const color = colors[idx] ?? "";
+    const labelColor = labelColors[idx] ?? "";
+    const ctx: Record<string, unknown> = {
+      wheel_index: idx,
+      wheel_label: label,
+      wheel_color: color,
+      wheel_label_color: labelColor,
+    };
+    const colorRgb = this._cssToRgbTriple(color);
+    if (colorRgb !== null) ctx.wheel_color_rgb = colorRgb;
+    const labelColorRgb = this._cssToRgbTriple(labelColor);
+    if (labelColorRgb !== null) ctx.wheel_label_color_rgb = labelColorRgb;
+    return ctx;
   }
 
   /** Pure: nearest-peg search for the off-peg nudge. Returns the peg
@@ -1428,7 +1502,12 @@ export class SpinningWheelCard extends LitElement {
     // prompt can't double-fire.
     const actions = this._segmentActions();
     const action = actions[idx];
-    if (action) void this._dispatchAction(action);
+    if (action) {
+      const context = this._wheelContextEnabled()
+        ? this._buildWheelContext(idx)
+        : undefined;
+      void this._dispatchAction(action, context);
+    }
   }
 
   /** Write the winning label to `result_entity`. Truncates to 255

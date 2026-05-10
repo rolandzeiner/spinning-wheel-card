@@ -41,6 +41,7 @@
     "segment_borders": "セグメント枠線",
     "pegs": "縁のペグ",
     "peg_density": "セグメント内のペグ数",
+    "wheel_context": "セグメント情報をアクションに送る",
     "result_entity": "結果ヘルパー",
     "result_entity_create": "専用ヘルパーを作成",
     "result_entity_create_hint": "専用の input_text ヘルパーを作成します。回すたびに勝ちラベルがここに書き込まれるので、HA オートメーションを `platform: state, entity_id: …` で起動できます。",
@@ -83,6 +84,7 @@
     "segment_borders_helper": "隣接するセグメントの間に細い白線を表示します。オフにするとふちのないフラットな見た目になります。",
     "pegs_helper": "本物のルーレットのように、縁に小さなペグを散りばめます。ペグが指針を通過するたびにホイールがわずかに減速します。クリック音は「クリック音」で別途制御されます。",
     "peg_density_helper": "境界ペグに加えて、各セグメント内に追加するペグの数。0 = 境界ペグのみ;1 = 境界 + 中央 1 つ(既定);4 = 密に配置。ペグが多いほどクリック音と総ブレーキも増えます。",
+    "wheel_context_helper": "オンにすると、発火する各アクションの `data` ペイロードに勝利セグメントの情報がマージされます:`wheel_index`、`wheel_label`、`wheel_color`、`wheel_color_rgb`、`wheel_label_color`、`wheel_label_color_rgb`。これらのフィールドを読む 1 本の汎用スクリプトであらゆるセグメントに対応できます。ユーザーが指定した data キーは自動注入されたものより優先されます。",
     "result_entity_helper": "回すたびに勝ちラベルを受け取る任意の `input_text.*` ヘルパー。`platform: state, entity_id: …` でオートメーションを起動できます。下の「専用ヘルパーを作成」(管理者のみ)で新しく作成可能 — 毎回の回転で上書きされます。",
     "advanced_helper": "YAML からの貼り付け、CSS キーワード、`var(--…)`、または完全な Lovelace ActionConfig オブジェクトのための生配列。上のセグメント割り当てでの編集はこれらと同期します。",
     "friction_low": "低 — 長くゆったりした回転",
@@ -127,6 +129,7 @@
     "segment_borders_type": "segment_borders はブール値である必要があります",
     "pegs_type": "pegs はブール値である必要があります",
     "peg_density_range": "peg_density は 0 から 4 の整数である必要があります",
+    "wheel_context_type": "wheel_context はブール値である必要があります",
     "result_entity_type": "result_entity は文字列である必要があります",
     "result_entity_invalid": "result_entity は input_text.* entity_id である必要があります"
   }
