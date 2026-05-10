@@ -446,9 +446,13 @@ export class SpinningWheelCard extends LitElement {
     max_rows?: number;
   } {
     if (this._isHalfMode()) {
+      // Dome aspect ≈ 0.58, so for cols=6 (~180 px) the dome wants
+      // ~104 px canvas + 32 px padding + 8 px gap + 22 px status =
+      // ~166 px total. rows:3 (~176 px @ 56 px/row + gaps) fits with
+      // a little slack; rows:4 left visible empty space.
       return {
         columns: 6,
-        rows: 4,
+        rows: 3,
         min_columns: 4,
         min_rows: 2,
       };
@@ -2050,30 +2054,41 @@ export class SpinningWheelCard extends LitElement {
     const idleKey = this._isSelectorMode()
       ? "status.idle_selector"
       : "status.idle";
-    const status = this._spinning
+    // Plain-text status string — used for the canvas's aria-label so
+    // screen readers always hear a literal value (no "ha-icon" jargon).
+    const statusText = this._spinning
       ? localize("status.spinning", lang)
       : this._result !== null
         ? localize("status.result", lang, { value: this._result })
         : todoEmpty
           ? localize("status.todo_empty", lang)
           : localize(idleKey, lang);
+    // Rich status node — same content, but when the result is an MDI
+    // icon string the {value} slot renders <ha-icon> instead of bare
+    // text. Falls back to plain text for typed labels and the other
+    // statuses (spinning / idle / todo_empty).
+    const statusNode: TemplateResult | string =
+      !this._spinning && this._result !== null
+        ? this._renderResultLine(this._result, lang)
+        : statusText;
     // Empty / whitespace `name` hides ha-card's header — fresh installs
     // show a clean wheel until the user opts in.
     const header = this.config.name?.trim()
       ? this.config.name
       : undefined;
+    const halfMode = this._isHalfMode();
 
     return html`
       <ha-card .header=${header}>
         <div class="card-content">
-          <div class="wheel-wrap">
+          <div class=${halfMode ? "wheel-wrap wheel-wrap-half" : "wheel-wrap"}>
             <canvas
               id="wheel"
               width=${DEFAULT_SIZE}
               height=${DEFAULT_SIZE}
               role="img"
               tabindex="0"
-              aria-label=${status}
+              aria-label=${statusText}
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -2083,10 +2098,33 @@ export class SpinningWheelCard extends LitElement {
           </div>
           ${this.config.show_status === false
             ? nothing
-            : html`<div class="status" aria-live="polite">${status}</div>`}
+            : html`<div class="status" aria-live="polite">${statusNode}</div>`}
         </div>
       </ha-card>
     `;
+  }
+
+  /** Render the "Result: X" line. When X is an MDI icon string
+   *  (`mdi:home`, `hass:foo`), substitute an inline `<ha-icon>` for the
+   *  bare text so the user sees the same glyph the wheel painted, not
+   *  the literal identifier. The aria-live region stays text-only via
+   *  the canvas's `aria-label` (= statusText), so screen readers
+   *  continue announcing the literal value. */
+  private _renderResultLine(result: string, lang: string): TemplateResult {
+    if (!this._looksLikeIcon(result)) {
+      return html`${localize("status.result", lang, { value: result })}`;
+    }
+    // Sentinel-split the localised template at the {value} placeholder
+    // so the icon can be inserted positionally without giving up i18n
+    // (some languages may put the value at a non-tail position).
+    const SENTINEL = " ";
+    const template = localize("status.result", lang, { value: SENTINEL });
+    const [prefix, suffix] = template.split(SENTINEL);
+    return html`${prefix ?? ""}<ha-icon
+        class="result-icon"
+        icon=${result}
+        title=${result}
+      ></ha-icon>${suffix ?? ""}`;
   }
 
   static override styles: CSSResultGroup = css`
@@ -2126,6 +2164,18 @@ export class SpinningWheelCard extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+    /* Half-circle: anchor the canvas to the bottom of the wrap so any
+       slack vertical space sits ABOVE the dome (not between the dome
+       and the status line). Status hugs the cut line. */
+    .wheel-wrap-half {
+      align-items: flex-end;
+    }
+    /* Inline MDI icon in the "Result: …" line when the winning label
+       is an icon string. Sized to the surrounding text. */
+    .result-icon {
+      --mdc-icon-size: 1.15em;
+      vertical-align: -0.22em;
     }
     #wheel {
       display: block;
