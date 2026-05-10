@@ -94,9 +94,10 @@ const PEG_DRAG_RAD_PER_S = 0.18;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
  *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
- *  smaller pulls it inward. 0.95 nests pegs visibly inside the disc,
- *  matching how real prize-wheel pegs sit just inside the rim band. */
-const PEG_RADIUS_FRAC = 0.95;
+ *  smaller pulls it inward. 0.99 keeps pegs hugging the rim while
+ *  letting the outer-ring stroke just kiss the inner edge of each
+ *  peg — they read as fixed to the rim, not skewered through it. */
+const PEG_RADIUS_FRAC = 0.99;
 
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
