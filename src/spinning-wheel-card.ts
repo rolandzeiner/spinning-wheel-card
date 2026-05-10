@@ -100,6 +100,13 @@ const PEG_DRAG_RAD_PER_S = 0.08;
  *  while still clearly belonging to the rim band. */
 const PEG_RADIUS_FRAC = 0.96;
 
+/** Peg dot pixel radius at the calibration wheel size (DEFAULT_SIZE).
+ *  Scales linearly with the actual wheel size at draw time, with a
+ *  2 px hard floor so MIN_SIZE wheels still render visible pegs.
+ *  Shared by `_draw` (paint) and `_computeOffPegPlan` (deadzone) so
+ *  the visual peg and its angular footprint stay in sync. */
+const PEG_SIZE_PX_AT_DEFAULT = 2.5;
+
 /** Maximum probability of "back-roll" when the wheel stops dead-on a
  *  peg — the simulated outcome of the peg almost blocking the spin so
  *  the wheel rolled back against its approach direction. Probability
@@ -887,7 +894,10 @@ export class SpinningWheelCard extends LitElement {
     const target = wrapAngle(-angle + a0 / 2);
     const k = this._pegsPerSegment();
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
-    const pegPx = Math.max(2, (this._size * 3) / DEFAULT_SIZE);
+    const pegPx = Math.max(
+      2,
+      (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
+    );
     // 1.5 × angular half-width — clears the peg's pixel footprint
     // with a small breathing buffer. Scales with wheel size.
     const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
@@ -2056,7 +2066,10 @@ export class SpinningWheelCard extends LitElement {
     // automatically. Colour matches the indicator/hub accent so the
     // pegs read against any segment fill.
     if (this._pegsEnabled()) {
-      const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
+      const pegSize = Math.max(
+        2,
+        (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
+      );
       const pegRadius = radius * PEG_RADIUS_FRAC;
       const k = this._pegsPerSegment();
       ctx.fillStyle = theme.indicatorFill;
