@@ -98,6 +98,14 @@ const PEG_DRAG_RAD_PER_S = 0.18;
  *  while still clearly belonging to the rim band. */
 const PEG_RADIUS_FRAC = 0.96;
 
+/** Maximum probability of "back-roll" when the wheel stops dead-on a
+ *  peg — the simulated outcome of the peg almost blocking the spin so
+ *  the wheel rolled back against its approach direction. Probability
+ *  scales linearly with how close the indicator stopped to the peg
+ *  centre (peg centre → max, deadzone edge → 0). 0.5 = true 50/50 at
+ *  dead-on; 0 disables back-roll entirely (always natural direction). */
+const PEG_BACKROLL_MAX_PROB = 0.5;
+
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
 
@@ -847,13 +855,22 @@ export class SpinningWheelCard extends LitElement {
     return this.config.pegs === true;
   }
 
-  /** Pure: compute the angle the wheel should land at to clear any peg
-   *  under the indicator. Returns null when pegs are off, no peg sits
-   *  within the deadzone, or there are no arcs. The direction follows
-   *  whichever side the indicator was already on, so the segment under
-   *  `_segmentIndexUnderPointer` doesn't flip — the result decision is
-   *  always preserved. */
-  private _computeOffPegAngle(angle: number): number | null {
+  /** Pure: nearest-peg search for the off-peg nudge. Returns the peg
+   *  the indicator stopped on (within deadzone), the direction the
+   *  indicator was naturally on (wheel coming-from side), and how
+   *  close to the peg centre the stop was (proximity ∈ [0, 1] —
+   *  1 = dead-on, 0 = at deadzone edge). `_finalizeStop` decides
+   *  whether to nudge in the natural direction or simulate a back-
+   *  roll (peg blocked the spin) using the proximity. Returns null
+   *  when pegs are off, no peg sits within the deadzone, or there
+   *  are no arcs. */
+  private _computeOffPegPlan(angle: number): {
+    pegAngle: number;
+    naturalSign: 1 | -1;
+    proximity: number;
+    a0: number;
+    deadzone: number;
+  } | null {
     if (!this._pegsEnabled()) return null;
     const arcs = this._arcs();
     const n = arcs.length;
@@ -864,8 +881,7 @@ export class SpinningWheelCard extends LitElement {
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
     const pegPx = Math.max(2, (this._size * 3) / DEFAULT_SIZE);
     // 1.5 × angular half-width — clears the peg's pixel footprint
-    // with a small breathing buffer. Scales with wheel size since
-    // pegPx scales with size.
+    // with a small breathing buffer. Scales with wheel size.
     const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
 
     let nearestSigned = 0;
@@ -895,24 +911,44 @@ export class SpinningWheelCard extends LitElement {
     }
 
     if (nearestAbs >= deadzone) return null;
-    const sign = nearestSigned >= 0 ? 1 : -1;
-    const newTarget = wrapAngle(nearestAngle + sign * deadzone);
-    return wrapAngle(a0 / 2 - newTarget);
+    return {
+      pegAngle: nearestAngle,
+      naturalSign: nearestSigned >= 0 ? 1 : -1,
+      proximity: 1 - nearestAbs / deadzone,
+      a0,
+      deadzone,
+    };
   }
 
   /** Final stop sequence — runs after the spin physics have settled
    *  below STOP_THRESHOLD. In pegs mode, if the indicator is sitting
-   *  on a peg, ease the wheel off it over ~220 ms (smooth path) so the
-   *  resolution doesn't look like an instant snap. The reduced-motion
-   *  path skips the tween and applies the nudge instantly per WCAG
-   *  2.3.3. Either way, after settle the result is announced. */
+   *  on a peg, ease the wheel off it over ~220 ms (smooth path) so
+   *  the resolution doesn't look like an instant snap. The reduced-
+   *  motion path skips the tween and applies the nudge instantly per
+   *  WCAG 2.3.3. Either way, the direction may flip back against the
+   *  natural side with `proximity * PEG_BACKROLL_MAX_PROB` chance —
+   *  simulates the peg "blocking" a borderline spin so the wheel
+   *  rolls back. After settle the result is announced. */
   private _finalizeStop(smooth: boolean): void {
-    const target = this._computeOffPegAngle(this._angle);
-    if (target !== null && smooth) {
-      this._startSettleTween(target);
+    const plan = this._computeOffPegPlan(this._angle);
+    if (plan === null) {
+      this._spinning = false;
+      this._rafId = null;
+      this._lastTickSeg = -1;
+      this._announceResult();
+      this._draw();
       return;
     }
-    if (target !== null) this._angle = target;
+    const backRollProb = plan.proximity * PEG_BACKROLL_MAX_PROB;
+    const flip = Math.random() < backRollProb;
+    const sign = (flip ? -plan.naturalSign : plan.naturalSign) as 1 | -1;
+    const newTarget = wrapAngle(plan.pegAngle + sign * plan.deadzone);
+    const targetAngle = wrapAngle(plan.a0 / 2 - newTarget);
+    if (smooth) {
+      this._startSettleTween(targetAngle);
+      return;
+    }
+    this._angle = targetAngle;
     this._spinning = false;
     this._rafId = null;
     this._lastTickSeg = -1;
