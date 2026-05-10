@@ -78,7 +78,7 @@
     "disable_boost_helper": "Desactivado (por defecto): hacer clic mientras la ruleta gira añade otro impulso; una ráfaga de clics puede mantenerla en movimiento. Activado: los clics durante un giro se ignoran. Útil para dashboards aptos para niños. Arrastrar y lanzar no se ve afectado.",
     "half_circle_helper": "Muestra solo la mitad superior de la ruleta como una cúpula: indicador arriba, eje en la parte inferior central. La física del giro no cambia.",
     "selector_mode_helper": "Arrastra la ruleta para alinear un segmento con el indicador; al soltarla encaja y dispara su acción. Sin giro, sin inercia, sin clic-para-girar; el texto del eje está oculto. Sustituye a «Desactivar el impulso al hacer clic».",
-    "pegs_helper": "Muestra pequeños pasadores en cada límite de segmento, como en una ruleta de premios real. Cada pasador frena la ruleta un poquito al pasar por el indicador. El sonido del clic se controla por separado mediante «Sonido del clic».",
+    "pegs_helper": "Adorna el borde con pequeños pasadores, como en una ruleta de premios real. La ruleta frena un poco en cada paso de segmento. El sonido del clic se controla por separado mediante «Sonido del clic».",
     "result_entity_helper": "Helper `input_text.*` opcional que recibe la etiqueta ganadora tras cada giro. Dispara automatizaciones en `platform: state, entity_id: …`. Haz clic en «Crear helper dedicado» abajo (solo admin) para uno nuevo — cada giro lo sobrescribe.",
     "advanced_helper": "Arrays sin procesar para pegar desde YAML, palabras clave CSS, `var(--…)` u objetos Lovelace ActionConfig completos. Las ediciones en Asignaciones de segmentos los mantienen sincronizados.",
     "friction_low": "Baja — giros largos y tranquilos",

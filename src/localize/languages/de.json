@@ -78,7 +78,7 @@
     "disable_boost_helper": "Aus (Standard) — Klicks während einer Drehung erzeugen einen weiteren Impuls; viele Klicks halten das Rad damit am Laufen. Ein — Klicks während der Drehung werden ignoriert. Hilfreich für kinderfreundliche Dashboards. Ziehen-und-Werfen bleibt unverändert.",
     "half_circle_helper": "Zeigt nur die obere Hälfte des Rads als Kuppel — Anzeiger oben, Nabe unten Mitte. Drehphysik bleibt unverändert.",
     "selector_mode_helper": "Rad ziehen, um ein Segment mit dem Anzeiger auszurichten; beim Loslassen rastet das Segment ein und löst seine Aktion aus. Kein Drehen, kein Schwung, kein Klick-zum-Drehen; Nabentext ausgeblendet. Überschreibt „Klick-Boost deaktivieren\".",
-    "pegs_helper": "Zeigt kleine Stifte an jeder Segmentgrenze, wie bei einem echten Glücksrad. Jeder Stift bremst das Rad ein wenig, wenn er am Anzeiger vorbeikommt. Das Klickgeräusch wird separat über „Klickgeräusch\" gesteuert.",
+    "pegs_helper": "Versieht den Rand mit kleinen Stiften, wie bei einem echten Glücksrad. Das Rad bremst bei jedem Segmentübergang ein wenig ab. Das Klickgeräusch wird separat über „Klickgeräusch\" gesteuert.",
     "result_entity_helper": "Optionaler `input_text.*`-Helfer, der die gewinnende Beschriftung nach jedem Dreh erhält. Löst Automationen auf `platform: state, entity_id: …` aus. Klick auf „Dedizierten Helfer erstellen\" unten (nur Admin) für einen frischen — jeder Dreh überschreibt ihn.",
     "advanced_helper": "Rohe Arrays für YAML-Einfügen, CSS-Schlüsselwörter, `var(--…)` oder vollständige Lovelace-ActionConfig-Objekte. Bearbeitungen in Segment-Bindungen oben halten diese synchron.",
     "friction_low": "Niedrig — lange, gemächliche Drehungen",

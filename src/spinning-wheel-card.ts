@@ -1796,21 +1796,39 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
-    // Rim pegs — opt-in. Painted in the rotated context so each peg
-    // sits on the segment boundary and follows the wheel's spin.
-    // Drawn AFTER segment fills (so they paint over the slice colour at
-    // the rim) and BEFORE the outer ring (so the ring overlays them
-    // softly). Half-circle clip handles the lower half automatically.
+    // Rim pegs — opt-in. Two pegs per slice (boundary + mid-segment) so
+    // the rim reads as densely studded like a real prize wheel. Painted
+    // in the rotated context so each peg follows the wheel's spin, AFTER
+    // segment fills and BEFORE the outer ring. Half-circle clip handles
+    // the lower half automatically. Colour matches the indicator/hub
+    // accent so the pegs read against any segment fill.
     if (this._pegsEnabled()) {
       const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
-      ctx.fillStyle = theme.hubStroke;
+      ctx.fillStyle = theme.indicatorFill;
       let pegCursor = 0;
       for (let i = 0; i < n; i++) {
-        const a = pegCursor;
+        const arc = arcs[i] ?? 0;
+        const boundary = pegCursor;
         ctx.beginPath();
-        ctx.arc(Math.cos(a) * radius, Math.sin(a) * radius, pegSize, 0, TWO_PI);
+        ctx.arc(
+          Math.cos(boundary) * radius,
+          Math.sin(boundary) * radius,
+          pegSize,
+          0,
+          TWO_PI,
+        );
         ctx.fill();
-        pegCursor += arcs[i] ?? 0;
+        const mid = pegCursor + arc / 2;
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(mid) * radius,
+          Math.sin(mid) * radius,
+          pegSize,
+          0,
+          TWO_PI,
+        );
+        ctx.fill();
+        pegCursor += arc;
       }
     }
 

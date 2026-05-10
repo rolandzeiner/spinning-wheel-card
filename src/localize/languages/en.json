@@ -78,7 +78,7 @@
     "disable_boost_helper": "Off (default) — clicks during a spin add another impulse, so rapid clicking keeps the wheel going. On — clicks during a spin are ignored. Useful for kid-friendly dashboards. Drag-to-throw is unaffected.",
     "half_circle_helper": "Show only the upper half of the wheel as a dome — pointer at the top, hub at the bottom centre. Spinning physics are unchanged.",
     "selector_mode_helper": "Drag the wheel to align a segment with the indicator and release to fire its action. No spinning, no momentum, no click-to-spin; hub text is hidden. Supersedes Disable click-to-boost.",
-    "pegs_helper": "Show small pegs at every segment boundary, like a real prize wheel. Each peg gives the wheel a tiny brake bump as it passes the indicator. The peg-click sound is controlled separately via Click sound.",
+    "pegs_helper": "Stud the rim with small pegs, like a real prize wheel. The wheel takes a small brake bump on each segment crossing. The peg-click sound is controlled separately via Click sound.",
     "result_entity_helper": "Optional `input_text.*` helper to receive the winning label after every spin. Triggers automations on `platform: state, entity_id: …`. Click \"Create dedicated helper\" below (admin only) for a fresh one — every spin overwrites it.",
     "advanced_helper": "Raw arrays for paste-from-YAML, CSS keywords, `var(--…)`, or full Lovelace ActionConfig objects. Edits in Segment bindings above keep these in sync.",
     "friction_low": "Low — long, lazy spins",
