@@ -16,6 +16,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Per-segment** labels, weights, colours, label colours, Lovelace actions. Lists shorter than `segments` cycle; same-label segments share fill / label colour / action.
 - **MDI icons as labels** — type `mdi:home` and the icon paints in place of text. The result line shows the icon glyph too, not the literal `mdi:` identifier.
 - **Result helper** — write the winning label into an `input_text.*` so HA automations trigger on `platform: state`.
+- **Wheel context** — opt-in: every fired action gets the winning segment merged into its `data` payload (`wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`). One generic script can then handle every segment.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
@@ -74,6 +75,7 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `label_colors` | string[] | dark grey | Label text colours. Same unique-label mapping as `colors`. |
 | `actions` | array of `string` / `ActionConfig` / `null` | none | Action fired on win. `script.foo` shortcuts to `perform-action`; full Lovelace [`ActionConfig`](https://www.home-assistant.io/dashboards/actions/) objects supported. Same unique-label mapping. |
 | `disable_confirm_actions` | boolean | `false` | Skip the "Run … for X?" prompt. Per-action `confirmation: false` opts a single one out. |
+| `wheel_context` | boolean | `false` | Merge the winning segment into every `perform-action` / `call-service` payload as `wheel_index` / `wheel_label` / `wheel_color` / `wheel_color_rgb` / `wheel_label_color` / `wheel_label_color_rgb`. User-supplied `data` keys win on collision. See [Wheel-context example](#wheel-context-pick-a-colour-set-a-light). |
 | `disable_boost` | boolean | `false` | Ignore clicks (and `Space`/`Enter`) while the wheel is spinning. Drag-to-throw unaffected. |
 | `half_circle` | boolean | `false` | Dome layout — only the upper half renders, hub on the cut line, card height shrinks. Spinning physics unchanged. |
 | `selector_mode` | boolean | `false` | Manual picker — no spin, no momentum, hub text hidden. Drag to align a segment, release to commit. |
@@ -189,6 +191,59 @@ selector_mode: true
 labels: [Living room, Kitchen, Bedroom]
 actions: [script.lights_living, script.lights_kitchen, script.lights_bedroom]
 ```
+
+**Wheel context — pick a colour, set a light:**
+
+`wheel_context: true` injects the winning segment into the action's `data`, so a single generic script handles every segment. The example below sets a ceiling light to whichever colour you spin to. No per-colour scripts.
+
+```yaml
+type: custom:spinning-wheel-card
+labels: [Red, Orange, Yellow, Green, Blue, Indigo, Violet]
+colors: ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787", "#9b5de5"]
+wheel_context: true
+actions:
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+  - perform_action: script.spin_to_ceiling_light
+```
+
+```yaml
+# script.spin_to_ceiling_light
+alias: Spin → ceiling light colour
+mode: restart
+fields:
+  wheel_color_rgb:
+    description: "[r, g, b] auto-injected by the wheel card."
+    example: "[228, 3, 3]"
+  wheel_color:
+    description: "CSS hex (#RRGGBB) fallback when wheel_color_rgb is absent."
+    example: "#e40303"
+sequence:
+  - action: light.turn_on
+    target:
+      entity_id: light.ceiling
+  - delay: { milliseconds: 200 }   # WiZ bulbs ignore colour on the first turn_on after off
+  - action: light.turn_on
+    target:
+      entity_id: light.ceiling
+    data:
+      rgb_color: >-
+        {% if wheel_color_rgb is defined and wheel_color_rgb | count == 3 -%}
+          {{ wheel_color_rgb }}
+        {%- elif wheel_color is defined and wheel_color | regex_match('^#[0-9A-Fa-f]{6}$') -%}
+          [{{ wheel_color[1:3] | int(base=16) }}, {{ wheel_color[3:5] | int(base=16) }}, {{ wheel_color[5:7] | int(base=16) }}]
+        {%- else -%}
+          [255, 255, 255]
+        {%- endif %}
+      brightness: 255
+      transition: 1
+```
+
+`wheel_color_rgb` is sent only for hex / `rgb()` colours; for named colours, `var(--…)`, or `hsl()` use `wheel_color` plus your own template. User-supplied `data` keys (e.g. a fixed `brightness`) override the auto-injected ones.
 
 **Real-prize-wheel** — densely studded rim, click + brake on every peg:
 

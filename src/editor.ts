@@ -392,6 +392,7 @@ export class SpinningWheelCardEditor
           },
         ],
       },
+      { name: "wheel_context", selector: { boolean: {} } },
       // Safety toggle pinned to the bottom — only relevant after the
       // user has wired actions above.
       { name: "disable_confirm_actions", selector: { boolean: {} } },
@@ -526,7 +527,6 @@ export class SpinningWheelCardEditor
                 } satisfies HaFormSchema,
               ]
             : []),
-          { name: "wheel_context", selector: { boolean: {} } },
           // result_entity rendered standalone (see render()) to dodge
           // ha-form's entity-selector-emits-empty-after-programmatic-set
           // race that was dropping the just-created helper.
