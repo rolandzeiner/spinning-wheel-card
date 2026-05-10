@@ -92,6 +92,12 @@ const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
  *  both compose. */
 const PEG_DRAG_RAD_PER_S = 0.18;
 
+/** Peg centre placement as a fraction of the wheel `radius` (the outer
+ *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
+ *  smaller pulls it inward. 0.95 nests pegs visibly inside the disc,
+ *  matching how real prize-wheel pegs sit just inside the rim band. */
+const PEG_RADIUS_FRAC = 0.95;
+
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
 
@@ -1887,6 +1893,7 @@ export class SpinningWheelCard extends LitElement {
     // pegs read against any segment fill.
     if (this._pegsEnabled()) {
       const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
+      const pegRadius = radius * PEG_RADIUS_FRAC;
       const k = this._pegsPerSegment();
       ctx.fillStyle = theme.indicatorFill;
       let pegCursor = 0;
@@ -1899,8 +1906,8 @@ export class SpinningWheelCard extends LitElement {
           const a = pegCursor + slice * j;
           ctx.beginPath();
           ctx.arc(
-            Math.cos(a) * radius,
-            Math.sin(a) * radius,
+            Math.cos(a) * pegRadius,
+            Math.sin(a) * pegRadius,
             pegSize,
             0,
             TWO_PI,
