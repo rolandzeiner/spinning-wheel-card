@@ -228,16 +228,6 @@ theme: pride
 labels: [mdi:pizza, mdi:hamburger, mdi:noodles, mdi:taco, mdi:food-croissant, mdi:silverware-fork-knife]
 ```
 
-**Kid-safe wheel** — disable boost + skip confirmation:
-
-```yaml
-type: custom:spinning-wheel-card
-disable_boost: true
-disable_confirm_actions: true
-labels: [Brush teeth, Read a book, Pyjamas]
-actions: [script.bathroom_routine, script.bedside_lamp_on, script.warmer_lights]
-```
-
 ## Controls
 
 | Action | Behaviour |
