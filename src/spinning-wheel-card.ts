@@ -892,7 +892,7 @@ export class SpinningWheelCard extends LitElement {
     if (n === 0) return null;
     const a0 = arcs[0] ?? TWO_PI / n;
     const target = wrapAngle(-angle + a0 / 2);
-    const k = this._pegsPerSegment();
+    const totalPegs = this._pegsPerSegment() * n;
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
     const pegPx = Math.max(
       2,
@@ -902,36 +902,21 @@ export class SpinningWheelCard extends LitElement {
     // with a small breathing buffer. Scales with wheel size.
     const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
 
-    let nearestSigned = 0;
-    let nearestAbs = Infinity;
-    let nearestAngle = 0;
-    let cursor = 0;
-    for (let i = 0; i < n; i++) {
-      const arc = arcs[i] ?? 0;
-      if (arc <= 0) {
-        cursor += arc;
-        continue;
-      }
-      const slice = arc / k;
-      for (let j = 0; j < k; j++) {
-        const pegAngle = cursor + slice * j;
-        let d = target - pegAngle;
-        if (d > Math.PI) d -= TWO_PI;
-        else if (d <= -Math.PI) d += TWO_PI;
-        const ad = Math.abs(d);
-        if (ad < nearestAbs) {
-          nearestAbs = ad;
-          nearestSigned = d;
-          nearestAngle = pegAngle;
-        }
-      }
-      cursor += arc;
-    }
+    // Pegs are evenly spaced around the rim (so weighted wheels still
+    // show uniform pegs), so closed-form snap to the nearest one
+    // instead of iterating arcs.
+    const pegStep = TWO_PI / totalPegs;
+    const nearestIdx = Math.round(target / pegStep);
+    const nearestAngle = wrapAngle(nearestIdx * pegStep);
+    let signed = target - nearestAngle;
+    if (signed > Math.PI) signed -= TWO_PI;
+    else if (signed <= -Math.PI) signed += TWO_PI;
+    const nearestAbs = Math.abs(signed);
 
     if (nearestAbs >= deadzone) return null;
     return {
       pegAngle: nearestAngle,
-      naturalSign: nearestSigned >= 0 ? 1 : -1,
+      naturalSign: signed >= 0 ? 1 : -1,
       proximity: 1 - nearestAbs / deadzone,
       a0,
       deadzone,
@@ -1404,27 +1389,18 @@ export class SpinningWheelCard extends LitElement {
 
   /** Index of the peg interval under the indicator, 0..(K*N - 1) where
    *  K = `_pegsPerSegment()`. Used by the audio + drag path when
-   *  `pegs: true` so every visible peg (boundary + each mid) fires its
-   *  own click and brake bump. */
+   *  `pegs: true` so every visible peg fires its own click and brake
+   *  bump. Pegs are spaced evenly around the rim (not subdivided per
+   *  segment) so weighted wheels also get uniform click cadence. */
   private _pegIntervalIndex(): number {
     const arcs = this._arcs();
     const n = arcs.length;
     if (n === 0) return 0;
-    const k = this._pegsPerSegment();
+    const totalPegs = this._pegsPerSegment() * n;
     const a0 = arcs[0] ?? TWO_PI / n;
     const target = wrapAngle(-this._angle + a0 / 2);
-    let cursor = 0;
-    let pegIdx = 0;
-    for (let i = 0; i < n; i++) {
-      const arc = arcs[i] ?? 0;
-      const slice = arc / k;
-      for (let j = 1; j <= k; j++) {
-        if (target < cursor + slice * j) return pegIdx;
-        pegIdx++;
-      }
-      cursor += arc;
-    }
-    return k * n - 1;
+    const pegStep = TWO_PI / totalPegs;
+    return Math.floor(target / pegStep) % totalPegs;
   }
 
   private _announceResult(): void {
@@ -2058,40 +2034,35 @@ export class SpinningWheelCard extends LitElement {
     ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
     ctx.stroke();
 
-    // Rim pegs — opt-in. K pegs per slice (1 boundary + `peg_density`
-    // mids, K = density + 1) so the rim reads as a real prize wheel.
-    // Painted AFTER the outer ring so a light/white peg colour
-    // (`hub_color: white`) doesn't get tinted by the grey ring stroke
-    // overlapping it. Half-circle clip handles the lower half
-    // automatically. Colour matches the indicator/hub accent so the
-    // pegs read against any segment fill.
+    // Rim pegs — opt-in. Total = K*N pegs (K = density + 1) spaced
+    // EVENLY around the rim so weighted wheels still get uniform peg
+    // distribution (real prize wheels have evenly-spaced posts
+    // regardless of slice colours). For equal-weight configs this
+    // collapses to the same positions as a per-segment layout. Painted
+    // AFTER the outer ring so light/white pegs don't pick up the grey
+    // ring tint; the half-circle clip handles the lower half. Colour
+    // matches the indicator/hub accent so the pegs read against any
+    // segment fill.
     if (this._pegsEnabled()) {
       const pegSize = Math.max(
         2,
         (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
       );
       const pegRadius = radius * PEG_RADIUS_FRAC;
-      const k = this._pegsPerSegment();
+      const totalPegs = this._pegsPerSegment() * n;
+      const pegStep = TWO_PI / totalPegs;
       ctx.fillStyle = theme.indicatorFill;
-      let pegCursor = 0;
-      for (let i = 0; i < n; i++) {
-        const arc = arcs[i] ?? 0;
-        const slice = arc / k;
-        // K pegs per segment at j*slice for j=0..K-1 (boundary at j=0,
-        // then K-1 mids evenly spaced inside the slice).
-        for (let j = 0; j < k; j++) {
-          const a = pegCursor + slice * j;
-          ctx.beginPath();
-          ctx.arc(
-            Math.cos(a) * pegRadius,
-            Math.sin(a) * pegRadius,
-            pegSize,
-            0,
-            TWO_PI,
-          );
-          ctx.fill();
-        }
-        pegCursor += arc;
+      for (let i = 0; i < totalPegs; i++) {
+        const a = i * pegStep;
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(a) * pegRadius,
+          Math.sin(a) * pegRadius,
+          pegSize,
+          0,
+          TWO_PI,
+        );
+        ctx.fill();
       }
     }
 
