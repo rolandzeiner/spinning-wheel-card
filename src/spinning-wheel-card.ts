@@ -2296,10 +2296,11 @@ export class SpinningWheelCard extends LitElement {
       align-items: flex-end;
     }
     /* Inline MDI icon in the "Result: …" line when the winning label
-       is an icon string. Sized to the surrounding text. */
+       is an icon string. Sized to the surrounding text; vertical
+       alignment left at the default baseline since the .status block
+       below now reserves a fixed 1.6em line-height for both states. */
     .result-icon {
       --mdc-icon-size: 1.15em;
-      vertical-align: -0.22em;
     }
     #wheel {
       display: block;
@@ -2323,7 +2324,11 @@ export class SpinningWheelCard extends LitElement {
       font-size: 0.875rem;
       font-variant-numeric: tabular-nums;
       color: var(--secondary-text-color);
-      min-height: 1.4em;
+      /* Fixed line-height + min-height reserves room for an inline
+         <ha-icon> in the result line so the wheel doesn't shift up
+         when the result flips from a text label to an MDI icon. */
+      line-height: 1.6;
+      min-height: 1.6em;
       flex-shrink: 0;
     }
 
