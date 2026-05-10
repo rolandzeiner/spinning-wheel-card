@@ -847,20 +847,19 @@ export class SpinningWheelCard extends LitElement {
     return this.config.pegs === true;
   }
 
-  /** Nudge `_angle` so the indicator clears any peg by ~1.5× the
-   *  peg's angular half-width. No-op when pegs are off, when no peg is
-   *  within the deadzone, or when the resulting angle would push the
-   *  indicator into a different segment (i.e., the result decision is
-   *  always preserved). Direction follows whichever side the indicator
-   *  was already on. Called from every wheel-stop branch in pegs mode
-   *  so a "stops on a peg" landing always resolves to a clear result. */
-  private _nudgeOffPeg(): void {
-    if (!this._pegsEnabled()) return;
+  /** Pure: compute the angle the wheel should land at to clear any peg
+   *  under the indicator. Returns null when pegs are off, no peg sits
+   *  within the deadzone, or there are no arcs. The direction follows
+   *  whichever side the indicator was already on, so the segment under
+   *  `_segmentIndexUnderPointer` doesn't flip — the result decision is
+   *  always preserved. */
+  private _computeOffPegAngle(angle: number): number | null {
+    if (!this._pegsEnabled()) return null;
     const arcs = this._arcs();
     const n = arcs.length;
-    if (n === 0) return;
+    if (n === 0) return null;
     const a0 = arcs[0] ?? TWO_PI / n;
-    const target = wrapAngle(-this._angle + a0 / 2);
+    const target = wrapAngle(-angle + a0 / 2);
     const k = this._pegsPerSegment();
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
     const pegPx = Math.max(2, (this._size * 3) / DEFAULT_SIZE);
@@ -895,13 +894,76 @@ export class SpinningWheelCard extends LitElement {
       cursor += arc;
     }
 
-    if (nearestAbs >= deadzone) return;
-    // Push away from the peg in the direction the indicator was
-    // naturally on. Tie (signed === 0) goes positive — arbitrary but
-    // consistent.
+    if (nearestAbs >= deadzone) return null;
     const sign = nearestSigned >= 0 ? 1 : -1;
     const newTarget = wrapAngle(nearestAngle + sign * deadzone);
-    this._angle = wrapAngle(a0 / 2 - newTarget);
+    return wrapAngle(a0 / 2 - newTarget);
+  }
+
+  /** Final stop sequence — runs after the spin physics have settled
+   *  below STOP_THRESHOLD. In pegs mode, if the indicator is sitting
+   *  on a peg, ease the wheel off it over ~220 ms (smooth path) so the
+   *  resolution doesn't look like an instant snap. The reduced-motion
+   *  path skips the tween and applies the nudge instantly per WCAG
+   *  2.3.3. Either way, after settle the result is announced. */
+  private _finalizeStop(smooth: boolean): void {
+    const target = this._computeOffPegAngle(this._angle);
+    if (target !== null && smooth) {
+      this._startSettleTween(target);
+      return;
+    }
+    if (target !== null) this._angle = target;
+    this._spinning = false;
+    this._rafId = null;
+    this._lastTickSeg = -1;
+    this._announceResult();
+    this._draw();
+  }
+
+  /** RAF tween: ease `_angle` from current to `targetAngle` over ~220 ms
+   *  with cubic ease-out. `_spinning` stays true during the tween (the
+   *  status line keeps reading "Spinning…" so the result announcement
+   *  doesn't flash before the wheel actually rests). Cancellable via
+   *  `_cancelSettleTween` when a fresh click claims the RAF slot. */
+  private _startSettleTween(targetAngle: number): void {
+    const startAngle = this._angle;
+    let delta = targetAngle - startAngle;
+    if (delta > Math.PI) delta -= TWO_PI;
+    else if (delta < -Math.PI) delta += TWO_PI;
+    const startMs = performance.now();
+    const durMs = 220;
+    const tween = (now: number): void => {
+      if (!this.isConnected) {
+        this._rafId = null;
+        return;
+      }
+      const t = Math.min(1, (now - startMs) / durMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this._angle = wrapAngle(startAngle + delta * eased);
+      this._draw();
+      if (t < 1) {
+        this._rafId = window.requestAnimationFrame(tween);
+        return;
+      }
+      this._rafId = null;
+      this._spinning = false;
+      this._lastTickSeg = -1;
+      this._announceResult();
+    };
+    this._rafId = window.requestAnimationFrame(tween);
+  }
+
+  /** Cancel an in-progress settle tween before kicking off a fresh
+   *  spin from rest. The tween holds the RAF slot while `_omega === 0`
+   *  — without this, a click during the settle would set _omega but
+   *  the `_rafId === null` guard in `_onPointerUp` / `_onKeyDown`
+   *  blocks the new `_startAnim()` call. */
+  private _cancelSettleTween(): void {
+    if (this._rafId !== null && this._omega === 0) {
+      window.cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+      this._spinning = false;
+    }
   }
 
   /** Pegs per segment when `pegs` is on: 1 boundary + N mid pegs. The
@@ -1198,11 +1260,7 @@ export class SpinningWheelCard extends LitElement {
     ) {
       this._angle = wrapAngle(this._angle + this._omega * 1.5);
       this._omega = 0;
-      this._spinning = false;
-      this._lastTickSeg = -1;
-      this._nudgeOffPeg();
-      this._announceResult();
-      this._draw();
+      this._finalizeStop(false);
       return;
     }
     this._lastFrameMs = performance.now();
@@ -1241,11 +1299,8 @@ export class SpinningWheelCard extends LitElement {
 
       if (Math.abs(this._omega) < STOP_THRESHOLD_RAD_PER_S) {
         this._omega = 0;
-        this._spinning = false;
         this._rafId = null;
-        this._lastTickSeg = -1;
-        this._nudgeOffPeg();
-        this._announceResult();
+        this._finalizeStop(true);
         return;
       }
       this._rafId = window.requestAnimationFrame(tick);
@@ -1623,7 +1678,9 @@ export class SpinningWheelCard extends LitElement {
               Math.min(MAX_VELOCITY_RAD_PER_S, next),
             );
           } else {
-            // Fresh start — random direction.
+            // Fresh start — random direction. Cancel any in-progress
+            // settle tween so the new spin can claim the RAF slot.
+            this._cancelSettleTween();
             const sign = Math.random() < 0.5 ? -1 : 1;
             this._omega = sign * mag;
             this._result = null;
@@ -1672,14 +1729,10 @@ export class SpinningWheelCard extends LitElement {
       this._startAnim();
     } else if (this._rafId === null) {
       // Drag-to-stop: _stopAnim ran on drag-commit but _spinning is
-      // still true. Snap to rest so the status line doesn't stay
-      // stuck on "Spinning…".
+      // still true. Run through _finalizeStop so any peg-stop is
+      // smoothly settled the same way as a natural friction stop.
       this._omega = 0;
-      this._spinning = false;
-      this._lastTickSeg = -1;
-      this._nudgeOffPeg();
-      this._announceResult();
-      this._draw();
+      this._finalizeStop(true);
     }
   };
 
@@ -1730,6 +1783,9 @@ export class SpinningWheelCard extends LitElement {
         Math.min(MAX_VELOCITY_RAD_PER_S, next),
       );
     } else {
+      // Cancel any in-progress settle tween so the new spin can claim
+      // the RAF slot.
+      this._cancelSettleTween();
       const sign = Math.random() < 0.5 ? -1 : 1;
       this._omega = sign * mag;
       this._result = null;
