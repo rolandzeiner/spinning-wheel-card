@@ -365,6 +365,12 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.selector_mode_type", lang));
     }
+    if (
+      config.segment_borders !== undefined &&
+      typeof config.segment_borders !== "boolean"
+    ) {
+      throw new Error(localize("errors.segment_borders_type", lang));
+    }
     if (config.pegs !== undefined && typeof config.pegs !== "boolean") {
       throw new Error(localize("errors.pegs_type", lang));
     }
@@ -1902,9 +1908,13 @@ export class SpinningWheelCard extends LitElement {
       ctx.closePath();
       ctx.fillStyle = colors[i] ?? "#888";
       ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "rgba(255,255,255,0.65)";
-      ctx.stroke();
+      // Per-segment separator stroke. Defaults on; opt out via
+      // `segment_borders: false` for a flatter look.
+      if (this.config.segment_borders !== false) {
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.65)";
+        ctx.stroke();
+      }
 
       // Below ~15° (≈ 4 %) there's no readable space.
       if (arc > 0.26) {

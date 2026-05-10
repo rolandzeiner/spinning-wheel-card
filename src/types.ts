@@ -286,6 +286,9 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  the indicator snaps to centre and its action fires. Space / Enter
    *  re-fires the current selection. Default false. */
   selector_mode?: boolean;
+  /** Show a thin white separator line between adjacent segments.
+   *  Default true. Set false for a flatter look without the rib. */
+  segment_borders?: boolean;
   /** Render small pegs at every segment boundary (rotating with the
    *  wheel) AND apply a tiny static velocity decrement on each peg
    *  crossing — the "real prize wheel" feel. The peg-click sound is

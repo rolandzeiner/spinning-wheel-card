@@ -42,6 +42,7 @@ const STATIC_DEFAULTS = {
   disable_boost: false,
   half_circle: false,
   selector_mode: false,
+  segment_borders: true,
   pegs: false,
   peg_density: 1,
 } satisfies Partial<SpinningWheelCardConfig>;
@@ -493,6 +494,7 @@ export class SpinningWheelCardEditor
           { name: "disable_boost", selector: { boolean: {} } },
           { name: "half_circle", selector: { boolean: {} } },
           { name: "selector_mode", selector: { boolean: {} } },
+          { name: "segment_borders", selector: { boolean: {} } },
           { name: "pegs", selector: { boolean: {} } },
           // Mid-segment peg slider only when pegs are on — splice
           // pattern per ha-lovelace-card SKILL § conditional fields.
@@ -593,6 +595,7 @@ export class SpinningWheelCardEditor
     ["disable_boost", { label: "editor.disable_boost", helper: "editor.disable_boost_helper" }],
     ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
     ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
+    ["segment_borders", { label: "editor.segment_borders", helper: "editor.segment_borders_helper" }],
     ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
     ["peg_density", { label: "editor.peg_density", helper: "editor.peg_density_helper" }],
     ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
@@ -861,6 +864,9 @@ export class SpinningWheelCardEditor
     }
     if (next.selector_mode === STATIC_DEFAULTS.selector_mode) {
       delete next.selector_mode;
+    }
+    if (next.segment_borders === STATIC_DEFAULTS.segment_borders) {
+      delete next.segment_borders;
     }
     if (next.pegs === STATIC_DEFAULTS.pegs) {
       delete next.pegs;
