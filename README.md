@@ -12,11 +12,13 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Click-to-spin / drag-to-throw** with frame-rate-independent friction (`low` / `medium` / `high`).
 - **Half-circle mode** — render as a dome (pointer top, hub on the cut line). Compact for narrow cells.
 - **Selector mode** — no spin, no momentum. Drag to align a segment with the indicator and release to fire its action; hub text hides since the centre prompt no longer applies.
+- **Rim pegs** — opt-in real-prize-wheel feel: visible pegs at the rim, each one fires a click sound and a tiny brake bump as it passes the indicator. Optional `peg_density` slider (0–4) for how many extra pegs sit inside each segment. Smooth ease-out settle nudges the wheel off any peg it stops on; borderline stops occasionally back-roll against the peg ("the peg almost blocked it").
 - **Per-segment** labels, weights, colours, label colours, Lovelace actions. Lists shorter than `segments` cycle; same-label segments share fill / label colour / action.
-- **MDI icons as labels** — type `mdi:home` and the icon paints in place of text.
+- **MDI icons as labels** — type `mdi:home` and the icon paints in place of text. The result line shows the icon glyph too, not the literal `mdi:` identifier.
 - **Result helper** — write the winning label into an `input_text.*` so HA automations trigger on `platform: state`.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
+- **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label via WCAG luminance.
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
 - **Responsive canvas** — 140–600 px, scales to the dashboard cell on both axes.
@@ -75,6 +77,9 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `disable_boost` | boolean | `false` | Ignore clicks (and `Space`/`Enter`) while the wheel is spinning. Drag-to-throw unaffected. |
 | `half_circle` | boolean | `false` | Dome layout — only the upper half renders, hub on the cut line, card height shrinks. Spinning physics unchanged. |
 | `selector_mode` | boolean | `false` | Manual picker — no spin, no momentum, hub text hidden. Drag to align a segment, release to commit. |
+| `segment_borders` | boolean | `true` | Thin white separator stroke between adjacent slices. Set `false` for a flatter, edge-to-edge look (e.g. with bold neon / pride palettes). |
+| `pegs` | boolean | `false` | Render small pegs at the rim. Each peg fires a peg-click sound (gated by `sound`) and a small velocity bump as it passes the indicator. The wheel smoothly settles off any peg it stops on; borderline stops have a chance to back-roll against the peg. |
+| `peg_density` | integer 0–4 | `1` | Extra pegs per segment beyond the always-present boundary peg. `0` = boundary pegs only (`segments` total); `1` = boundary + 1 mid (`2 × segments`, default); `4` = densely studded (`5 × segments`). Ignored when `pegs: false`. |
 | `result_entity` | `input_text.*` entity_id | none | Helper to receive the winning label after every spin. Editor's "Create dedicated helper" button auto-provisions one (admin only). |
 | `todo_entity` | `todo.*` entity_id | none | Fill segments from this entity's open items (4–24, deduped). `segments`, `labels`, `text_orientation` are ignored while wired. |
 | `text_orientation` | `tangent` / `radial` | `tangent` (`radial` in todo mode) | Tangent wraps text around the rim; radial reads along the spoke. |
@@ -183,6 +188,17 @@ type: custom:spinning-wheel-card
 selector_mode: true
 labels: [Living room, Kitchen, Bedroom]
 actions: [script.lights_living, script.lights_kitchen, script.lights_bedroom]
+```
+
+**Real-prize-wheel** — densely studded rim, click + brake on every peg:
+
+```yaml
+type: custom:spinning-wheel-card
+pegs: true
+peg_density: 3       # 4 pegs per segment (1 boundary + 3 mids)
+segment_borders: false
+theme: pride
+labels: [mdi:pizza, mdi:hamburger, mdi:noodles, mdi:taco, mdi:food-croissant, mdi:silverware-fork-knife]
 ```
 
 **Kid-safe wheel** — disable boost + skip confirmation:
