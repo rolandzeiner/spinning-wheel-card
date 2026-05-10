@@ -38,6 +38,7 @@
     "disable_boost": "Desativar o impulso ao clicar",
     "half_circle": "Modo semicírculo",
     "selector_mode": "Modo seletor",
+    "pegs": "Pinos do bordo",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Criar helper dedicado",
     "result_entity_create_hint": "Crie um helper input_text dedicado. A roda escreve nele a etiqueta vencedora após cada giro para que as automações HA possam disparar em `platform: state, entity_id: …`.",
@@ -77,6 +78,7 @@
     "disable_boost_helper": "Off (predefinido) — clicar enquanto a roda gira adiciona outro impulso; uma rajada de cliques pode mantê-la em movimento. On — cliques durante o giro são ignorados. Útil para dashboards adequados a crianças. Arrastar-para-lançar não é afetado.",
     "half_circle_helper": "Mostra apenas a metade superior da roda como uma cúpula — ponteiro no topo, eixo no centro inferior. A física da rotação permanece inalterada.",
     "selector_mode_helper": "Arraste a roda para alinhar um segmento com o indicador; ao soltar encaixa e dispara a sua ação. Sem rotação, sem inércia, sem clique-para-girar; o texto do eixo está oculto. Substitui «Desativar o impulso ao clicar».",
+    "pegs_helper": "Mostra pequenos pinos em cada fronteira de segmento, como numa verdadeira roda da sorte. Cada pino trava a roda um pouco ao passar pelo indicador. O som do clique é controlado em separado por «Som do clique».",
     "result_entity_helper": "Helper `input_text.*` opcional que recebe a etiqueta vencedora após cada giro. Dispara automações em `platform: state, entity_id: …`. Clique em «Criar helper dedicado» abaixo (apenas admin) para criar um novo — cada giro sobrescreve-o.",
     "advanced_helper": "Arrays brutos para colar de YAML, palavras-chave CSS, `var(--…)` ou objetos Lovelace ActionConfig completos. Edições em Associações de segmentos mantêm-nos sincronizados.",
     "friction_low": "Baixo — giros longos e tranquilos",
@@ -118,6 +120,7 @@
     "disable_boost_type": "disable_boost deve ser um booleano",
     "half_circle_type": "half_circle deve ser um booleano",
     "selector_mode_type": "selector_mode deve ser um booleano",
+    "pegs_type": "pegs deve ser um booleano",
     "result_entity_type": "result_entity deve ser uma string",
     "result_entity_invalid": "result_entity deve ser uma entity_id input_text.*"
   }

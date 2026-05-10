@@ -286,6 +286,11 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  the indicator snaps to centre and its action fires. Space / Enter
    *  re-fires the current selection. Default false. */
   selector_mode?: boolean;
+  /** Render small pegs at every segment boundary (rotating with the
+   *  wheel) AND apply a tiny static velocity decrement on each peg
+   *  crossing — the "real prize wheel" feel. The peg-click sound is
+   *  controlled separately via `sound`. Default false. */
+  pegs?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

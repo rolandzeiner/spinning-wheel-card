@@ -83,6 +83,15 @@ const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
 const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
 const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
 
+/** Static velocity decrement on each segment-under-pointer change when
+ *  `pegs: true`. Sized so an 8-peg wheel at 40 rad/s loses ~1.4 rad/s
+ *  per revolution from pegs alone — meaningful but never stuttery —
+ *  while at low speed each click meaningfully chips away ("click click
+ *  click stop" settling feel). Capped at zero so it can't reverse the
+ *  spin direction. Independent of the continuous friction multiplier;
+ *  both compose. */
+const PEG_DRAG_RAD_PER_S = 0.18;
+
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
 
@@ -341,6 +350,9 @@ export class SpinningWheelCard extends LitElement {
       typeof config.selector_mode !== "boolean"
     ) {
       throw new Error(localize("errors.selector_mode_type", lang));
+    }
+    if (config.pegs !== undefined && typeof config.pegs !== "boolean") {
+      throw new Error(localize("errors.pegs_type", lang));
     }
     if (config.result_entity !== undefined) {
       if (typeof config.result_entity !== "string") {
@@ -799,6 +811,10 @@ export class SpinningWheelCard extends LitElement {
     return this.config.selector_mode === true;
   }
 
+  private _pegsEnabled(): boolean {
+    return this.config.pegs === true;
+  }
+
   private _canvasCssHeight(): number {
     return this._isHalfMode()
       ? Math.round(this._size * HALF_ASPECT)
@@ -1114,7 +1130,7 @@ export class SpinningWheelCard extends LitElement {
           1 - overshoot * (1 - TICK_HIGH_SPEED_FLOOR),
         );
       }
-      this._maybeTick(intensity);
+      this._onSegmentCrossing(intensity);
 
       this._draw();
 
@@ -1306,10 +1322,16 @@ export class SpinningWheelCard extends LitElement {
     src.stop(t0 + dur + 0.01);
   }
 
-  /** Tick on segment crossing, capped at TICK_RATE_LIMIT_MS. Cursor
-   *  advances even when rate-limited so the next crossing isn't spurious. */
-  private _maybeTick(intensity: number): void {
-    if (!this._soundEnabled()) {
+  /** Detect a segment-under-pointer change and react: fire the audio
+   *  click (rate-limited to TICK_RATE_LIMIT_MS, gated on `sound`) and /
+   *  or apply the per-peg drag (gated on `pegs`). The crossing detection
+   *  itself runs unconditionally so a `sound: false` + `pegs: true`
+   *  user still gets the brake on each peg. The seg cursor advances even
+   *  when audio is rate-limited so the next crossing isn't spurious. */
+  private _onSegmentCrossing(intensity: number): void {
+    const audioOn = this._soundEnabled();
+    const pegsOn = this._pegsEnabled();
+    if (!audioOn && !pegsOn) {
       this._lastTickSeg = -1;
       return;
     }
@@ -1319,10 +1341,20 @@ export class SpinningWheelCard extends LitElement {
       return;
     }
     if (cur === this._lastTickSeg) return;
-    const now = performance.now();
-    if (now - this._lastTickMs >= TICK_RATE_LIMIT_MS) {
-      this._playTick(intensity);
-      this._lastTickMs = now;
+    if (audioOn) {
+      const now = performance.now();
+      if (now - this._lastTickMs >= TICK_RATE_LIMIT_MS) {
+        this._playTick(intensity);
+        this._lastTickMs = now;
+      }
+    }
+    if (pegsOn) {
+      // Brake bump opposite to current motion. Capped at zero so
+      // an at-rest wheel doesn't reverse direction on residual ω.
+      const sign = this._omega >= 0 ? 1 : -1;
+      const next = this._omega - sign * PEG_DRAG_RAD_PER_S;
+      this._omega =
+        Math.sign(next) === sign || next === 0 ? next : 0;
     }
     this._lastTickSeg = cur;
   }
@@ -1414,7 +1446,7 @@ export class SpinningWheelCard extends LitElement {
       this._velocitySamples.shift();
     }
 
-    this._maybeTick(Math.min(1, Math.abs(delta) * 6));
+    this._onSegmentCrossing(Math.min(1, Math.abs(delta) * 6));
     this._draw();
   };
 
@@ -1762,6 +1794,24 @@ export class SpinningWheelCard extends LitElement {
       }
 
       cursor += arc;
+    }
+
+    // Rim pegs — opt-in. Painted in the rotated context so each peg
+    // sits on the segment boundary and follows the wheel's spin.
+    // Drawn AFTER segment fills (so they paint over the slice colour at
+    // the rim) and BEFORE the outer ring (so the ring overlays them
+    // softly). Half-circle clip handles the lower half automatically.
+    if (this._pegsEnabled()) {
+      const pegSize = Math.max(2, (size * 3) / DEFAULT_SIZE);
+      ctx.fillStyle = theme.hubStroke;
+      let pegCursor = 0;
+      for (let i = 0; i < n; i++) {
+        const a = pegCursor;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * radius, Math.sin(a) * radius, pegSize, 0, TWO_PI);
+        ctx.fill();
+        pegCursor += arcs[i] ?? 0;
+      }
     }
 
     // Soft outer ring — CSS drop-shadow carries the depth.

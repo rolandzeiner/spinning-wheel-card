@@ -42,6 +42,7 @@ const STATIC_DEFAULTS = {
   disable_boost: false,
   half_circle: false,
   selector_mode: false,
+  pegs: false,
 } satisfies Partial<SpinningWheelCardConfig>;
 
 /** Split CSV / newline-separated text into trimmed, non-empty entries. */
@@ -491,6 +492,7 @@ export class SpinningWheelCardEditor
           { name: "disable_boost", selector: { boolean: {} } },
           { name: "half_circle", selector: { boolean: {} } },
           { name: "selector_mode", selector: { boolean: {} } },
+          { name: "pegs", selector: { boolean: {} } },
           // result_entity rendered standalone (see render()) to dodge
           // ha-form's entity-selector-emits-empty-after-programmatic-set
           // race that was dropping the just-created helper.
@@ -570,6 +572,7 @@ export class SpinningWheelCardEditor
     ["disable_boost", { label: "editor.disable_boost", helper: "editor.disable_boost_helper" }],
     ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
     ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
+    ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
     ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
   ]);
 
@@ -837,6 +840,7 @@ export class SpinningWheelCardEditor
     if (next.selector_mode === STATIC_DEFAULTS.selector_mode) {
       delete next.selector_mode;
     }
+    if (next.pegs === STATIC_DEFAULTS.pegs) delete next.pegs;
     if (next.language === "auto") delete next.language;
     if (next.todo_entity === "" || next.todo_entity == null) {
       delete next.todo_entity;
