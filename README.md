@@ -31,9 +31,11 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 
 <table>
   <tr>
+    <td align="center"><img src="screenshots/card.webp" height="420" alt="Spinning wheel card" /></td>
     <td align="center"><img src="screenshots/card-config.webp" height="420" alt="Visual card editor" /></td>
   </tr>
   <tr>
+    <td align="center"><em>Lovelace card</em></td>
     <td align="center"><em>Visual editor — every option in one form</em></td>
   </tr>
 </table>
