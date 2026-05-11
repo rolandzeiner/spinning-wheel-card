@@ -5,7 +5,6 @@ import { property, state } from "lit/decorators.js";
 import type {
   ActionConfig,
   ConfirmationConfig,
-  Friction,
   HomeAssistant,
   HubColor,
   LovelaceCardEditor,
@@ -13,6 +12,7 @@ import type {
   TextOrientation,
   TodoItem,
 } from "./types";
+import { frictionMultiplier, normalizeFriction } from "./friction";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
@@ -61,12 +61,6 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
  *  "dial nub" + HALF_BOTTOM_PAD_FRAC breathing room. */
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
-// Per-frame velocity multiplier at 60 fps. Lower = faster decay.
-const FRICTION: Record<Friction, number> = {
-  low: 0.995,    // ~6 s to drop to 10 % of initial ω
-  medium: 0.99,  // ~4 s
-  high: 0.98,    // ~2 s
-};
 
 const STOP_THRESHOLD_RAD_PER_S = 0.05;
 const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
@@ -76,22 +70,53 @@ const MAX_VELOCITY_RAD_PER_S = 40;
 
 const TWO_PI = Math.PI * 2;
 
-/** Wrap to [0, 2π). `%` on multi-billion-radian doubles drifts. */
-const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI;
+/** Wrap to [0, 2π). `%` on multi-billion-radian doubles drifts.
+ *  Exported for unit tests. */
+export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI;
+
+/** Pure parser for `#RRGGBB`, `#RGB`, `rgb(r,g,b)`, `rgba(r,g,b,a)`.
+ *  Returns null for anything else (named colours, hsl(), CSS vars).
+ *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
+export const cssToRgbTriple = (
+  css: string,
+): readonly [number, number, number] | null => {
+  const s = css.trim();
+  if (s.startsWith("#")) {
+    if (s.length === 7) {
+      const r = parseInt(s.slice(1, 3), 16);
+      const g = parseInt(s.slice(3, 5), 16);
+      const b = parseInt(s.slice(5, 7), 16);
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b];
+      }
+    }
+    if (s.length === 4) {
+      const r = parseInt(s[1]!.repeat(2), 16);
+      const g = parseInt(s[2]!.repeat(2), 16);
+      const b = parseInt(s[3]!.repeat(2), 16);
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b];
+      }
+    }
+    return null;
+  }
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) {
+    return [parseInt(m[1]!, 10), parseInt(m[2]!, 10), parseInt(m[3]!, 10)];
+  }
+  return null;
+};
 
 const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
 const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
 const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
 
-/** Static velocity decrement on each segment-under-pointer change when
- *  `pegs: true`. Sized so the per-peg brake is tactile but composes
- *  cleanly with the user's `friction` preset — at higher peg densities
- *  (peg_density 2–4) the original 0.18 was eating most of the
- *  `friction: low` headroom, dropping multi-revolution spins to ~4 s.
- *  0.08 keeps the per-click feel while letting low-friction setups
- *  spin closer to their pegs-off stop time. Capped at zero so the
- *  brake can't reverse the spin direction. Independent of the
- *  continuous friction multiplier; both compose. */
+/** Per-segment-crossing brake bump at slider level 5 (the new default).
+ *  `_pegDrag()` scales linearly with the 1–10 friction slider so light
+ *  setups (level 1) get ~0.016 rad/s per peg, heavy setups (level 10)
+ *  get ~0.16. Capped at zero in the use-site so the brake can't reverse
+ *  the spin direction. Composes with the continuous friction decay;
+ *  one slider drives both. */
 const PEG_DRAG_RAD_PER_S = 0.08;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
@@ -133,7 +158,7 @@ export class SpinningWheelCard extends LitElement {
   public static getStubConfig(): Record<string, unknown> {
     // Omit `name` — render() falls back to localised default so the
     // header tracks the user's language without baking a string into YAML.
-    return { segments: 8, friction: "medium" };
+    return { segments: 8, friction: 5 };
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -196,11 +221,18 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.segments_range", lang));
       }
     }
-    if (
-      config.friction !== undefined &&
-      !["low", "medium", "high"].includes(config.friction)
-    ) {
-      throw new Error(localize("errors.friction_value", lang));
+    if (config.friction !== undefined) {
+      const f = config.friction;
+      const isPreset =
+        typeof f === "string" && ["low", "medium", "high"].includes(f);
+      const isLevel =
+        typeof f === "number" &&
+        Number.isInteger(f) &&
+        f >= 1 &&
+        f <= 10;
+      if (!isPreset && !isLevel) {
+        throw new Error(localize("errors.friction_range", lang));
+      }
     }
     const segments = config.segments ?? 8;
     if (config.labels !== undefined) {
@@ -520,8 +552,22 @@ export class SpinningWheelCard extends LitElement {
     }
     return this.config.segments ?? 8;
   }
+  /** Resolved 1–10 slider level for the current config, with pre-v1.2
+   *  string presets transparently aliased. */
+  private _frictionLevel(): number {
+    return normalizeFriction(this.config.friction);
+  }
+
   private _frictionFactor(): number {
-    return FRICTION[this.config.friction ?? "medium"];
+    return frictionMultiplier(this._frictionLevel());
+  }
+
+  /** Per-peg brake bump in rad/s. Scaled by the same 1–10 friction
+   *  slider so one knob controls both the continuous decay and the
+   *  per-peg bump — 5 (default) reproduces the historical 0.08 value
+   *  exactly, 1 gives a feather-touch, 10 a heavy ratchet. */
+  private _pegDrag(): number {
+    return PEG_DRAG_RAD_PER_S * (this._frictionLevel() / 5);
   }
   /** Labels expanded to length = segments; cycles short arrays;
    *  defaults to "1".."N". */
@@ -901,37 +947,12 @@ export class SpinningWheelCard extends LitElement {
     return this.config.wheel_context === true;
   }
 
-  /** Pure parser for `#RRGGBB`, `#RGB`, `rgb(r,g,b)`, `rgba(r,g,b,a)`.
-   *  Returns null for anything else (named colours, hsl(), CSS vars) —
-   *  callers send the CSS string as `wheel_color` and skip the triple. */
+  /** Class shim around the module-level `cssToRgbTriple` — kept so any
+   *  existing `this._cssToRgbTriple(...)` call sites stay valid. */
   private _cssToRgbTriple(
     css: string,
   ): readonly [number, number, number] | null {
-    const s = css.trim();
-    if (s.startsWith("#")) {
-      if (s.length === 7) {
-        const r = parseInt(s.slice(1, 3), 16);
-        const g = parseInt(s.slice(3, 5), 16);
-        const b = parseInt(s.slice(5, 7), 16);
-        if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
-          return [r, g, b];
-        }
-      }
-      if (s.length === 4) {
-        const r = parseInt(s[1]!.repeat(2), 16);
-        const g = parseInt(s[2]!.repeat(2), 16);
-        const b = parseInt(s[3]!.repeat(2), 16);
-        if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
-          return [r, g, b];
-        }
-      }
-      return null;
-    }
-    const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (m) {
-      return [parseInt(m[1]!, 10), parseInt(m[2]!, 10), parseInt(m[3]!, 10)];
-    }
-    return null;
+    return cssToRgbTriple(css);
   }
 
   /** Build the auto-injected payload merged into action `data` when
@@ -1665,7 +1686,7 @@ export class SpinningWheelCard extends LitElement {
       // Brake bump opposite to current motion. Capped at zero so
       // an at-rest wheel doesn't reverse direction on residual ω.
       const sign = this._omega >= 0 ? 1 : -1;
-      const next = this._omega - sign * PEG_DRAG_RAD_PER_S;
+      const next = this._omega - sign * this._pegDrag();
       this._omega =
         Math.sign(next) === sign || next === 0 ? next : 0;
     }

@@ -201,7 +201,16 @@ export type HaFormSchema =
   | HaFormGridSchema
   | HaFormExpandableSchema;
 
-export type Friction = "low" | "medium" | "high";
+/** Pre-v1.2 string presets — still accepted in saved YAML, silently
+ *  coerced to the new 1–10 integer scale (low → 3, medium → 5,
+ *  high → 7). Kept exported for the migration helper. */
+export type FrictionPreset = "low" | "medium" | "high";
+
+/** v1.2+ wheel-dampening shape: integer 1–10. Drives BOTH the
+ *  continuous per-frame velocity decay AND the per-peg brake bump
+ *  when `pegs: true`. 1 = long lazy spin, 5 = classic (old "medium"),
+ *  10 = stops quickly. Pre-v1.2 string presets are still accepted. */
+export type Friction = number | FrictionPreset;
 
 /** Built-in palette presets. Custom `colors` always wins over `theme`. */
 export type Theme = "default" | "pastel" | "pride" | "neon";

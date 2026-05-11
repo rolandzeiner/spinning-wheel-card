@@ -15,6 +15,7 @@ import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
+import { normalizeFriction } from "./friction";
 
 // Editor projects array config (labels / weights / colors / label_colors)
 // as `*_csv` strings and per-unique-label values as synthetic
@@ -32,7 +33,7 @@ type EditorData = SpinningWheelCardConfig & {
 // excluded — see _formDefaults.
 const STATIC_DEFAULTS = {
   segments: 8,
-  friction: "medium" as const,
+  friction: 5,
   text_orientation: "tangent" as const,
   sound: true,
   theme: "default" as const,
@@ -52,8 +53,9 @@ const STATIC_DEFAULTS = {
  *  `null` sentinels so `#a,,#c` produces `["#a", null, "#c"]` — the
  *  middle slot falls through to the active theme palette per
  *  `_mapPaletteToLabels`. Trailing empties are trimmed so a user
- *  typing `#a, #b, ` doesn't accumulate phantom theme slots. */
-const parseColorList = (csv: string): ReadonlyArray<string | null> => {
+ *  typing `#a, #b, ` doesn't accumulate phantom theme slots.
+ *  Exported for unit tests. */
+export const parseColorList = (csv: string): ReadonlyArray<string | null> => {
   const parts: (string | null)[] = csv.split(/[,\n]/).map((s) => {
     const t = s.trim();
     return t.length > 0 ? t : null;
@@ -63,8 +65,8 @@ const parseColorList = (csv: string): ReadonlyArray<string | null> => {
 };
 
 /** Parse CSV / whitespace-separated positive numbers; skips invalid
- *  tokens silently rather than throwing. */
-const parseWeights = (csv: string): ReadonlyArray<number> => {
+ *  tokens silently rather than throwing. Exported for unit tests. */
+export const parseWeights = (csv: string): ReadonlyArray<number> => {
   const out: number[] = [];
   for (const tok of csv.split(/[,\s]+/)) {
     if (!tok) continue;
@@ -78,8 +80,8 @@ const parseWeights = (csv: string): ReadonlyArray<number> => {
  *  selector. Handles `#RRGGBB`, `#RGB`, `rgb(r, g, b)` — the three forms
  *  the editor itself emits. Returns null for everything else (named
  *  colours, `var(--…)`, hsl()); those keep working in YAML but the
- *  picker falls back to undefined. */
-const cssToRgb = (
+ *  picker falls back to undefined. Exported for unit tests. */
+export const cssToRgb = (
   s: string | undefined,
 ): readonly [number, number, number] | null => {
   if (!s) return null;
@@ -116,10 +118,13 @@ const cssToRgb = (
   return null;
 };
 
-const rgbToCss = (rgb: readonly [number, number, number]): string =>
+/** Format an [r, g, b] tuple as a CSS `rgb(...)` string. Exported for tests. */
+export const rgbToCss = (rgb: readonly [number, number, number]): string =>
   `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
-const isRgbTuple = (v: unknown): v is readonly [number, number, number] =>
+/** Type guard for [r, g, b] number tuples (not range-validated; ha-form's
+ *  color_rgb selector emits 0–255). Exported for tests. */
+export const isRgbTuple = (v: unknown): v is readonly [number, number, number] =>
   Array.isArray(v) &&
   v.length === 3 &&
   typeof v[0] === "number" &&
@@ -318,6 +323,15 @@ export class SpinningWheelCardEditor
         name: "todo_entity",
         selector: { entity: { domain: "todo" } },
       },
+      // Friction lives at top level (not in General) and stays visible in
+      // both todo and labels modes — spin physics are independent of
+      // where labels come from.
+      {
+        name: "friction",
+        selector: {
+          number: { min: 1, max: 10, step: 1, mode: "slider" },
+        },
+      },
       ...(todoActive
         ? []
         : [
@@ -428,25 +442,6 @@ export class SpinningWheelCardEditor
                   { value: "pt", label: "Português" },
                   { value: "zh", label: "简体中文" },
                   { value: "ja", label: "日本語" },
-                ],
-              },
-            },
-          },
-          {
-            name: "friction",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "low", label: localize("editor.friction_low", lang) },
-                  {
-                    value: "medium",
-                    label: localize("editor.friction_medium", lang),
-                  },
-                  {
-                    value: "high",
-                    label: localize("editor.friction_high", lang),
-                  },
                 ],
               },
             },
@@ -635,6 +630,22 @@ export class SpinningWheelCardEditor
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     if (field.name.startsWith("binding_")) return undefined;
+    // Surface a soft warning under todo_entity when a list is wired but
+    // has zero open items right now — otherwise the wheel renders blank
+    // and it isn't obvious why. ha-form has no per-field warning slot,
+    // so we hijack the helper text with a ⚠ prefix; styling stays
+    // standard helper.
+    if (field.name === "todo_entity") {
+      const entity = this._config.todo_entity;
+      const wired = typeof entity === "string" && entity.length > 0;
+      if (
+        wired &&
+        this._todoItems !== null &&
+        this._todoItems.length === 0
+      ) {
+        return localize("editor.todo_entity_empty_warning", this._lang());
+      }
+    }
     const entry = SpinningWheelCardEditor.FIELD_I18N.get(field.name);
     return entry?.helper ? localize(entry.helper, this._lang()) : undefined;
   };
@@ -959,6 +970,10 @@ export class SpinningWheelCardEditor
       actions: (this._config.actions ?? []).filter(
         (a): a is string => typeof a === "string",
       ),
+      // Migrate pre-v1.2 string presets to the new 1–10 slider on the
+      // fly so the slider widget displays a value (the dropdown is gone).
+      // Save path re-strips if the result equals the default.
+      friction: normalizeFriction(this._config.friction),
       weights_csv: this._weightsText,
       colors_csv: this._colorsText,
       label_colors_csv: this._labelColorsText,
