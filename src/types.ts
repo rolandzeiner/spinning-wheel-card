@@ -201,7 +201,16 @@ export type HaFormSchema =
   | HaFormGridSchema
   | HaFormExpandableSchema;
 
-export type Friction = "low" | "medium" | "high";
+/** Pre-v1.2 string presets — still accepted in saved YAML, silently
+ *  coerced to the new 1–10 integer scale (low → 3, medium → 5,
+ *  high → 7). Kept exported for the migration helper. */
+export type FrictionPreset = "low" | "medium" | "high";
+
+/** v1.2+ wheel-dampening shape: integer 1–10. Drives BOTH the
+ *  continuous per-frame velocity decay AND the per-peg brake bump
+ *  when `pegs: true`. 1 = long lazy spin, 5 = classic (old "medium"),
+ *  10 = stops quickly. Pre-v1.2 string presets are still accepted. */
+export type Friction = number | FrictionPreset;
 
 /** Built-in palette presets. Custom `colors` always wins over `theme`. */
 export type Theme = "default" | "pastel" | "pride" | "neon";
@@ -241,13 +250,16 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   weights?: ReadonlyArray<number>;
   /** Fallback palette preset, used when `colors` is unset. */
   theme?: Theme;
-  /** Per-segment fill colours (any CSS colour string). Mapped to UNIQUE
-   *  LABELS in order of first appearance, so segments sharing a label
-   *  always share a colour. Length 1..segments. Overrides `theme`. */
-  colors?: ReadonlyArray<string>;
-  /** Per-segment label text colours. Same unique-label mapping rule as
-   *  `colors`. Length 1..segments. Default: dark grey for every segment. */
-  label_colors?: ReadonlyArray<string>;
+  /** Per-unique-label fill colours (any CSS colour string). Mapped to
+   *  UNIQUE LABELS in order of first appearance, so segments sharing a
+   *  label always share a colour. Length 1..segments. `null` entries
+   *  (or empty strings in CSV) fall through to the active `theme`
+   *  palette at that position — set explicit colours where you care
+   *  and leave the rest themed so a `theme:` change still updates them. */
+  colors?: ReadonlyArray<string | null>;
+  /** Per-unique-label text colours. Same `null`-falls-through rule
+   *  as `colors`. Default: dark grey for every label. */
+  label_colors?: ReadonlyArray<string | null>;
   /** Centre hub text. Empty string hides it. */
   hub_text?: string;
   /** Centre-hub + pointer fill mode. */
@@ -286,6 +298,28 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  the indicator snaps to centre and its action fires. Space / Enter
    *  re-fires the current selection. Default false. */
   selector_mode?: boolean;
+  /** Show a thin white separator line between adjacent segments.
+   *  Default true. Set false for a flatter look without the rib. */
+  segment_borders?: boolean;
+  /** Render small pegs at every segment boundary (rotating with the
+   *  wheel) AND apply a tiny static velocity decrement on each peg
+   *  crossing — the "real prize wheel" feel. The peg-click sound is
+   *  controlled separately via `sound`. Default false. */
+  pegs?: boolean;
+  /** Number of EXTRA pegs to drop inside each segment, on top of the
+   *  always-present boundary peg. 0 = boundary pegs only (N pegs);
+   *  1 = boundary + 1 mid (2N pegs, default); 4 = boundary + 4 mids
+   *  (5N pegs). Each peg fires its own click + brake bump. Ignored
+   *  when `pegs: false`. Default 1. */
+  peg_density?: number;
+  /** When true, every fired action (perform-action / call-service)
+   *  gets the winning segment's data merged into its `data` payload:
+   *  `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`,
+   *  `wheel_label_color`, `wheel_label_color_rgb`. A single generic
+   *  script reading those fields can then handle every segment.
+   *  User-supplied `data` keys override the auto-injected ones.
+   *  Default false. */
+  wheel_context?: boolean;
 }
 
 export type TextOrientation = "tangent" | "radial";

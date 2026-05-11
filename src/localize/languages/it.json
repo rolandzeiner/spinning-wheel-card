@@ -6,6 +6,10 @@
     "idle_selector": "Trascina la ruota per selezionare",
     "todo_empty": "Nessun elemento aperto nella lista delle attività"
   },
+  "a11y": {
+    "wheel_role": "ruota della fortuna",
+    "wheel_label": "Far girare la ruota"
+  },
   "confirm": {
     "run_action": "Eseguire \"{action}\" per \"{value}\"?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "Disattiva l'accelerazione al clic",
     "half_circle": "Modalità semicerchio",
     "selector_mode": "Modalità selettore",
+    "segment_borders": "Bordi dei segmenti",
+    "pegs": "Perni del bordo",
+    "peg_density": "Perni per segmento",
+    "wheel_context": "Invia contesto del segmento alle azioni",
     "result_entity": "Helper di risultato",
     "result_entity_create": "Crea helper dedicato",
     "result_entity_create_hint": "Crea un helper input_text dedicato. La ruota vi scrive l'etichetta vincente dopo ogni giro così le automazioni HA possono attivarsi su `platform: state, entity_id: …`.",
@@ -51,10 +59,11 @@
     "binding_weight": "Peso (dimensione relativa della fetta)",
     "binding_action": "Azione",
     "advanced": "Avanzate (array grezzi)",
-    "language_helper": "Sovrascrive la lingua di visualizzazione rilevata. Auto segue il tuo profilo HA (lingua del browser come ripiego).",
+    "language_helper": "Sovrascrive la lingua di visualizzazione rilevata.",
     "todo_entity_helper": "Quando impostato, i segmenti della ruota provengono dagli elementi aperti di questa lista (max 24). Segmenti ed Etichette sono ignorati mentre è collegata.",
+    "todo_entity_empty_warning": "⚠ Questa lista di attività non ha elementi aperti al momento — la ruota resterà vuota finché non ne aggiungi uno.",
     "segments_helper": "In quante fette è divisa la ruota. Da 4 a 24.",
-    "friction_helper": "Quanto rapidamente la ruota rallenta dopo un giro o un rilascio.",
+    "friction_helper": "Smorzamento della ruota, 1–10. 1 = giro lungo e rilassato, 5 = classico (predefinito), 10 = si ferma in fretta. Ridimensiona anche il freno per perno quando i Perni del bordo sono attivi.",
     "theme_helper": "Palette di colori integrata usata quando Colori è vuoto. I Colori personalizzati la sovrascrivono sempre.",
     "theme_default": "Predefinito — palette integrata a 8 colori",
     "theme_pastel": "Pastello — toni morbidi e poco saturi",
@@ -77,11 +86,12 @@
     "disable_boost_helper": "Off (predefinito) — cliccando mentre la ruota gira si aggiunge un altro impulso; una sequenza di clic può mantenerla in movimento. On — i clic durante il giro vengono ignorati. Utile per dashboard a misura di bambino. Il trascina-e-lancia non è influenzato.",
     "half_circle_helper": "Mostra solo la metà superiore della ruota come una cupola — indicatore in alto, mozzo in basso al centro. La fisica della rotazione rimane invariata.",
     "selector_mode_helper": "Trascina la ruota per allineare un segmento all'indicatore; al rilascio scatta in posizione e attiva l'azione. Niente rotazione, niente inerzia, niente clic-per-girare; il testo del mozzo è nascosto. Sostituisce «Disattiva l'accelerazione al clic».",
+    "segment_borders_helper": "Mostra una linea bianca sottile tra segmenti adiacenti. Off per un aspetto più piatto e senza filetto.",
+    "pegs_helper": "Decora il bordo con piccoli perni, come in una vera ruota della fortuna. Ogni perno frena la ruota di un piccolo scatto quando passa davanti all'indicatore. Il suono del clic è controllato separatamente da «Suono del clic».",
+    "peg_density_helper": "Perni aggiuntivi all'interno di ogni segmento, oltre al perno di confine. 0 = solo perni di confine; 1 = confine + 1 al centro (predefinito); 4 = densamente costellato. Più perni = più clic e più frenata totale per giro.",
+    "wheel_context_helper": "Quando attivo, ogni azione attivata riceve il segmento vincente unito nel suo payload `data`: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Un singolo script generico che legge questi campi può poi gestire ogni segmento. Le chiavi data fornite dall'utente sovrascrivono quelle iniettate automaticamente.",
     "result_entity_helper": "Helper `input_text.*` opzionale che riceve l'etichetta vincente dopo ogni giro. Attiva automazioni su `platform: state, entity_id: …`. Clicca «Crea helper dedicato» qui sotto (solo admin) per crearne uno fresco — ogni giro lo sovrascrive.",
     "advanced_helper": "Array grezzi per incollare da YAML, parole chiave CSS, `var(--…)` o oggetti Lovelace ActionConfig completi. Le modifiche in Associazioni di segmenti li mantengono sincronizzati.",
-    "friction_low": "Basso — giri lunghi e tranquilli",
-    "friction_medium": "Medio — classico",
-    "friction_high": "Alto — si ferma in fretta",
     "orientation_tangent": "Tangent — etichette intorno al bordo",
     "orientation_radial": "Radial — etichette lungo i raggi",
     "footer_hint": "Clicca per un giro a impulso casuale, oppure clicca-e-trascina per lanciarla — la velocità al rilascio determina il giro. L'attrito la frena fino all'arresto."
@@ -91,7 +101,7 @@
     "name_type": "name deve essere una stringa",
     "language_type": "language deve essere una stringa",
     "segments_range": "segments deve essere un intero tra 4 e 24",
-    "friction_value": "friction deve essere low, medium o high",
+    "friction_range": "friction deve essere un intero tra 1 e 10 (o uno dei vecchi preset: low, medium, high)",
     "labels_type": "labels deve essere un array di stringhe",
     "labels_length": "la lunghezza di labels ({len}) non deve superare segments ({segments})",
     "weights_type": "weights deve essere un array di numeri positivi",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost deve essere un booleano",
     "half_circle_type": "half_circle deve essere un booleano",
     "selector_mode_type": "selector_mode deve essere un booleano",
+    "segment_borders_type": "segment_borders deve essere un booleano",
+    "pegs_type": "pegs deve essere un booleano",
+    "peg_density_range": "peg_density deve essere un intero tra 0 e 4",
+    "wheel_context_type": "wheel_context deve essere un booleano",
     "result_entity_type": "result_entity deve essere una stringa",
     "result_entity_invalid": "result_entity deve essere un entity_id input_text.*"
   }

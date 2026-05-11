@@ -6,6 +6,10 @@
     "idle_selector": "Rad ziehen, um auszuwählen",
     "todo_empty": "Keine offenen Einträge in der Todo-Liste"
   },
+  "a11y": {
+    "wheel_role": "Glücksrad",
+    "wheel_label": "Rad drehen"
+  },
   "confirm": {
     "run_action": "„{action}\" für „{value}\" ausführen?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "Klick-Boost deaktivieren",
     "half_circle": "Halbkreismodus",
     "selector_mode": "Auswahlmodus",
+    "segment_borders": "Segmentränder",
+    "pegs": "Randstifte",
+    "peg_density": "Stifte je Segment",
+    "wheel_context": "Segment-Kontext an Aktionen senden",
     "result_entity": "Ergebnis-Helfer",
     "result_entity_create": "Dedizierten Helfer erstellen",
     "result_entity_create_hint": "Erstelle einen dedizierten input_text-Helfer. Das Rad schreibt die gewinnende Beschriftung nach jedem Dreh hier hinein, sodass HA-Automationen auf `platform: state, entity_id: …` auslösen können.",
@@ -51,10 +59,11 @@
     "binding_weight": "Gewichtung (relative Stückgröße)",
     "binding_action": "Aktion",
     "advanced": "Erweitert (Roh-Arrays)",
-    "language_helper": "Überschreibt die automatisch erkannte Anzeigesprache. Auto folgt deinem HA-Profil (Browser-Sprache als Fallback).",
+    "language_helper": "Überschreibt die automatisch erkannte Anzeigesprache.",
     "todo_entity_helper": "Wenn gesetzt, werden die Segmente des Rads aus den offenen Einträgen dieser Todo-Liste befüllt (max. 24). Segmente und Beschriftungen werden ignoriert, solange verbunden.",
+    "todo_entity_empty_warning": "⚠ Diese Todo-Liste hat aktuell keine offenen Einträge — das Rad bleibt leer, bis einer hinzugefügt wird.",
     "segments_helper": "In wie viele Stücke das Rad geteilt wird. 4 bis 24.",
-    "friction_helper": "Wie schnell das Rad nach einer Drehung oder dem Loslassen abbremst.",
+    "friction_helper": "Rad-Bremswirkung, 1–10. 1 = lange gemächliche Drehung, 5 = klassisch (Standard), 10 = stoppt schnell. Skaliert auch die Bremswirkung der Randstifte, wenn aktiv.",
     "theme_helper": "Eingebaute Farbpalette, die verwendet wird, wenn Farben leer ist. Benutzerdefinierte Farben überschreiben dies immer.",
     "theme_default": "Standard — eingebaute 8-Farben-Palette",
     "theme_pastel": "Pastell — sanfte, niedrig gesättigte Töne",
@@ -76,12 +85,13 @@
     "disable_confirm_actions_helper": "Aus (Standard) — die Karte fragt vor dem Ausführen einer Segment-Aktion nach. Ein — Aktionen werden ohne Nachfrage ausgelöst. Mit Vorsicht verwenden: ein beiläufiger Dreh kann echte Automationen auslösen.",
     "disable_boost_helper": "Aus (Standard) — Klicks während einer Drehung erzeugen einen weiteren Impuls; viele Klicks halten das Rad damit am Laufen. Ein — Klicks während der Drehung werden ignoriert. Hilfreich für kinderfreundliche Dashboards. Ziehen-und-Werfen bleibt unverändert.",
     "half_circle_helper": "Zeigt nur die obere Hälfte des Rads als Kuppel — Anzeiger oben, Nabe unten Mitte. Drehphysik bleibt unverändert.",
-    "selector_mode_helper": "Rad ziehen, um ein Segment mit dem Anzeiger auszurichten; beim Loslassen rastet das Segment ein und löst seine Aktion aus. Kein Drehen, kein Schwung, kein Klick-zum-Drehen; Nabentext ausgeblendet. Überschreibt „Klick-Boost deaktivieren\".",
+    "selector_mode_helper": "Rad ziehen, um ein Segment mit dem Anzeiger auszurichten; beim Loslassen rastet das Segment ein und löst seine Aktion aus. Kein Drehen, kein Schwung, kein Klick-zum-Drehen; Nabentext ausgeblendet. Überschreibt „Klick-Boost deaktivieren“.",
+    "segment_borders_helper": "Zeigt eine dünne weiße Linie zwischen benachbarten Segmenten. Aus für ein flacheres, kantenloses Aussehen.",
+    "pegs_helper": "Versieht den Rand mit kleinen Stiften, wie bei einem echten Glücksrad. Jeder Stift bremst das Rad ein wenig, wenn er am Anzeiger vorbeikommt. Das Klickgeräusch wird separat über „Klickgeräusch\" gesteuert.",
+    "peg_density_helper": "Zusätzliche Stifte pro Segment, zusätzlich zum Stift an der Segmentgrenze. 0 = nur Grenzstifte; 1 = Grenze + 1 in der Mitte (Standard); 4 = dicht besetzt. Mehr Stifte = mehr Klicks und stärkere Gesamtbremsung pro Drehung.",
+    "wheel_context_helper": "Wenn aktiv, erhält jede ausgelöste Aktion das Gewinner-Segment in ihrem `data`-Payload: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Ein einzelnes generisches Skript, das diese Felder liest, kann dann jedes Segment behandeln. Vom Benutzer gesetzte data-Schlüssel überschreiben die automatisch eingefügten.",
     "result_entity_helper": "Optionaler `input_text.*`-Helfer, der die gewinnende Beschriftung nach jedem Dreh erhält. Löst Automationen auf `platform: state, entity_id: …` aus. Klick auf „Dedizierten Helfer erstellen\" unten (nur Admin) für einen frischen — jeder Dreh überschreibt ihn.",
     "advanced_helper": "Rohe Arrays für YAML-Einfügen, CSS-Schlüsselwörter, `var(--…)` oder vollständige Lovelace-ActionConfig-Objekte. Bearbeitungen in Segment-Bindungen oben halten diese synchron.",
-    "friction_low": "Niedrig — lange, gemächliche Drehungen",
-    "friction_medium": "Mittel — klassisch",
-    "friction_high": "Hoch — stoppt schnell",
     "orientation_tangent": "Tangent — Beschriftungen am Rand",
     "orientation_radial": "Radial — Beschriftungen entlang der Speichen",
     "footer_hint": "Klicke für eine zufällige Drehung, oder klicke und ziehe zum Werfen — die Geschwindigkeit beim Loslassen bestimmt die Drehung. Reibung bremst sie, bis sie stoppt."
@@ -91,7 +101,7 @@
     "name_type": "name muss ein String sein",
     "language_type": "language muss ein String sein",
     "segments_range": "segments muss eine Ganzzahl zwischen 4 und 24 sein",
-    "friction_value": "friction muss low, medium oder high sein",
+    "friction_range": "friction muss eine Ganzzahl zwischen 1 und 10 sein (oder einer der alten Werte: low, medium, high)",
     "labels_type": "labels muss ein Array von Strings sein",
     "labels_length": "labels-Länge ({len}) darf segments ({segments}) nicht überschreiten",
     "weights_type": "weights muss ein Array positiver Zahlen sein",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost muss ein Boolean sein",
     "half_circle_type": "half_circle muss ein Boolean sein",
     "selector_mode_type": "selector_mode muss ein Boolean sein",
+    "segment_borders_type": "segment_borders muss ein Boolean sein",
+    "pegs_type": "pegs muss ein Boolean sein",
+    "peg_density_range": "peg_density muss eine Ganzzahl zwischen 0 und 4 sein",
+    "wheel_context_type": "wheel_context muss ein Boolean sein",
     "result_entity_type": "result_entity muss ein String sein",
     "result_entity_invalid": "result_entity muss eine input_text.*-entity_id sein"
   }

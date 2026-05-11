@@ -6,6 +6,10 @@
     "idle_selector": "Arrastra la ruleta para seleccionar",
     "todo_empty": "Sin elementos abiertos en la lista de tareas"
   },
+  "a11y": {
+    "wheel_role": "ruleta de la fortuna",
+    "wheel_label": "Girar la ruleta"
+  },
   "confirm": {
     "run_action": "¿Ejecutar «{action}» para «{value}»?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "Desactivar el impulso al hacer clic",
     "half_circle": "Modo semicírculo",
     "selector_mode": "Modo selector",
+    "segment_borders": "Bordes de segmento",
+    "pegs": "Pasadores del borde",
+    "peg_density": "Pasadores por segmento",
+    "wheel_context": "Enviar contexto del segmento a las acciones",
     "result_entity": "Helper de resultado",
     "result_entity_create": "Crear helper dedicado",
     "result_entity_create_hint": "Crea un helper input_text dedicado. La ruleta escribe en él la etiqueta ganadora tras cada giro para que las automatizaciones de HA puedan dispararse en `platform: state, entity_id: …`.",
@@ -51,10 +59,11 @@
     "binding_weight": "Peso (tamaño relativo de la porción)",
     "binding_action": "Acción",
     "advanced": "Avanzado (arrays sin procesar)",
-    "language_helper": "Sustituye el idioma detectado. Auto sigue tu perfil de HA (idioma del navegador como respaldo).",
+    "language_helper": "Sustituye el idioma detectado.",
     "todo_entity_helper": "Cuando se establece, los segmentos provienen de los elementos abiertos de esta lista (máx. 24). Segmentos y Etiquetas se ignoran mientras esté conectada.",
+    "todo_entity_empty_warning": "⚠ Esta lista de tareas no tiene elementos abiertos ahora mismo — la ruleta estará vacía hasta que se añada uno.",
     "segments_helper": "En cuántas porciones se divide la ruleta. De 4 a 24.",
-    "friction_helper": "Con qué rapidez la ruleta se frena tras un giro o un soltar.",
+    "friction_helper": "Amortiguación de la ruleta, 1–10. 1 = giro largo y tranquilo, 5 = clásico (por defecto), 10 = se detiene rápido. También escala el frenado por pasador cuando los Pasadores del borde están activos.",
     "theme_helper": "Paleta integrada usada cuando Colores está vacío. Los Colores personalizados siempre la sobrescriben.",
     "theme_default": "Predeterminado — paleta integrada de 8 colores",
     "theme_pastel": "Pastel — tonos suaves y poco saturados",
@@ -77,11 +86,12 @@
     "disable_boost_helper": "Desactivado (por defecto): hacer clic mientras la ruleta gira añade otro impulso; una ráfaga de clics puede mantenerla en movimiento. Activado: los clics durante un giro se ignoran. Útil para dashboards aptos para niños. Arrastrar y lanzar no se ve afectado.",
     "half_circle_helper": "Muestra solo la mitad superior de la ruleta como una cúpula: indicador arriba, eje en la parte inferior central. La física del giro no cambia.",
     "selector_mode_helper": "Arrastra la ruleta para alinear un segmento con el indicador; al soltarla encaja y dispara su acción. Sin giro, sin inercia, sin clic-para-girar; el texto del eje está oculto. Sustituye a «Desactivar el impulso al hacer clic».",
+    "segment_borders_helper": "Muestra una fina línea blanca entre segmentos adyacentes. Off para un aspecto más plano y sin filete.",
+    "pegs_helper": "Adorna el borde con pequeños pasadores, como en una ruleta de premios real. Cada pasador frena la ruleta un poquito al pasar por el indicador. El sonido del clic se controla por separado mediante «Sonido del clic».",
+    "peg_density_helper": "Pasadores adicionales dentro de cada segmento, además del pasador del borde. 0 = solo pasadores de borde; 1 = borde + 1 en el medio (por defecto); 4 = densamente tachonado. Más pasadores = más clics y más frenado total por giro.",
+    "wheel_context_helper": "Cuando está activo, cada acción disparada recibe el segmento ganador combinado en su payload `data`: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Un único script genérico que lea estos campos puede gestionar todos los segmentos. Las claves data proporcionadas por el usuario tienen prioridad sobre las inyectadas automáticamente.",
     "result_entity_helper": "Helper `input_text.*` opcional que recibe la etiqueta ganadora tras cada giro. Dispara automatizaciones en `platform: state, entity_id: …`. Haz clic en «Crear helper dedicado» abajo (solo admin) para uno nuevo — cada giro lo sobrescribe.",
     "advanced_helper": "Arrays sin procesar para pegar desde YAML, palabras clave CSS, `var(--…)` u objetos Lovelace ActionConfig completos. Las ediciones en Asignaciones de segmentos los mantienen sincronizados.",
-    "friction_low": "Baja — giros largos y tranquilos",
-    "friction_medium": "Media — clásica",
-    "friction_high": "Alta — se detiene rápido",
     "orientation_tangent": "Tangent — etiquetas alrededor del borde",
     "orientation_radial": "Radial — etiquetas a lo largo de los radios",
     "footer_hint": "Haz clic para un giro de impulso aleatorio, o haz clic y arrastra para lanzarla — la velocidad al soltar determina el giro. La fricción la frena hasta detenerla."
@@ -91,7 +101,7 @@
     "name_type": "name debe ser una cadena",
     "language_type": "language debe ser una cadena",
     "segments_range": "segments debe ser un entero entre 4 y 24",
-    "friction_value": "friction debe ser low, medium o high",
+    "friction_range": "friction debe ser un entero entre 1 y 10 (o uno de los preajustes antiguos: low, medium, high)",
     "labels_type": "labels debe ser un array de cadenas",
     "labels_length": "la longitud de labels ({len}) no debe superar segments ({segments})",
     "weights_type": "weights debe ser un array de números positivos",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost debe ser un booleano",
     "half_circle_type": "half_circle debe ser un booleano",
     "selector_mode_type": "selector_mode debe ser un booleano",
+    "segment_borders_type": "segment_borders debe ser un booleano",
+    "pegs_type": "pegs debe ser un booleano",
+    "peg_density_range": "peg_density debe ser un entero entre 0 y 4",
+    "wheel_context_type": "wheel_context debe ser un booleano",
     "result_entity_type": "result_entity debe ser una cadena",
     "result_entity_invalid": "result_entity debe ser un entity_id input_text.*"
   }

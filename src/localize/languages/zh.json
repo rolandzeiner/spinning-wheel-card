@@ -6,6 +6,10 @@
     "idle_selector": "拖动转盘进行选择",
     "todo_empty": "待办列表中没有未完成的项目"
   },
+  "a11y": {
+    "wheel_role": "幸运转盘",
+    "wheel_label": "转动转盘"
+  },
   "confirm": {
     "run_action": "为「{value}」执行「{action}」?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "禁用点击加速",
     "half_circle": "半圆模式",
     "selector_mode": "选择器模式",
+    "segment_borders": "扇形边框",
+    "pegs": "边缘挡钉",
+    "peg_density": "每段挡钉数",
+    "wheel_context": "向操作发送扇形上下文",
     "result_entity": "结果助手",
     "result_entity_create": "创建专用助手",
     "result_entity_create_hint": "创建一个专用的 input_text 助手。每次旋转后转盘都会把胜出标签写入其中,这样 HA 自动化就可以在 `platform: state, entity_id: …` 上触发。",
@@ -51,10 +59,11 @@
     "binding_weight": "权重(扇形相对大小)",
     "binding_action": "操作",
     "advanced": "高级(原始数组)",
-    "language_helper": "覆盖自动检测的显示语言。自动会跟随你的 HA 配置文件(浏览器语言作为后备)。",
+    "language_helper": "覆盖自动检测的显示语言。",
     "todo_entity_helper": "设置后,转盘扇形从此待办列表的未完成项目填充(最多 24 个)。连接期间,扇形数量与标签都会被忽略。",
+    "todo_entity_empty_warning": "⚠ 当前此待办列表没有未完成项目 — 转盘将保持为空,直到添加一项。",
     "segments_helper": "转盘被分成多少块。4 到 24。",
-    "friction_helper": "旋转或释放后转盘减速的快慢。",
+    "friction_helper": "转盘阻尼,1–10。1 = 长而悠闲的旋转,5 = 经典(默认),10 = 快速停止。当「边缘挡钉」开启时,同样的滑块也调节每根挡钉的制动强度。",
     "theme_helper": "颜色为空时使用的内置调色板。自定义颜色会始终覆盖它。",
     "theme_default": "默认 — 内置 8 色调色板",
     "theme_pastel": "粉彩 — 柔和、低饱和度色调",
@@ -77,11 +86,12 @@
     "disable_boost_helper": "关闭(默认)— 在转盘旋转时点击会再增加一次冲量,连续点击可以让它持续旋转。开启 — 旋转期间的点击会被忽略。适合儿童友好的仪表盘。拖动投掷不受影响。",
     "half_circle_helper": "仅以圆顶形式显示转盘的上半部分 — 指针在顶部,轮毂位于底部中央。旋转物理保持不变。",
     "selector_mode_helper": "拖动转盘以将某个扇形对准指针,松开后即触发其操作。无旋转、无惯性、无单击旋转;轮毂文字隐藏。会覆盖「禁用点击加速」。",
+    "segment_borders_helper": "在相邻扇形之间显示细白线。关闭以获得更扁平、无分隔的外观。",
+    "pegs_helper": "在边缘点缀小挡钉,像真实的幸运转盘一样。每根挡钉经过指针时会让转盘略微减速。点击声由「点击音效」单独控制。",
+    "peg_density_helper": "在每个扇形内部额外添加的挡钉数,边界挡钉之外。0 = 仅边界挡钉;1 = 边界 + 中间 1 个(默认);4 = 密集排布。挡钉越多,每次旋转的点击声和总制动力越多。",
+    "wheel_context_helper": "开启后,每次触发的操作都会把胜出扇形的数据合并到其 `data` 负载中:`wheel_index`、`wheel_label`、`wheel_color`、`wheel_color_rgb`、`wheel_label_color`、`wheel_label_color_rgb`。一个读取这些字段的通用脚本即可处理所有扇形。用户提供的 data 键会覆盖自动注入的同名键。",
     "result_entity_helper": "可选的 `input_text.*` 助手,用于接收每次旋转后的胜出标签。可以触发 `platform: state, entity_id: …` 上的自动化。点击下方的「创建专用助手」(仅管理员)可创建一个新的 — 每次旋转都会覆盖它。",
     "advanced_helper": "原始数组,可用于从 YAML 粘贴、CSS 关键字、`var(--…)` 或完整的 Lovelace ActionConfig 对象。在上方扇形绑定中的编辑会保持这些同步。",
-    "friction_low": "低 — 长而悠闲的旋转",
-    "friction_medium": "中 — 经典",
-    "friction_high": "高 — 快速停止",
     "orientation_tangent": "Tangent — 标签沿轮缘",
     "orientation_radial": "Radial — 标签沿辐条",
     "footer_hint": "点击进行随机冲量旋转,或点击并拖动以投掷 — 释放时的速度决定旋转。摩擦让它逐渐停下。"
@@ -91,7 +101,7 @@
     "name_type": "name 必须为字符串",
     "language_type": "language 必须为字符串",
     "segments_range": "segments 必须为 4 到 24 之间的整数",
-    "friction_value": "friction 必须为 low、medium 或 high",
+    "friction_range": "friction 必须为 1 到 10 之间的整数(或旧的预设之一:low、medium、high)",
     "labels_type": "labels 必须为字符串数组",
     "labels_length": "labels 长度({len})不得超过 segments({segments})",
     "weights_type": "weights 必须为正数数组",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost 必须为布尔值",
     "half_circle_type": "half_circle 必须为布尔值",
     "selector_mode_type": "selector_mode 必须为布尔值",
+    "segment_borders_type": "segment_borders 必须为布尔值",
+    "pegs_type": "pegs 必须为布尔值",
+    "peg_density_range": "peg_density 必须为 0 到 4 之间的整数",
+    "wheel_context_type": "wheel_context 必须为布尔值",
     "result_entity_type": "result_entity 必须为字符串",
     "result_entity_invalid": "result_entity 必须为 input_text.* entity_id"
   }

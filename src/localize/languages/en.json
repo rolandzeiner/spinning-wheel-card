@@ -6,6 +6,10 @@
     "idle_selector": "Drag the wheel to select",
     "todo_empty": "No open items in the todo list"
   },
+  "a11y": {
+    "wheel_role": "prize wheel",
+    "wheel_label": "Spin the wheel"
+  },
   "confirm": {
     "run_action": "Run \"{action}\" for \"{value}\"?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "Disable click-to-boost",
     "half_circle": "Half-circle mode",
     "selector_mode": "Selector mode",
+    "segment_borders": "Segment borders",
+    "pegs": "Rim pegs",
+    "peg_density": "Mid-segment pegs",
+    "wheel_context": "Send segment context to actions",
     "result_entity": "Result helper",
     "result_entity_create": "Create dedicated helper",
     "result_entity_create_hint": "Create a dedicated input_text helper. The wheel writes the winning label here after every spin so HA automations can trigger on `platform: state, entity_id: …`.",
@@ -51,10 +59,11 @@
     "binding_weight": "Weight (relative slice size)",
     "binding_action": "Action",
     "advanced": "Advanced (raw arrays)",
-    "language_helper": "Override the auto-detected display language. Auto follows your HA profile (browser language as fallback).",
+    "language_helper": "Override the auto-detected display language.",
     "todo_entity_helper": "When set, the wheel's segments come from this todo list's open items (max 24). Segments and Labels are ignored while wired.",
+    "todo_entity_empty_warning": "⚠ This todo list has no open items right now — the wheel will be empty until one is added.",
     "segments_helper": "How many slices the wheel is divided into. 4 to 24.",
-    "friction_helper": "How quickly the wheel decelerates after a spin or release.",
+    "friction_helper": "Wheel dampening, 1–10. 1 = long lazy spin, 5 = classic (default), 10 = stops quickly. Also scales the per-peg brake bump when Rim pegs are on.",
     "theme_helper": "Built-in colour palette used when Colours is empty. Custom Colours overrides this.",
     "theme_default": "Default — built-in 8-colour palette",
     "theme_pastel": "Pastel — soft, low-saturation tones",
@@ -77,11 +86,12 @@
     "disable_boost_helper": "Off (default) — clicks during a spin add another impulse, so rapid clicking keeps the wheel going. On — clicks during a spin are ignored. Useful for kid-friendly dashboards. Drag-to-throw is unaffected.",
     "half_circle_helper": "Show only the upper half of the wheel as a dome — pointer at the top, hub at the bottom centre. Spinning physics are unchanged.",
     "selector_mode_helper": "Drag the wheel to align a segment with the indicator and release to fire its action. No spinning, no momentum, no click-to-spin; hub text is hidden. Supersedes Disable click-to-boost.",
+    "segment_borders_helper": "Show a thin white line between adjacent segments. Off for a flatter, edge-to-edge look.",
+    "pegs_helper": "Stud the rim with small pegs, like a real prize wheel. Each peg gives the wheel a tiny brake bump as it passes the indicator. The peg-click sound is controlled separately via Click sound.",
+    "peg_density_helper": "Extra pegs to add inside each segment, on top of the boundary peg. 0 = boundary pegs only; 1 = boundary + 1 mid (default); 4 = densely studded. More pegs = more clicks and more total braking per spin.",
+    "wheel_context_helper": "When on, every fired action gets the winning segment merged into its `data` payload: `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. A single generic script reading those fields can then handle every segment. User-supplied data keys override the auto-injected ones.",
     "result_entity_helper": "Optional `input_text.*` helper to receive the winning label after every spin. Triggers automations on `platform: state, entity_id: …`. Click \"Create dedicated helper\" below (admin only) for a fresh one — every spin overwrites it.",
     "advanced_helper": "Raw arrays for paste-from-YAML, CSS keywords, `var(--…)`, or full Lovelace ActionConfig objects. Edits in Segment bindings above keep these in sync.",
-    "friction_low": "Low — long, lazy spins",
-    "friction_medium": "Medium — classic",
-    "friction_high": "High — stops quickly",
     "orientation_tangent": "Tangent — labels around the rim",
     "orientation_radial": "Radial — labels along the spokes",
     "footer_hint": "Click for a random impulse spin, or click-and-drag to throw — release velocity drives the spin. Friction decays it until it stops."
@@ -91,7 +101,7 @@
     "name_type": "name must be a string",
     "language_type": "language must be a string",
     "segments_range": "segments must be an integer between 4 and 24",
-    "friction_value": "friction must be one of: low, medium, high",
+    "friction_range": "friction must be an integer between 1 and 10 (or one of the legacy presets: low, medium, high)",
     "labels_type": "labels must be an array of strings",
     "labels_length": "labels length ({len}) must not exceed segments ({segments})",
     "weights_type": "weights must be an array of positive numbers",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost must be a boolean",
     "half_circle_type": "half_circle must be a boolean",
     "selector_mode_type": "selector_mode must be a boolean",
+    "segment_borders_type": "segment_borders must be a boolean",
+    "pegs_type": "pegs must be a boolean",
+    "peg_density_range": "peg_density must be an integer between 0 and 4",
+    "wheel_context_type": "wheel_context must be a boolean",
     "result_entity_type": "result_entity must be a string",
     "result_entity_invalid": "result_entity must be an input_text.* entity_id"
   }

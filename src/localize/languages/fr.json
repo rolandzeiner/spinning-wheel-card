@@ -6,6 +6,10 @@
     "idle_selector": "Faites glisser la roue pour sélectionner",
     "todo_empty": "Aucun élément ouvert dans la liste de tâches"
   },
+  "a11y": {
+    "wheel_role": "roue de la fortune",
+    "wheel_label": "Faire tourner la roue"
+  },
   "confirm": {
     "run_action": "Exécuter « {action} » pour « {value} » ?"
   },
@@ -38,6 +42,10 @@
     "disable_boost": "Désactiver le boost au clic",
     "half_circle": "Mode demi-cercle",
     "selector_mode": "Mode sélecteur",
+    "segment_borders": "Bordures de segment",
+    "pegs": "Picots de bord",
+    "peg_density": "Picots par segment",
+    "wheel_context": "Envoyer le contexte du segment aux actions",
     "result_entity": "Helper de résultat",
     "result_entity_create": "Créer un helper dédié",
     "result_entity_create_hint": "Créez un helper input_text dédié. La roue y inscrit l'étiquette gagnante après chaque tour, pour que les automatisations HA puissent se déclencher sur `platform: state, entity_id: …`.",
@@ -51,10 +59,11 @@
     "binding_weight": "Poids (taille relative de la part)",
     "binding_action": "Action",
     "advanced": "Avancé (tableaux bruts)",
-    "language_helper": "Remplace la langue d'affichage détectée. Auto suit votre profil HA (langue du navigateur en repli).",
+    "language_helper": "Remplace la langue d'affichage détectée.",
     "todo_entity_helper": "Lorsque défini, les segments de la roue proviennent des éléments ouverts de cette liste de tâches (max 24). Segments et Étiquettes sont ignorés tant que c'est connecté.",
+    "todo_entity_empty_warning": "⚠ Cette liste de tâches n'a aucun élément ouvert pour le moment — la roue restera vide jusqu'à l'ajout d'un élément.",
     "segments_helper": "En combien de parts la roue est divisée. 4 à 24.",
-    "friction_helper": "Vitesse à laquelle la roue ralentit après un tour ou un lâcher.",
+    "friction_helper": "Amortissement de la roue, 1–10. 1 = tour long et tranquille, 5 = classique (défaut), 10 = s'arrête vite. Met aussi à l'échelle le freinage par picot quand les Picots de bord sont activés.",
     "theme_helper": "Palette de couleurs intégrée utilisée quand Couleurs est vide. Les Couleurs personnalisées prennent toujours le dessus.",
     "theme_default": "Par défaut — palette intégrée à 8 couleurs",
     "theme_pastel": "Pastel — tons doux et peu saturés",
@@ -77,11 +86,12 @@
     "disable_boost_helper": "Désactivé (par défaut) — cliquer pendant la rotation ajoute une nouvelle impulsion ; une rafale de clics peut maintenir la roue en mouvement. Activé — les clics pendant la rotation sont ignorés. Utile pour les tableaux de bord pour enfants. Le glisser-lancer reste inchangé.",
     "half_circle_helper": "Affiche uniquement la moitié supérieure de la roue en forme de dôme — pointeur en haut, moyeu en bas au centre. La physique de rotation reste inchangée.",
     "selector_mode_helper": "Faites glisser la roue pour aligner un segment avec l'indicateur ; au relâchement, l'action correspondante se déclenche. Pas de rotation, pas d'inertie, pas de clic-pour-tourner ; le texte du moyeu est masqué. Remplace « Désactiver le boost au clic ».",
+    "segment_borders_helper": "Affiche une fine ligne blanche entre les segments adjacents. Désactivé pour un rendu plus plat et sans liseré.",
+    "pegs_helper": "Garnit le bord de petits picots, comme sur une vraie roue de la fortune. Chaque picot freine la roue d'un petit cran lorsqu'il passe devant l'indicateur. Le son du clic est contrôlé séparément via « Son du clic ».",
+    "peg_density_helper": "Picots supplémentaires à l'intérieur de chaque segment, en plus du picot à la limite. 0 = uniquement les limites ; 1 = limite + 1 au milieu (par défaut) ; 4 = densément garni. Plus de picots = plus de clics et de freinage total par rotation.",
+    "wheel_context_helper": "Quand activé, chaque action déclenchée reçoit le segment gagnant fusionné dans son payload `data` : `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`. Un seul script générique lisant ces champs peut alors traiter tous les segments. Les clés data fournies par l'utilisateur ont la priorité sur celles injectées automatiquement.",
     "result_entity_helper": "Helper `input_text.*` optionnel qui reçoit l'étiquette gagnante après chaque tour. Déclenche les automatisations sur `platform: state, entity_id: …`. Cliquez sur « Créer un helper dédié » ci-dessous (admin uniquement) pour en créer un — chaque tour l'écrase.",
     "advanced_helper": "Tableaux bruts pour coller depuis YAML, mots-clés CSS, `var(--…)` ou objets Lovelace ActionConfig complets. Les modifications dans Liaisons de segments ci-dessus restent synchronisées.",
-    "friction_low": "Faible — tours longs et tranquilles",
-    "friction_medium": "Moyen — classique",
-    "friction_high": "Fort — s'arrête vite",
     "orientation_tangent": "Tangent — étiquettes autour du bord",
     "orientation_radial": "Radial — étiquettes le long des rayons",
     "footer_hint": "Cliquez pour une rotation à impulsion aléatoire, ou cliquez-glissez pour lancer — la vitesse au lâcher détermine la rotation. Le frottement la fait ralentir jusqu'à l'arrêt."
@@ -91,7 +101,7 @@
     "name_type": "name doit être une chaîne",
     "language_type": "language doit être une chaîne",
     "segments_range": "segments doit être un entier entre 4 et 24",
-    "friction_value": "friction doit être low, medium ou high",
+    "friction_range": "friction doit être un entier entre 1 et 10 (ou un des anciens préréglages : low, medium, high)",
     "labels_type": "labels doit être un tableau de chaînes",
     "labels_length": "la longueur de labels ({len}) ne doit pas dépasser segments ({segments})",
     "weights_type": "weights doit être un tableau de nombres positifs",
@@ -118,6 +128,10 @@
     "disable_boost_type": "disable_boost doit être un booléen",
     "half_circle_type": "half_circle doit être un booléen",
     "selector_mode_type": "selector_mode doit être un booléen",
+    "segment_borders_type": "segment_borders doit être un booléen",
+    "pegs_type": "pegs doit être un booléen",
+    "peg_density_range": "peg_density doit être un entier entre 0 et 4",
+    "wheel_context_type": "wheel_context doit être un booléen",
     "result_entity_type": "result_entity doit être une chaîne",
     "result_entity_invalid": "result_entity doit être une entity_id input_text.*"
   }

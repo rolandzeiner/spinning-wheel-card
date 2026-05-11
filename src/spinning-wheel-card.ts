@@ -1,11 +1,10 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { property, state } from "lit/decorators.js";
 
 import type {
   ActionConfig,
   ConfirmationConfig,
-  Friction,
   HomeAssistant,
   HubColor,
   LovelaceCardEditor,
@@ -13,6 +12,7 @@ import type {
   TextOrientation,
   TodoItem,
 } from "./types";
+import { frictionMultiplier, normalizeFriction } from "./friction";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
@@ -61,12 +61,6 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
  *  "dial nub" + HALF_BOTTOM_PAD_FRAC breathing room. */
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
-// Per-frame velocity multiplier at 60 fps. Lower = faster decay.
-const FRICTION: Record<Friction, number> = {
-  low: 0.995,    // ~6 s to drop to 10 % of initial ω
-  medium: 0.99,  // ~4 s
-  high: 0.98,    // ~2 s
-};
 
 const STOP_THRESHOLD_RAD_PER_S = 0.05;
 const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
@@ -76,12 +70,75 @@ const MAX_VELOCITY_RAD_PER_S = 40;
 
 const TWO_PI = Math.PI * 2;
 
-/** Wrap to [0, 2π). `%` on multi-billion-radian doubles drifts. */
-const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI;
+/** Wrap to [0, 2π). `%` on multi-billion-radian doubles drifts.
+ *  Exported for unit tests. */
+export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI;
+
+/** Pure parser for `#RRGGBB`, `#RGB`, `rgb(r,g,b)`, `rgba(r,g,b,a)`.
+ *  Returns null for anything else (named colours, hsl(), CSS vars).
+ *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
+export const cssToRgbTriple = (
+  css: string,
+): readonly [number, number, number] | null => {
+  const s = css.trim();
+  if (s.startsWith("#")) {
+    if (s.length === 7) {
+      const r = parseInt(s.slice(1, 3), 16);
+      const g = parseInt(s.slice(3, 5), 16);
+      const b = parseInt(s.slice(5, 7), 16);
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b];
+      }
+    }
+    if (s.length === 4) {
+      const r = parseInt(s[1]!.repeat(2), 16);
+      const g = parseInt(s[2]!.repeat(2), 16);
+      const b = parseInt(s[3]!.repeat(2), 16);
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b];
+      }
+    }
+    return null;
+  }
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) {
+    return [parseInt(m[1]!, 10), parseInt(m[2]!, 10), parseInt(m[3]!, 10)];
+  }
+  return null;
+};
 
 const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
 const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
 const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
+
+/** Per-segment-crossing brake bump at slider level 5 (the new default).
+ *  `_pegDrag()` scales linearly with the 1–10 friction slider so light
+ *  setups (level 1) get ~0.016 rad/s per peg, heavy setups (level 10)
+ *  get ~0.16. Capped at zero in the use-site so the brake can't reverse
+ *  the spin direction. Composes with the continuous friction decay;
+ *  one slider drives both. */
+const PEG_DRAG_RAD_PER_S = 0.08;
+
+/** Peg centre placement as a fraction of the wheel `radius` (the outer
+ *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
+ *  smaller pulls it inward. 0.96 nudges them visibly into the disc
+ *  while still clearly belonging to the rim band. */
+const PEG_RADIUS_FRAC = 0.96;
+
+/** Peg dot pixel radius at the calibration wheel size (DEFAULT_SIZE).
+ *  Scales linearly with the actual wheel size at draw time, with a
+ *  2 px hard floor so MIN_SIZE wheels still render visible pegs.
+ *  Shared by `_draw` (paint) and `_computeOffPegPlan` (deadzone) so
+ *  the visual peg and its angular footprint stay in sync. */
+const PEG_SIZE_PX_AT_DEFAULT = 2.5;
+
+/** Maximum probability of "back-roll" when the wheel stops dead-on a
+ *  peg — the simulated outcome of the peg almost blocking the spin so
+ *  the wheel rolled back against its approach direction. Probability
+ *  scales linearly with how close the indicator stopped to the peg
+ *  centre (peg centre → max, deadzone edge → 0). 0.5 = true 50/50 at
+ *  dead-on; 0 disables back-roll entirely (always natural direction). */
+const PEG_BACKROLL_MAX_PROB = 0.5;
 
 /** Drag-vs-click threshold (~3 px on a 280 px wheel). */
 const DRAG_COMMIT_RAD = 0.04;
@@ -101,7 +158,7 @@ export class SpinningWheelCard extends LitElement {
   public static getStubConfig(): Record<string, unknown> {
     // Omit `name` — render() falls back to localised default so the
     // header tracks the user's language without baking a string into YAML.
-    return { segments: 8, friction: "medium" };
+    return { segments: 8, friction: 5 };
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -164,11 +221,18 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.segments_range", lang));
       }
     }
-    if (
-      config.friction !== undefined &&
-      !["low", "medium", "high"].includes(config.friction)
-    ) {
-      throw new Error(localize("errors.friction_value", lang));
+    if (config.friction !== undefined) {
+      const f = config.friction;
+      const isPreset =
+        typeof f === "string" && ["low", "medium", "high"].includes(f);
+      const isLevel =
+        typeof f === "number" &&
+        Number.isInteger(f) &&
+        f >= 1 &&
+        f <= 10;
+      if (!isPreset && !isLevel) {
+        throw new Error(localize("errors.friction_range", lang));
+      }
     }
     const segments = config.segments ?? 8;
     if (config.labels !== undefined) {
@@ -211,7 +275,11 @@ export class SpinningWheelCard extends LitElement {
     if (config.colors !== undefined) {
       if (
         !Array.isArray(config.colors) ||
-        !config.colors.every((c) => typeof c === "string" && c.length > 0)
+        // null entries are theme-passthrough sentinels — only reject
+        // entries that are neither null nor a non-empty string.
+        !config.colors.every(
+          (c) => c === null || (typeof c === "string" && c.length > 0),
+        )
       ) {
         throw new Error(localize("errors.colors_type", lang));
       }
@@ -231,7 +299,7 @@ export class SpinningWheelCard extends LitElement {
       if (
         !Array.isArray(config.label_colors) ||
         !config.label_colors.every(
-          (c) => typeof c === "string" && c.length > 0,
+          (c) => c === null || (typeof c === "string" && c.length > 0),
         )
       ) {
         throw new Error(localize("errors.label_colors_type", lang));
@@ -342,6 +410,31 @@ export class SpinningWheelCard extends LitElement {
     ) {
       throw new Error(localize("errors.selector_mode_type", lang));
     }
+    if (
+      config.segment_borders !== undefined &&
+      typeof config.segment_borders !== "boolean"
+    ) {
+      throw new Error(localize("errors.segment_borders_type", lang));
+    }
+    if (config.pegs !== undefined && typeof config.pegs !== "boolean") {
+      throw new Error(localize("errors.pegs_type", lang));
+    }
+    if (config.peg_density !== undefined) {
+      if (
+        typeof config.peg_density !== "number" ||
+        !Number.isInteger(config.peg_density) ||
+        config.peg_density < 0 ||
+        config.peg_density > 4
+      ) {
+        throw new Error(localize("errors.peg_density_range", lang));
+      }
+    }
+    if (
+      config.wheel_context !== undefined &&
+      typeof config.wheel_context !== "boolean"
+    ) {
+      throw new Error(localize("errors.wheel_context_type", lang));
+    }
     if (config.result_entity !== undefined) {
       if (typeof config.result_entity !== "string") {
         throw new Error(localize("errors.result_entity_type", lang));
@@ -361,7 +454,20 @@ export class SpinningWheelCard extends LitElement {
       this._todoItems = null;
       this._todoLastEntityState = null;
     }
+    // Pegs toggle and density slider both change the tick index space
+    // ((density+1)*N intervals when on, N segments when off). Reset the
+    // baseline so the next crossing detection re-seeds in the new
+    // scale instead of comparing across scales (would fire a spurious
+    // click on the next frame).
+    const prevPegsOn = this.config.pegs ?? false;
+    const nextPegsOn = config.pegs ?? false;
+    const prevDensity = this.config.peg_density ?? 1;
+    const nextDensity = config.peg_density ?? 1;
+    if (prevPegsOn !== nextPegsOn || prevDensity !== nextDensity) {
+      this._lastTickSeg = -1;
+    }
     this.config = { ...config };
+    this._invalidateThemeCache();
     this._result = null;
   }
 
@@ -412,9 +518,13 @@ export class SpinningWheelCard extends LitElement {
     max_rows?: number;
   } {
     if (this._isHalfMode()) {
+      // Dome aspect ≈ 0.58, so for cols=6 (~180 px) the dome wants
+      // ~104 px canvas + 32 px padding + 8 px gap + 22 px status =
+      // ~166 px total. rows:3 (~176 px @ 56 px/row + gaps) fits with
+      // a little slack; rows:4 left visible empty space.
       return {
         columns: 6,
-        rows: 4,
+        rows: 3,
         min_columns: 4,
         min_rows: 2,
       };
@@ -443,8 +553,22 @@ export class SpinningWheelCard extends LitElement {
     }
     return this.config.segments ?? 8;
   }
+  /** Resolved 1–10 slider level for the current config, with pre-v1.2
+   *  string presets transparently aliased. */
+  private _frictionLevel(): number {
+    return normalizeFriction(this.config.friction);
+  }
+
   private _frictionFactor(): number {
-    return FRICTION[this.config.friction ?? "medium"];
+    return frictionMultiplier(this._frictionLevel());
+  }
+
+  /** Per-peg brake bump in rad/s. Scaled by the same 1–10 friction
+   *  slider so one knob controls both the continuous decay and the
+   *  per-peg bump — 5 (default) reproduces the historical 0.08 value
+   *  exactly, 1 gives a feather-touch, 10 a heavy ratchet. */
+  private _pegDrag(): number {
+    return PEG_DRAG_RAD_PER_S * (this._frictionLevel() / 5);
   }
   /** Labels expanded to length = segments; cycles short arrays;
    *  defaults to "1".."N". */
@@ -504,21 +628,60 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** Per-segment label-text colour. Same unique-label rule as
-   *  `_segmentColors`; defaults to dark grey for every segment. */
+   *  `_segmentColors`. When the user hasn't set `label_colors`, AUTO-
+   *  picks black or white per segment via WCAG relative luminance
+   *  against the segment's fill — so a dark navy slice gets white
+   *  text, a pastel slice keeps black, etc. Otherwise default
+   *  palettes silently violated WCAG 1.4.3 contrast. Any per-slot
+   *  `null` in `label_colors` also falls through to auto-contrast. */
   private _segmentLabelColors(): ReadonlyArray<string> {
-    return this._mapPaletteToLabels(this.config.label_colors, [
-      DEFAULT_LABEL_COLOR,
-    ]);
+    const custom = this.config.label_colors;
+    const hasAnyCustom =
+      Array.isArray(custom) &&
+      custom.some(
+        (c) => typeof c === "string" && c.length > 0,
+      );
+    const fills = this._segmentColors();
+    const autoFallback = fills.map((fill) => {
+      const rgb = cssToRgbTriple(fill);
+      if (rgb === null) return DEFAULT_LABEL_COLOR;
+      return this._isLight([rgb[0], rgb[1], rgb[2]]) ? "#1a1a1a" : "#ffffff";
+    });
+    if (!hasAnyCustom) return autoFallback;
+    // User set at least one entry. Per-segment merge: explicit value
+    // wins; null / empty fall through to auto-contrast at that index.
+    const labels = this._expandedLabels();
+    const map = new Map<string, string>();
+    let assigned = 0;
+    const out: string[] = new Array(labels.length);
+    for (let i = 0; i < labels.length; i++) {
+      const lbl = labels[i] ?? "";
+      let c = map.get(lbl);
+      if (c === undefined) {
+        const candidate = custom?.[assigned % custom.length];
+        c =
+          typeof candidate === "string" && candidate.length > 0
+            ? candidate
+            : (autoFallback[i] ?? DEFAULT_LABEL_COLOR);
+        map.set(lbl, c);
+        assigned += 1;
+      }
+      out[i] = c;
+    }
+    return out;
   }
 
-  /** Palette cycled across unique labels in order of first appearance;
-   *  falls back to `defaults` when the user palette is empty. */
+  /** Palette cycled across unique labels in order of first appearance.
+   *  When the user palette is empty, falls back to `defaults` entirely.
+   *  When a per-position entry in `custom` is `null` (or empty), THAT
+   *  position falls through to the theme `defaults` at the same index
+   *  — explicit colours stay user-set; nulls track the active theme. */
   private _mapPaletteToLabels(
-    custom: ReadonlyArray<string> | undefined,
+    custom: ReadonlyArray<string | null> | undefined,
     defaults: ReadonlyArray<string>,
   ): ReadonlyArray<string> {
     const labels = this._expandedLabels();
-    const palette: ReadonlyArray<string> =
+    const palette: ReadonlyArray<string | null> =
       custom && custom.length > 0 ? custom : defaults;
     const map = new Map<string, string>();
     let assigned = 0;
@@ -527,7 +690,13 @@ export class SpinningWheelCard extends LitElement {
       const lbl = labels[i] ?? "";
       let c = map.get(lbl);
       if (c === undefined) {
-        c = palette[assigned % palette.length] ?? defaults[0] ?? "#888";
+        const candidate = palette[assigned % palette.length];
+        c =
+          typeof candidate === "string" && candidate.length > 0
+            ? candidate
+            : (defaults[assigned % defaults.length] ??
+              defaults[0] ??
+              "#888");
         map.set(lbl, c);
         assigned += 1;
       }
@@ -620,8 +789,14 @@ export class SpinningWheelCard extends LitElement {
 
   /** Hand-rolled Lovelace ActionConfig dispatcher (avoids the
    *  `custom-card-helpers` dep). Accepts both `call-service` /
-   *  `service` and the modern `perform-action` / `perform_action`. */
-  private async _dispatchAction(cfg: ActionConfig): Promise<void> {
+   *  `service` and the modern `perform-action` / `perform_action`.
+   *  When `context` is supplied (wheel_context mode), its keys are
+   *  merged into the service `data` payload — user-supplied data
+   *  keys override the auto-injected ones so explicit config wins. */
+  private async _dispatchAction(
+    cfg: ActionConfig,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.hass) return;
     if (cfg.action === "none") return;
     if (!(await this._confirmAction(cfg))) return;
@@ -635,10 +810,12 @@ export class SpinningWheelCard extends LitElement {
         if (dot <= 0 || dot === svc.length - 1) return;
         const domain = svc.slice(0, dot);
         const name = svc.slice(dot + 1);
-        const data =
+        const userData =
           cfg.action === "call-service"
             ? (cfg.data ?? cfg.service_data ?? {})
             : (cfg.data ?? {});
+        const data =
+          context !== undefined ? { ...context, ...userData } : userData;
         const target = "target" in cfg ? cfg.target : undefined;
         await this.hass.callService?.(domain, name, data, target);
         return;
@@ -737,16 +914,32 @@ export class SpinningWheelCard extends LitElement {
   }
 
   protected override firstUpdated(_changed: PropertyValues): void {
+    this._attachResizeObserver();
+    this._draw();
+  }
+
+  /** Lit fires `connectedCallback` again whenever HA moves the card
+   *  across the DOM tree (tab switch, section-view rearrange, dialog
+   *  open/close). `firstUpdated` only runs once per element lifetime,
+   *  so without a re-attach here the ResizeObserver disconnected in
+   *  `disconnectedCallback` never comes back and the canvas freezes
+   *  at its pre-detach size. */
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    if (this._resizeObserver === null && this.shadowRoot !== null) {
+      this._attachResizeObserver();
+      this._draw();
+    }
+  }
+
+  private _attachResizeObserver(): void {
     const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
       | HTMLElement
       | null;
     const c = this.shadowRoot?.getElementById("wheel") as
       | HTMLCanvasElement
       | null;
-    if (!wrap || !c) {
-      this._draw();
-      return;
-    }
+    if (!wrap || !c) return;
     // Seed from layout if resolved; observer's first delivery fixes
     // it within a frame either way.
     const rect = wrap.getBoundingClientRect();
@@ -773,7 +966,6 @@ export class SpinningWheelCard extends LitElement {
     // Observe the wrap, not the canvas — observing the canvas would
     // create a no-op feedback loop (we drive its CSS box ourselves).
     this._resizeObserver.observe(wrap);
-    this._draw();
   }
 
   /** Effective diameter from a container box. Square mode: min(w, h).
@@ -797,6 +989,191 @@ export class SpinningWheelCard extends LitElement {
 
   private _isSelectorMode(): boolean {
     return this.config.selector_mode === true;
+  }
+
+  private _pegsEnabled(): boolean {
+    return this.config.pegs === true;
+  }
+
+  private _wheelContextEnabled(): boolean {
+    return this.config.wheel_context === true;
+  }
+
+  /** Class shim around the module-level `cssToRgbTriple` — kept so any
+   *  existing `this._cssToRgbTriple(...)` call sites stay valid. */
+  private _cssToRgbTriple(
+    css: string,
+  ): readonly [number, number, number] | null {
+    return cssToRgbTriple(css);
+  }
+
+  /** Build the auto-injected payload merged into action `data` when
+   *  `wheel_context: true`. Lets a single generic script branch on
+   *  `wheel_label` / `wheel_color` instead of one script per segment. */
+  private _buildWheelContext(idx: number): Record<string, unknown> {
+    const labels = this._expandedLabels();
+    const colors = this._segmentColors();
+    const labelColors = this._segmentLabelColors();
+    const label = labels[idx] ?? "";
+    const color = colors[idx] ?? "";
+    const labelColor = labelColors[idx] ?? "";
+    const ctx: Record<string, unknown> = {
+      wheel_index: idx,
+      wheel_label: label,
+      wheel_color: color,
+      wheel_label_color: labelColor,
+    };
+    const colorRgb = this._cssToRgbTriple(color);
+    if (colorRgb !== null) ctx.wheel_color_rgb = colorRgb;
+    const labelColorRgb = this._cssToRgbTriple(labelColor);
+    if (labelColorRgb !== null) ctx.wheel_label_color_rgb = labelColorRgb;
+    return ctx;
+  }
+
+  /** Pure: nearest-peg search for the off-peg nudge. Returns the peg
+   *  the indicator stopped on (within deadzone), the direction the
+   *  indicator was naturally on (wheel coming-from side), and how
+   *  close to the peg centre the stop was (proximity ∈ [0, 1] —
+   *  1 = dead-on, 0 = at deadzone edge). `_finalizeStop` decides
+   *  whether to nudge in the natural direction or simulate a back-
+   *  roll (peg blocked the spin) using the proximity. Returns null
+   *  when pegs are off, no peg sits within the deadzone, or there
+   *  are no arcs. */
+  private _computeOffPegPlan(angle: number): {
+    pegAngle: number;
+    naturalSign: 1 | -1;
+    proximity: number;
+    a0: number;
+    deadzone: number;
+  } | null {
+    if (!this._pegsEnabled()) return null;
+    const arcs = this._arcs();
+    const n = arcs.length;
+    if (n === 0) return null;
+    const a0 = arcs[0] ?? TWO_PI / n;
+    const target = wrapAngle(-angle + a0 / 2);
+    const totalPegs = this._pegsPerSegment() * n;
+    const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
+    const pegPx = Math.max(
+      2,
+      (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
+    );
+    // 1.5 × angular half-width — clears the peg's pixel footprint
+    // with a small breathing buffer. Scales with wheel size.
+    const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
+
+    // Pegs are evenly spaced around the rim (so weighted wheels still
+    // show uniform pegs), so closed-form snap to the nearest one
+    // instead of iterating arcs.
+    const pegStep = TWO_PI / totalPegs;
+    const nearestIdx = Math.round(target / pegStep);
+    const nearestAngle = wrapAngle(nearestIdx * pegStep);
+    let signed = target - nearestAngle;
+    if (signed > Math.PI) signed -= TWO_PI;
+    else if (signed <= -Math.PI) signed += TWO_PI;
+    const nearestAbs = Math.abs(signed);
+
+    if (nearestAbs >= deadzone) return null;
+    return {
+      pegAngle: nearestAngle,
+      naturalSign: signed >= 0 ? 1 : -1,
+      proximity: 1 - nearestAbs / deadzone,
+      a0,
+      deadzone,
+    };
+  }
+
+  /** Final stop sequence — runs after the spin physics have settled
+   *  below STOP_THRESHOLD. In pegs mode, if the indicator is sitting
+   *  on a peg, ease the wheel off it over ~220 ms (smooth path) so
+   *  the resolution doesn't look like an instant snap. The reduced-
+   *  motion path skips the tween and applies the nudge instantly per
+   *  WCAG 2.3.3. Either way, the direction may flip back against the
+   *  natural side with `proximity * PEG_BACKROLL_MAX_PROB` chance —
+   *  simulates the peg "blocking" a borderline spin so the wheel
+   *  rolls back. After settle the result is announced. */
+  private _finalizeStop(smooth: boolean): void {
+    const plan = this._computeOffPegPlan(this._angle);
+    if (plan === null) {
+      this._spinning = false;
+      this._rafId = null;
+      this._lastTickSeg = -1;
+      this._announceResult();
+      this._draw();
+      return;
+    }
+    const backRollProb = plan.proximity * PEG_BACKROLL_MAX_PROB;
+    const flip = Math.random() < backRollProb;
+    const sign = (flip ? -plan.naturalSign : plan.naturalSign) as 1 | -1;
+    const newTarget = wrapAngle(plan.pegAngle + sign * plan.deadzone);
+    const targetAngle = wrapAngle(plan.a0 / 2 - newTarget);
+    if (smooth) {
+      this._startSettleTween(targetAngle);
+      return;
+    }
+    this._angle = targetAngle;
+    this._spinning = false;
+    this._rafId = null;
+    this._lastTickSeg = -1;
+    this._announceResult();
+    this._draw();
+  }
+
+  /** RAF tween: ease `_angle` from current to `targetAngle` over ~220 ms
+   *  with cubic ease-out. `_spinning` stays true during the tween (the
+   *  status line keeps reading "Spinning…" so the result announcement
+   *  doesn't flash before the wheel actually rests). Cancellable via
+   *  `_cancelSettleTween` when a fresh click claims the RAF slot. */
+  private _startSettleTween(targetAngle: number): void {
+    const startAngle = this._angle;
+    let delta = targetAngle - startAngle;
+    if (delta > Math.PI) delta -= TWO_PI;
+    else if (delta < -Math.PI) delta += TWO_PI;
+    const startMs = performance.now();
+    const durMs = 220;
+    const tween = (now: number): void => {
+      if (!this.isConnected) {
+        this._rafId = null;
+        return;
+      }
+      const t = Math.min(1, (now - startMs) / durMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this._angle = wrapAngle(startAngle + delta * eased);
+      this._draw();
+      if (t < 1) {
+        this._rafId = window.requestAnimationFrame(tween);
+        return;
+      }
+      this._rafId = null;
+      this._spinning = false;
+      this._lastTickSeg = -1;
+      this._announceResult();
+    };
+    this._rafId = window.requestAnimationFrame(tween);
+  }
+
+  /** Cancel an in-progress settle tween before kicking off a fresh
+   *  spin from rest. The tween holds the RAF slot while `_omega === 0`
+   *  — without this, a click during the settle would set _omega but
+   *  the `_rafId === null` guard in `_onPointerUp` / `_onKeyDown`
+   *  blocks the new `_startAnim()` call. */
+  private _cancelSettleTween(): void {
+    if (this._rafId !== null && this._omega === 0) {
+      window.cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+      this._spinning = false;
+    }
+  }
+
+  /** Pegs per segment when `pegs` is on: 1 boundary + N mid pegs. The
+   *  mid count is the `peg_density` slider (0–4, default 1). Returns 1
+   *  when pegs are off (callers gate on `_pegsEnabled` first; this is
+   *  defensive). */
+  private _pegsPerSegment(): number {
+    if (!this._pegsEnabled()) return 1;
+    const d = this.config.peg_density;
+    const density = typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 4 ? d : 1;
+    return density + 1;
   }
 
   private _canvasCssHeight(): number {
@@ -843,6 +1220,21 @@ export class SpinningWheelCard extends LitElement {
     return Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(w)));
   }
 
+  private _resolvedThemeCache: {
+    indicatorFill: string;
+    hubLight: string;
+    hubDark: string;
+    hubText: string;
+    hubStroke: string;
+  } | null = null;
+
+  /** Drop the resolved-theme cache. Called from `updated()` on dark-mode
+   *  / theme-name / hub_color changes and from setConfig — anywhere
+   *  the CSS-var read in `_resolveTheme` could shift. */
+  private _invalidateThemeCache(): void {
+    this._resolvedThemeCache = null;
+  }
+
   private _resolveTheme(ctx: CanvasRenderingContext2D): {
     indicatorFill: string;
     hubLight: string;
@@ -850,6 +1242,7 @@ export class SpinningWheelCard extends LitElement {
     hubText: string;
     hubStroke: string;
   } {
+    if (this._resolvedThemeCache !== null) return this._resolvedThemeCache;
     const cs = getComputedStyle(this);
     const dividerColor =
       cs.getPropertyValue("--divider-color").trim() ||
@@ -860,23 +1253,25 @@ export class SpinningWheelCard extends LitElement {
     if (choice === "black") {
       // Subtle gradient (dark grey highlight → black edge) so the hub
       // reads as a button rather than a flat disc.
-      return {
+      this._resolvedThemeCache = {
         indicatorFill: "#000000",
         hubLight: "#3a3a3a",
         hubDark: "#000000",
         hubText: "#ffffff",
         hubStroke: dividerColor,
       };
+      return this._resolvedThemeCache;
     }
 
     if (choice === "white") {
-      return {
+      this._resolvedThemeCache = {
         indicatorFill: "#ffffff",
         hubLight: "#ffffff",
         hubDark: "#cccccc",
         hubText: "#000000",
         hubStroke: dividerColor,
       };
+      return this._resolvedThemeCache;
     }
 
     // Theme accent — indicator + hub use --primary-color; hub label
@@ -884,13 +1279,14 @@ export class SpinningWheelCard extends LitElement {
     const primary =
       cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
     const rgb = this._cssColorToRgb(primary, ctx);
-    return {
+    this._resolvedThemeCache = {
       indicatorFill: primary,
       hubLight: this._adjustLightness(rgb, 0.18),
       hubDark: this._adjustLightness(rgb, -0.18),
       hubText: this._isLight(rgb) ? "#0a0a0a" : "#ffffff",
       hubStroke: dividerColor,
     };
+    return this._resolvedThemeCache;
   }
 
   /** CSS colour → [r, g, b] via the canvas fillStyle round-trip. */
@@ -1082,15 +1478,16 @@ export class SpinningWheelCard extends LitElement {
     ) {
       this._angle = wrapAngle(this._angle + this._omega * 1.5);
       this._omega = 0;
-      this._spinning = false;
-      this._lastTickSeg = -1;
-      this._announceResult();
-      this._draw();
+      this._finalizeStop(false);
       return;
     }
     this._lastFrameMs = performance.now();
-    // Baseline — so the first frame doesn't tick spuriously.
-    this._lastTickSeg = this._segmentIndexUnderPointer();
+    // Baseline — so the first frame doesn't tick spuriously. Match the
+    // index space `_onSegmentCrossing` will use (2N peg intervals when
+    // pegs on, N segment intervals otherwise).
+    this._lastTickSeg = this._pegsEnabled()
+      ? this._pegIntervalIndex()
+      : this._segmentIndexUnderPointer();
     const tick = (now: number): void => {
       const dt = Math.min(0.05, (now - this._lastFrameMs) / 1000);
       this._lastFrameMs = now;
@@ -1114,16 +1511,14 @@ export class SpinningWheelCard extends LitElement {
           1 - overshoot * (1 - TICK_HIGH_SPEED_FLOOR),
         );
       }
-      this._maybeTick(intensity);
+      this._onSegmentCrossing(intensity);
 
       this._draw();
 
       if (Math.abs(this._omega) < STOP_THRESHOLD_RAD_PER_S) {
         this._omega = 0;
-        this._spinning = false;
         this._rafId = null;
-        this._lastTickSeg = -1;
-        this._announceResult();
+        this._finalizeStop(true);
         return;
       }
       this._rafId = window.requestAnimationFrame(tick);
@@ -1171,6 +1566,22 @@ export class SpinningWheelCard extends LitElement {
     return arcs.length - 1;
   }
 
+  /** Index of the peg interval under the indicator, 0..(K*N - 1) where
+   *  K = `_pegsPerSegment()`. Used by the audio + drag path when
+   *  `pegs: true` so every visible peg fires its own click and brake
+   *  bump. Pegs are spaced evenly around the rim (not subdivided per
+   *  segment) so weighted wheels also get uniform click cadence. */
+  private _pegIntervalIndex(): number {
+    const arcs = this._arcs();
+    const n = arcs.length;
+    if (n === 0) return 0;
+    const totalPegs = this._pegsPerSegment() * n;
+    const a0 = arcs[0] ?? TWO_PI / n;
+    const target = wrapAngle(-this._angle + a0 / 2);
+    const pegStep = TWO_PI / totalPegs;
+    return Math.floor(target / pegStep) % totalPegs;
+  }
+
   private _announceResult(): void {
     const labels = this._expandedLabels();
     const idx = this._segmentIndexUnderPointer();
@@ -1183,7 +1594,12 @@ export class SpinningWheelCard extends LitElement {
     // prompt can't double-fire.
     const actions = this._segmentActions();
     const action = actions[idx];
-    if (action) void this._dispatchAction(action);
+    if (action) {
+      const context = this._wheelContextEnabled()
+        ? this._buildWheelContext(idx)
+        : undefined;
+      void this._dispatchAction(action, context);
+    }
   }
 
   /** Write the winning label to `result_entity`. Truncates to 255
@@ -1202,11 +1618,6 @@ export class SpinningWheelCard extends LitElement {
         entity_id: entity,
         value,
       });
-      // Diagnostic for "the spin doesn't update my helper" — cheap,
-      // quiet for users who never open DevTools.
-      console.info(
-        `[spinning-wheel-card] result written: ${entity} = ${JSON.stringify(value)}`,
-      );
     } catch (err) {
       console.warn(
         "[spinning-wheel-card] input_text.set_value failed:",
@@ -1306,23 +1717,44 @@ export class SpinningWheelCard extends LitElement {
     src.stop(t0 + dur + 0.01);
   }
 
-  /** Tick on segment crossing, capped at TICK_RATE_LIMIT_MS. Cursor
-   *  advances even when rate-limited so the next crossing isn't spurious. */
-  private _maybeTick(intensity: number): void {
-    if (!this._soundEnabled()) {
+  /** Detect a peg or segment crossing and react: fire the audio click
+   *  (rate-limited to TICK_RATE_LIMIT_MS, gated on `sound`) and / or
+   *  apply the per-peg drag (gated on `pegs`). When `pegs: true` the
+   *  detector runs at 2N peg intervals so every visible peg (boundary
+   *  AND mid-segment) fires; otherwise it runs at N segment intervals
+   *  (the original v1.0 audio cadence). Detection runs unconditionally
+   *  so a `sound: false` + `pegs: true` user still gets the brake on
+   *  each peg. The cursor advances even when audio is rate-limited so
+   *  the next crossing isn't spurious. */
+  private _onSegmentCrossing(intensity: number): void {
+    const audioOn = this._soundEnabled();
+    const pegsOn = this._pegsEnabled();
+    if (!audioOn && !pegsOn) {
       this._lastTickSeg = -1;
       return;
     }
-    const cur = this._segmentIndexUnderPointer();
+    const cur = pegsOn
+      ? this._pegIntervalIndex()
+      : this._segmentIndexUnderPointer();
     if (this._lastTickSeg === -1) {
       this._lastTickSeg = cur;
       return;
     }
     if (cur === this._lastTickSeg) return;
-    const now = performance.now();
-    if (now - this._lastTickMs >= TICK_RATE_LIMIT_MS) {
-      this._playTick(intensity);
-      this._lastTickMs = now;
+    if (audioOn) {
+      const now = performance.now();
+      if (now - this._lastTickMs >= TICK_RATE_LIMIT_MS) {
+        this._playTick(intensity);
+        this._lastTickMs = now;
+      }
+    }
+    if (pegsOn) {
+      // Brake bump opposite to current motion. Capped at zero so
+      // an at-rest wheel doesn't reverse direction on residual ω.
+      const sign = this._omega >= 0 ? 1 : -1;
+      const next = this._omega - sign * this._pegDrag();
+      this._omega =
+        Math.sign(next) === sign || next === 0 ? next : 0;
     }
     this._lastTickSeg = cur;
   }
@@ -1368,9 +1800,13 @@ export class SpinningWheelCard extends LitElement {
           .catch(() => {});
       }
       // Only seed when RAF isn't running — otherwise the loop owns
-      // _lastTickSeg and reseeding would race the next tick.
+      // _lastTickSeg and reseeding would race the next tick. Same
+      // index-space split as `_onSegmentCrossing` (peg intervals when
+      // pegs on, segment intervals otherwise).
       if (this._rafId === null) {
-        this._lastTickSeg = this._segmentIndexUnderPointer();
+        this._lastTickSeg = this._pegsEnabled()
+          ? this._pegIntervalIndex()
+          : this._segmentIndexUnderPointer();
       }
     }
     (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
@@ -1392,6 +1828,11 @@ export class SpinningWheelCard extends LitElement {
       this._dragMoved = true;
       this._omega = 0;
       this._stopAnim();
+      // Drag commandeered a settle tween: the tween would have set
+      // _spinning=false at completion, but _stopAnim killed its RAF
+      // before that ran. Without this the status line says "Spinning…"
+      // forever despite the user actively dragging.
+      this._spinning = false;
       this._result = null;
     }
     this._dragLastAngle = a;
@@ -1414,7 +1855,7 @@ export class SpinningWheelCard extends LitElement {
       this._velocitySamples.shift();
     }
 
-    this._maybeTick(Math.min(1, Math.abs(delta) * 6));
+    this._onSegmentCrossing(Math.min(1, Math.abs(delta) * 6));
     this._draw();
   };
 
@@ -1451,7 +1892,9 @@ export class SpinningWheelCard extends LitElement {
               Math.min(MAX_VELOCITY_RAD_PER_S, next),
             );
           } else {
-            // Fresh start — random direction.
+            // Fresh start — random direction. Cancel any in-progress
+            // settle tween so the new spin can claim the RAF slot.
+            this._cancelSettleTween();
             const sign = Math.random() < 0.5 ? -1 : 1;
             this._omega = sign * mag;
             this._result = null;
@@ -1500,13 +1943,10 @@ export class SpinningWheelCard extends LitElement {
       this._startAnim();
     } else if (this._rafId === null) {
       // Drag-to-stop: _stopAnim ran on drag-commit but _spinning is
-      // still true. Snap to rest so the status line doesn't stay
-      // stuck on "Spinning…".
+      // still true. Run through _finalizeStop so any peg-stop is
+      // smoothly settled the same way as a natural friction stop.
       this._omega = 0;
-      this._spinning = false;
-      this._lastTickSeg = -1;
-      this._announceResult();
-      this._draw();
+      this._finalizeStop(true);
     }
   };
 
@@ -1557,6 +1997,9 @@ export class SpinningWheelCard extends LitElement {
         Math.min(MAX_VELOCITY_RAD_PER_S, next),
       );
     } else {
+      // Cancel any in-progress settle tween so the new spin can claim
+      // the RAF slot.
+      this._cancelSettleTween();
       const sign = Math.random() < 0.5 ? -1 : 1;
       this._omega = sign * mag;
       this._result = null;
@@ -1637,9 +2080,13 @@ export class SpinningWheelCard extends LitElement {
       ctx.closePath();
       ctx.fillStyle = colors[i] ?? "#888";
       ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "rgba(255,255,255,0.65)";
-      ctx.stroke();
+      // Per-segment separator stroke. Defaults on; opt out via
+      // `segment_borders: false` for a flatter look.
+      if (this.config.segment_borders !== false) {
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.65)";
+        ctx.stroke();
+      }
 
       // Below ~15° (≈ 4 %) there's no readable space.
       if (arc > 0.26) {
@@ -1771,6 +2218,38 @@ export class SpinningWheelCard extends LitElement {
     ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
     ctx.stroke();
 
+    // Rim pegs — opt-in. Total = K*N pegs (K = density + 1) spaced
+    // EVENLY around the rim so weighted wheels still get uniform peg
+    // distribution (real prize wheels have evenly-spaced posts
+    // regardless of slice colours). For equal-weight configs this
+    // collapses to the same positions as a per-segment layout. Painted
+    // AFTER the outer ring so light/white pegs don't pick up the grey
+    // ring tint; the half-circle clip handles the lower half. Colour
+    // matches the indicator/hub accent so the pegs read against any
+    // segment fill.
+    if (this._pegsEnabled()) {
+      const pegSize = Math.max(
+        2,
+        (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
+      );
+      const pegRadius = radius * PEG_RADIUS_FRAC;
+      const totalPegs = this._pegsPerSegment() * n;
+      const pegStep = TWO_PI / totalPegs;
+      ctx.fillStyle = theme.indicatorFill;
+      for (let i = 0; i < totalPegs; i++) {
+        const a = i * pegStep;
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(a) * pegRadius,
+          Math.sin(a) * pegRadius,
+          pegSize,
+          0,
+          TWO_PI,
+        );
+        ctx.fill();
+      }
+    }
+
     ctx.restore();
 
     // Release the upper-half clip so hub + pointer can paint below.
@@ -1887,6 +2366,7 @@ export class SpinningWheelCard extends LitElement {
       if (dark !== this._prevDarkMode || themeName !== this._prevTheme) {
         this._prevDarkMode = dark;
         this._prevTheme = themeName;
+        this._invalidateThemeCache();
         needsDraw = true;
       }
     }
@@ -1915,30 +2395,43 @@ export class SpinningWheelCard extends LitElement {
     const idleKey = this._isSelectorMode()
       ? "status.idle_selector"
       : "status.idle";
-    const status = this._spinning
+    // Plain-text status string — used for the canvas's aria-label so
+    // screen readers always hear a literal value (no "ha-icon" jargon).
+    const statusText = this._spinning
       ? localize("status.spinning", lang)
       : this._result !== null
         ? localize("status.result", lang, { value: this._result })
         : todoEmpty
           ? localize("status.todo_empty", lang)
           : localize(idleKey, lang);
+    // Rich status node — same content, but when the result is an MDI
+    // icon string the {value} slot renders <ha-icon> instead of bare
+    // text. Falls back to plain text for typed labels and the other
+    // statuses (spinning / idle / todo_empty).
+    const statusNode: TemplateResult | string =
+      !this._spinning && this._result !== null
+        ? this._renderResultLine(this._result, lang)
+        : statusText;
     // Empty / whitespace `name` hides ha-card's header — fresh installs
     // show a clean wheel until the user opts in.
     const header = this.config.name?.trim()
       ? this.config.name
       : undefined;
+    const halfMode = this._isHalfMode();
 
     return html`
       <ha-card .header=${header}>
         <div class="card-content">
-          <div class="wheel-wrap">
+          <div class=${halfMode ? "wheel-wrap wheel-wrap-half" : "wheel-wrap"}>
             <canvas
               id="wheel"
               width=${DEFAULT_SIZE}
               height=${DEFAULT_SIZE}
               role="img"
               tabindex="0"
-              aria-label=${status}
+              aria-roledescription=${localize("a11y.wheel_role", lang)}
+              aria-label=${localize("a11y.wheel_label", lang)}
+              aria-keyshortcuts="Space Enter"
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -1946,12 +2439,47 @@ export class SpinningWheelCard extends LitElement {
               @pointercancel=${this._onPointerCancel}
             ></canvas>
           </div>
-          ${this.config.show_status === false
-            ? nothing
-            : html`<div class="status" aria-live="polite">${status}</div>`}
+          <!-- Status row owns dynamic announcements. Canvas stays
+               static-labelled (role description + name) so AT users
+               aren't double-announced as the status changes mid-spin.
+               When show_status:false the status row is hidden visually
+               but kept in the DOM as a polite live region — disabling
+               the indicator is a layout choice, not an a11y choice. -->
+          <div
+            class=${this.config.show_status === false
+              ? "status status-sr-only"
+              : "status"}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            ${this.config.show_status === false ? statusText : statusNode}
+          </div>
         </div>
       </ha-card>
     `;
+  }
+
+  /** Render the "Result: X" line. When X is an MDI icon string
+   *  (`mdi:home`, `hass:foo`), substitute an inline `<ha-icon>` for the
+   *  bare text so the user sees the same glyph the wheel painted, not
+   *  the literal identifier. The aria-live region stays text-only via
+   *  the canvas's `aria-label` (= statusText), so screen readers
+   *  continue announcing the literal value. */
+  private _renderResultLine(result: string, lang: string): TemplateResult {
+    if (!this._looksLikeIcon(result)) {
+      return html`${localize("status.result", lang, { value: result })}`;
+    }
+    // Sentinel-split the localised template at the {value} placeholder
+    // so the icon can be inserted positionally without giving up i18n
+    // (some languages may put the value at a non-tail position).
+    const SENTINEL = " ";
+    const template = localize("status.result", lang, { value: SENTINEL });
+    const [prefix, suffix] = template.split(SENTINEL);
+    return html`${prefix ?? ""}<ha-icon
+        class="result-icon"
+        icon=${result}
+        title=${result}
+      ></ha-icon>${suffix ?? ""}`;
   }
 
   static override styles: CSSResultGroup = css`
@@ -1992,6 +2520,19 @@ export class SpinningWheelCard extends LitElement {
       align-items: center;
       justify-content: center;
     }
+    /* Half-circle: anchor the canvas to the bottom of the wrap so any
+       slack vertical space sits ABOVE the dome (not between the dome
+       and the status line). Status hugs the cut line. */
+    .wheel-wrap-half {
+      align-items: flex-end;
+    }
+    /* Inline MDI icon in the "Result: …" line when the winning label
+       is an icon string. Sized to the surrounding text; vertical
+       alignment left at the default baseline since the .status block
+       below now reserves a fixed 1.6em line-height for both states. */
+    .result-icon {
+      --mdc-icon-size: 1.15em;
+    }
     #wheel {
       display: block;
       max-width: 600px;
@@ -2014,8 +2555,26 @@ export class SpinningWheelCard extends LitElement {
       font-size: 0.875rem;
       font-variant-numeric: tabular-nums;
       color: var(--secondary-text-color);
-      min-height: 1.4em;
+      /* Fixed line-height + min-height reserves room for an inline
+         <ha-icon> in the result line so the wheel doesn't shift up
+         when the result flips from a text label to an MDI icon. */
+      line-height: 1.6;
+      min-height: 1.6em;
       flex-shrink: 0;
+    }
+    /* WCAG-recommended visually-hidden pattern. Keeps the live region
+       in the a11y tree (so screen readers get spin updates) when the
+       user opts out of the visible status line. */
+    .status-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* Windows High Contrast. */
