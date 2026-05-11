@@ -699,7 +699,15 @@ export class SpinningWheelCardEditor
     // 3. Labels — chip selector emits string[] directly. Trim each chip
     // and drop empties (paste of a trailing comma can leave one), clamp
     // to the wheel's segment count.
-    const segments = next.segments ?? STATIC_DEFAULTS.segments;
+    // No editor-side truncation against `segments`. Labels and every
+    // secondary array (weights / colors / label_colors / actions)
+    // stay at their full user-entered length. When `segments` drops
+    // below an array length, setConfig validation throws a clear
+    // "labels length (N) must not exceed segments (M)" error in the
+    // dashboard's red banner — fail-loud beats silent data loss, and
+    // the user can either raise segments back or trim the offending
+    // array themselves. Only label cleaning (trim + drop empties from
+    // a paste) runs here.
     const rawLabels = next.labels;
     if (Array.isArray(rawLabels)) {
       const cleaned = rawLabels
@@ -707,7 +715,7 @@ export class SpinningWheelCardEditor
         .map((l) => l.trim())
         .filter((l) => l.length > 0);
       if (cleaned.length === 0) delete next.labels;
-      else next.labels = cleaned.slice(0, segments);
+      else next.labels = cleaned;
     } else {
       delete next.labels;
     }
@@ -718,7 +726,7 @@ export class SpinningWheelCardEditor
     if (weightsCsvChanged) {
       const parsed = parseWeights(weightsCsv);
       if (parsed.length === 0) delete next.weights;
-      else next.weights = parsed.slice(0, segments);
+      else next.weights = parsed;
     } else {
       const wDeltas = Object.entries(bindingDeltas).filter(([k]) =>
         /^binding_\d+_weight$/.test(k),
@@ -752,7 +760,7 @@ export class SpinningWheelCardEditor
       if (parsed.length === 0 || parsed.every((c) => c === null)) {
         delete next.colors;
       } else {
-        next.colors = parsed.slice(0, segments);
+        next.colors = parsed;
       }
     } else {
       const colorDeltas = Object.entries(bindingDeltas).filter(
@@ -789,7 +797,7 @@ export class SpinningWheelCardEditor
       if (parsed.length === 0 || parsed.every((c) => c === null)) {
         delete next.label_colors;
       } else {
-        next.label_colors = parsed.slice(0, segments);
+        next.label_colors = parsed;
       }
     } else {
       const lcDeltas = Object.entries(bindingDeltas).filter(([k]) =>
@@ -877,6 +885,37 @@ export class SpinningWheelCardEditor
         // config from a fresh YAML setConfig.
         if (oldObjects.length > 0) next.actions = [...oldObjects];
         else delete next.actions;
+      }
+    }
+
+    // 6.5 Labels-shrink cascade. When the chip selector emits a shorter
+    // labels array than what was saved, trim every position-keyed
+    // secondary array (weights / colors / label_colors / actions) to
+    // the new labels length. The chip selector is the user's intent
+    // channel — deleting a chip implies its row's weight, colour and
+    // action are gone too. Without this, a stale weights[6] sticks
+    // around after labels drops to 4 and trips setConfig validation
+    // (labels.length is fine vs segments=4, but weights.length=6
+    // isn't).
+    const oldLabelsLen = Array.isArray(this._config.labels)
+      ? this._config.labels.length
+      : 0;
+    const newLabelsLen = Array.isArray(next.labels) ? next.labels.length : 0;
+    if (newLabelsLen > 0 && newLabelsLen < oldLabelsLen) {
+      if (Array.isArray(next.weights) && next.weights.length > newLabelsLen) {
+        next.weights = next.weights.slice(0, newLabelsLen);
+      }
+      if (Array.isArray(next.colors) && next.colors.length > newLabelsLen) {
+        next.colors = next.colors.slice(0, newLabelsLen);
+      }
+      if (
+        Array.isArray(next.label_colors) &&
+        next.label_colors.length > newLabelsLen
+      ) {
+        next.label_colors = next.label_colors.slice(0, newLabelsLen);
+      }
+      if (Array.isArray(next.actions) && next.actions.length > newLabelsLen) {
+        next.actions = next.actions.slice(0, newLabelsLen);
       }
     }
 
