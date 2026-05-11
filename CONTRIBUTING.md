@@ -52,12 +52,12 @@ HACS plugin validation, and CodeQL JS/TS analysis.
 Add a new language by:
 
 1. Drop a `<code>.json` next to the existing
-   `src/localize/languages/*.json` (eight bundled today: en / de / fr / it /
-   es / pt / zh / ja). Same key tree, fully translated.
+   `src/localize/languages/*.json` (nine bundled today: en / de / fr / it /
+   es / pt / nl / zh / ja). Same key tree, fully translated.
 2. Register it in `src/localize/localize.ts`:
    ```ts
-   import * as nl from "./languages/nl.json";
-   const languages = { en, de, fr, it, es, pt, zh, ja, nl };
+   import * as sv from "./languages/sv.json";
+   const languages = { en, de, fr, it, es, pt, nl, zh, ja, sv };
    ```
 3. `npm run build` and confirm the picker / status / editor / confirmation
    prompts switch.
