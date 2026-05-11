@@ -2069,6 +2069,18 @@ export class SpinningWheelCard extends LitElement {
     // ~14 px label at the 280 px calibration size.
     const labelFontPx = Math.max(9, Math.round(size * 0.05));
 
+    // Borderless mode bleeds the canvas-clear colour through the
+    // sub-pixel antialiasing along each diagonal seam between two
+    // adjacent filled wedges. ~1 px of angular slack at the rim
+    // makes neighbouring fills overlap by ~2 px so the later-drawn
+    // segment overpaints the seam — invisible angular shift
+    // (~0.005 rad at radius 250), no visible hairline gap. The
+    // separator stroke already covers the seam when borders are on,
+    // so skip the slack in that path to keep the bordered look
+    // pixel-identical to v1.2.0.
+    const borderless = this.config.segment_borders === false;
+    const seamSlack = borderless ? 1 / Math.max(1, radius) : 0;
+
     let cursor = 0;
     for (let i = 0; i < n; i++) {
       const arc = arcs[i] ?? 0;
@@ -2076,13 +2088,13 @@ export class SpinningWheelCard extends LitElement {
       const end = cursor + arc;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, radius, start, end);
+      ctx.arc(0, 0, radius, start - seamSlack, end + seamSlack);
       ctx.closePath();
       ctx.fillStyle = colors[i] ?? "#888";
       ctx.fill();
       // Per-segment separator stroke. Defaults on; opt out via
       // `segment_borders: false` for a flatter look.
-      if (this.config.segment_borders !== false) {
+      if (!borderless) {
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = "rgba(255,255,255,0.65)";
         ctx.stroke();
