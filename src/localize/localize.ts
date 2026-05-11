@@ -4,20 +4,46 @@ import * as fr from "./languages/fr.json";
 import * as it from "./languages/it.json";
 import * as es from "./languages/es.json";
 import * as pt from "./languages/pt.json";
+import * as nl from "./languages/nl.json";
 import * as zh from "./languages/zh.json";
 import * as ja from "./languages/ja.json";
 
-// English is the canonical fallback for missing dicts and missing keys.
-const languages: Record<string, Record<string, unknown>> = {
-  en,
-  de,
-  fr,
-  it,
-  es,
-  pt,
-  zh,
-  ja,
-};
+/** Single source of truth for bundled languages — ISO-639-1 code,
+ *  native-language name (used as the editor dropdown label, never
+ *  translated), and the imported JSON dict. Display order is what
+ *  the editor renders, so keep English first (canonical fallback)
+ *  with the rest in a stable order. To add a language, drop in the
+ *  JSON file, import it above, and append an entry here. */
+const LANGUAGE_REGISTRY: ReadonlyArray<{
+  code: string;
+  nativeName: string;
+  dict: Record<string, unknown>;
+}> = [
+  { code: "en", nativeName: "English", dict: en },
+  { code: "de", nativeName: "Deutsch", dict: de },
+  { code: "fr", nativeName: "Français", dict: fr },
+  { code: "it", nativeName: "Italiano", dict: it },
+  { code: "es", nativeName: "Español", dict: es },
+  { code: "pt", nativeName: "Português", dict: pt },
+  { code: "nl", nativeName: "Nederlands", dict: nl },
+  { code: "zh", nativeName: "简体中文", dict: zh },
+  { code: "ja", nativeName: "日本語", dict: ja },
+];
+
+/** Code → dict lookup. English is the canonical fallback for missing
+ *  dicts and missing keys (see resolveTranslation usage below). */
+const languages: Record<string, Record<string, unknown>> = Object.fromEntries(
+  LANGUAGE_REGISTRY.map((l) => [l.code, l.dict]),
+);
+
+/** Editor-facing list of bundled languages — code + native-language
+ *  display name. Drives the language dropdown in the visual editor;
+ *  iterating this avoids hand-syncing the dropdown every time a new
+ *  locale is added. */
+export const AVAILABLE_LANGUAGES: ReadonlyArray<{
+  code: string;
+  nativeName: string;
+}> = LANGUAGE_REGISTRY.map(({ code, nativeName }) => ({ code, nativeName }));
 
 function resolveTranslation(
   path: string,

@@ -24,7 +24,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
 - **Responsive canvas** — 140–600 px, scales to the dashboard cell on both axes.
 - **Visual editor** with grouped sections (General / Segment bindings / Advanced).
-- **8 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `zh` / `ja`; falls back to English.
+- **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
 - **WCAG 2.2 A+AA** — keyboard activation, focus-visible ring, `prefers-reduced-motion`, forced-colors fallback.
 
 ## Screenshots
