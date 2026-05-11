@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { property, state } from "lit/decorators.js";
 
@@ -467,6 +467,7 @@ export class SpinningWheelCard extends LitElement {
       this._lastTickSeg = -1;
     }
     this.config = { ...config };
+    this._invalidateThemeCache();
     this._result = null;
   }
 
@@ -627,11 +628,47 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** Per-segment label-text colour. Same unique-label rule as
-   *  `_segmentColors`; defaults to dark grey for every segment. */
+   *  `_segmentColors`. When the user hasn't set `label_colors`, AUTO-
+   *  picks black or white per segment via WCAG relative luminance
+   *  against the segment's fill — so a dark navy slice gets white
+   *  text, a pastel slice keeps black, etc. Otherwise default
+   *  palettes silently violated WCAG 1.4.3 contrast. Any per-slot
+   *  `null` in `label_colors` also falls through to auto-contrast. */
   private _segmentLabelColors(): ReadonlyArray<string> {
-    return this._mapPaletteToLabels(this.config.label_colors, [
-      DEFAULT_LABEL_COLOR,
-    ]);
+    const custom = this.config.label_colors;
+    const hasAnyCustom =
+      Array.isArray(custom) &&
+      custom.some(
+        (c) => typeof c === "string" && c.length > 0,
+      );
+    const fills = this._segmentColors();
+    const autoFallback = fills.map((fill) => {
+      const rgb = cssToRgbTriple(fill);
+      if (rgb === null) return DEFAULT_LABEL_COLOR;
+      return this._isLight([rgb[0], rgb[1], rgb[2]]) ? "#1a1a1a" : "#ffffff";
+    });
+    if (!hasAnyCustom) return autoFallback;
+    // User set at least one entry. Per-segment merge: explicit value
+    // wins; null / empty fall through to auto-contrast at that index.
+    const labels = this._expandedLabels();
+    const map = new Map<string, string>();
+    let assigned = 0;
+    const out: string[] = new Array(labels.length);
+    for (let i = 0; i < labels.length; i++) {
+      const lbl = labels[i] ?? "";
+      let c = map.get(lbl);
+      if (c === undefined) {
+        const candidate = custom?.[assigned % custom.length];
+        c =
+          typeof candidate === "string" && candidate.length > 0
+            ? candidate
+            : (autoFallback[i] ?? DEFAULT_LABEL_COLOR);
+        map.set(lbl, c);
+        assigned += 1;
+      }
+      out[i] = c;
+    }
+    return out;
   }
 
   /** Palette cycled across unique labels in order of first appearance.
@@ -877,16 +914,32 @@ export class SpinningWheelCard extends LitElement {
   }
 
   protected override firstUpdated(_changed: PropertyValues): void {
+    this._attachResizeObserver();
+    this._draw();
+  }
+
+  /** Lit fires `connectedCallback` again whenever HA moves the card
+   *  across the DOM tree (tab switch, section-view rearrange, dialog
+   *  open/close). `firstUpdated` only runs once per element lifetime,
+   *  so without a re-attach here the ResizeObserver disconnected in
+   *  `disconnectedCallback` never comes back and the canvas freezes
+   *  at its pre-detach size. */
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    if (this._resizeObserver === null && this.shadowRoot !== null) {
+      this._attachResizeObserver();
+      this._draw();
+    }
+  }
+
+  private _attachResizeObserver(): void {
     const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
       | HTMLElement
       | null;
     const c = this.shadowRoot?.getElementById("wheel") as
       | HTMLCanvasElement
       | null;
-    if (!wrap || !c) {
-      this._draw();
-      return;
-    }
+    if (!wrap || !c) return;
     // Seed from layout if resolved; observer's first delivery fixes
     // it within a frame either way.
     const rect = wrap.getBoundingClientRect();
@@ -913,7 +966,6 @@ export class SpinningWheelCard extends LitElement {
     // Observe the wrap, not the canvas — observing the canvas would
     // create a no-op feedback loop (we drive its CSS box ourselves).
     this._resizeObserver.observe(wrap);
-    this._draw();
   }
 
   /** Effective diameter from a container box. Square mode: min(w, h).
@@ -1168,6 +1220,21 @@ export class SpinningWheelCard extends LitElement {
     return Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(w)));
   }
 
+  private _resolvedThemeCache: {
+    indicatorFill: string;
+    hubLight: string;
+    hubDark: string;
+    hubText: string;
+    hubStroke: string;
+  } | null = null;
+
+  /** Drop the resolved-theme cache. Called from `updated()` on dark-mode
+   *  / theme-name / hub_color changes and from setConfig — anywhere
+   *  the CSS-var read in `_resolveTheme` could shift. */
+  private _invalidateThemeCache(): void {
+    this._resolvedThemeCache = null;
+  }
+
   private _resolveTheme(ctx: CanvasRenderingContext2D): {
     indicatorFill: string;
     hubLight: string;
@@ -1175,6 +1242,7 @@ export class SpinningWheelCard extends LitElement {
     hubText: string;
     hubStroke: string;
   } {
+    if (this._resolvedThemeCache !== null) return this._resolvedThemeCache;
     const cs = getComputedStyle(this);
     const dividerColor =
       cs.getPropertyValue("--divider-color").trim() ||
@@ -1185,23 +1253,25 @@ export class SpinningWheelCard extends LitElement {
     if (choice === "black") {
       // Subtle gradient (dark grey highlight → black edge) so the hub
       // reads as a button rather than a flat disc.
-      return {
+      this._resolvedThemeCache = {
         indicatorFill: "#000000",
         hubLight: "#3a3a3a",
         hubDark: "#000000",
         hubText: "#ffffff",
         hubStroke: dividerColor,
       };
+      return this._resolvedThemeCache;
     }
 
     if (choice === "white") {
-      return {
+      this._resolvedThemeCache = {
         indicatorFill: "#ffffff",
         hubLight: "#ffffff",
         hubDark: "#cccccc",
         hubText: "#000000",
         hubStroke: dividerColor,
       };
+      return this._resolvedThemeCache;
     }
 
     // Theme accent — indicator + hub use --primary-color; hub label
@@ -1209,13 +1279,14 @@ export class SpinningWheelCard extends LitElement {
     const primary =
       cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
     const rgb = this._cssColorToRgb(primary, ctx);
-    return {
+    this._resolvedThemeCache = {
       indicatorFill: primary,
       hubLight: this._adjustLightness(rgb, 0.18),
       hubDark: this._adjustLightness(rgb, -0.18),
       hubText: this._isLight(rgb) ? "#0a0a0a" : "#ffffff",
       hubStroke: dividerColor,
     };
+    return this._resolvedThemeCache;
   }
 
   /** CSS colour → [r, g, b] via the canvas fillStyle round-trip. */
@@ -1547,11 +1618,6 @@ export class SpinningWheelCard extends LitElement {
         entity_id: entity,
         value,
       });
-      // Diagnostic for "the spin doesn't update my helper" — cheap,
-      // quiet for users who never open DevTools.
-      console.info(
-        `[spinning-wheel-card] result written: ${entity} = ${JSON.stringify(value)}`,
-      );
     } catch (err) {
       console.warn(
         "[spinning-wheel-card] input_text.set_value failed:",
@@ -1762,6 +1828,11 @@ export class SpinningWheelCard extends LitElement {
       this._dragMoved = true;
       this._omega = 0;
       this._stopAnim();
+      // Drag commandeered a settle tween: the tween would have set
+      // _spinning=false at completion, but _stopAnim killed its RAF
+      // before that ran. Without this the status line says "Spinning…"
+      // forever despite the user actively dragging.
+      this._spinning = false;
       this._result = null;
     }
     this._dragLastAngle = a;
@@ -2295,6 +2366,7 @@ export class SpinningWheelCard extends LitElement {
       if (dark !== this._prevDarkMode || themeName !== this._prevTheme) {
         this._prevDarkMode = dark;
         this._prevTheme = themeName;
+        this._invalidateThemeCache();
         needsDraw = true;
       }
     }
@@ -2357,7 +2429,9 @@ export class SpinningWheelCard extends LitElement {
               height=${DEFAULT_SIZE}
               role="img"
               tabindex="0"
-              aria-label=${statusText}
+              aria-roledescription=${localize("a11y.wheel_role", lang)}
+              aria-label=${localize("a11y.wheel_label", lang)}
+              aria-keyshortcuts="Space Enter"
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -2365,9 +2439,21 @@ export class SpinningWheelCard extends LitElement {
               @pointercancel=${this._onPointerCancel}
             ></canvas>
           </div>
-          ${this.config.show_status === false
-            ? nothing
-            : html`<div class="status" aria-live="polite">${statusNode}</div>`}
+          <!-- Status row owns dynamic announcements. Canvas stays
+               static-labelled (role description + name) so AT users
+               aren't double-announced as the status changes mid-spin.
+               When show_status:false the status row is hidden visually
+               but kept in the DOM as a polite live region — disabling
+               the indicator is a layout choice, not an a11y choice. -->
+          <div
+            class=${this.config.show_status === false
+              ? "status status-sr-only"
+              : "status"}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            ${this.config.show_status === false ? statusText : statusNode}
+          </div>
         </div>
       </ha-card>
     `;
@@ -2475,6 +2561,20 @@ export class SpinningWheelCard extends LitElement {
       line-height: 1.6;
       min-height: 1.6em;
       flex-shrink: 0;
+    }
+    /* WCAG-recommended visually-hidden pattern. Keeps the live region
+       in the a11y tree (so screen readers get spin updates) when the
+       user opts out of the visible status line. */
+    .status-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* Windows High Contrast. */

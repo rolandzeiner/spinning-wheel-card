@@ -25,14 +25,15 @@ export const normalizeFriction = (value: unknown): number => {
 };
 
 /** Per-frame velocity multiplier at 60 fps for a given slider level.
- *  Piecewise linear, anchored so old presets land on the same feel:
- *    1 → 0.998 (long lazy spin)
- *    3 → 0.995  (old "low")
- *    5 → 0.99   (old "medium" — new default)
- *    7 → 0.98   (old "high")
- *   10 → 0.97   (stops quickly)
+ *  Piecewise linear with anchors at the slider extremes and the
+ *  centre, where old "medium" lands exactly:
+ *    1  → 0.998 (long lazy spin)
+ *    3  → 0.994 (close to the old "low" preset of 0.995)
+ *    5  → 0.99  (old "medium" — new default)
+ *    7  → 0.982 (close to the old "high" preset of 0.98)
+ *   10  → 0.97  (stops quickly)
  *  1–5 covers the lighter half (0.998 → 0.99), 5–10 the heavier
- *  (0.99 → 0.97) — the slot where extra resolution matters. */
+ *  (0.99 → 0.97) — extra resolution where it matters. */
 export const frictionMultiplier = (level: number): number => {
   if (level <= 5) return 0.998 - (0.008 * (level - 1)) / 4;
   return 0.99 - (0.02 * (level - 5)) / 5;

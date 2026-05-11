@@ -6,6 +6,10 @@
     "idle_selector": "Faites glisser la roue pour sélectionner",
     "todo_empty": "Aucun élément ouvert dans la liste de tâches"
   },
+  "a11y": {
+    "wheel_role": "roue de la fortune",
+    "wheel_label": "Faire tourner la roue"
+  },
   "confirm": {
     "run_action": "Exécuter « {action} » pour « {value} » ?"
   },

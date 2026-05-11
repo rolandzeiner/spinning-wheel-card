@@ -6,6 +6,10 @@
     "idle_selector": "Drag the wheel to select",
     "todo_empty": "No open items in the todo list"
   },
+  "a11y": {
+    "wheel_role": "prize wheel",
+    "wheel_label": "Spin the wheel"
+  },
   "confirm": {
     "run_action": "Run \"{action}\" for \"{value}\"?"
   },

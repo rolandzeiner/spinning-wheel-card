@@ -6,6 +6,10 @@
     "idle_selector": "拖动转盘进行选择",
     "todo_empty": "待办列表中没有未完成的项目"
   },
+  "a11y": {
+    "wheel_role": "幸运转盘",
+    "wheel_label": "转动转盘"
+  },
   "confirm": {
     "run_action": "为「{value}」执行「{action}」?"
   },

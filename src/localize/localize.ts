@@ -55,9 +55,14 @@ export function localize(
 
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
+      // Function form so `$&`/`$1`/`$<name>` in the substitution value
+      // are NOT interpreted as replacement patterns — a todo summary
+      // like "Pay $50 to $&" must render literally, not as the matched
+      // `{value}` placeholder.
+      const replacement = String(v);
       translated = translated.replace(
         new RegExp(`\\{${k}\\}`, "g"),
-        String(v),
+        () => replacement,
       );
     }
   }

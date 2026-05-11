@@ -6,6 +6,10 @@
     "idle_selector": "ホイールをドラッグして選択",
     "todo_empty": "ToDo リストに未完了のアイテムはありません"
   },
+  "a11y": {
+    "wheel_role": "ルーレット",
+    "wheel_label": "ルーレットを回す"
+  },
   "confirm": {
     "run_action": "「{value}」に対して「{action}」を実行しますか?"
   },

@@ -6,6 +6,10 @@
     "idle_selector": "Trascina la ruota per selezionare",
     "todo_empty": "Nessun elemento aperto nella lista delle attività"
   },
+  "a11y": {
+    "wheel_role": "ruota della fortuna",
+    "wheel_label": "Far girare la ruota"
+  },
   "confirm": {
     "run_action": "Eseguire \"{action}\" per \"{value}\"?"
   },

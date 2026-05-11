@@ -6,6 +6,10 @@
     "idle_selector": "Arrastra la ruleta para seleccionar",
     "todo_empty": "Sin elementos abiertos en la lista de tareas"
   },
+  "a11y": {
+    "wheel_role": "ruleta de la fortuna",
+    "wheel_label": "Girar la ruleta"
+  },
   "confirm": {
     "run_action": "¿Ejecutar «{action}» para «{value}»?"
   },
