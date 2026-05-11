@@ -54,11 +54,14 @@ Add a new language by:
 1. Drop a `<code>.json` next to the existing
    `src/localize/languages/*.json` (nine bundled today: en / de / fr / it /
    es / pt / nl / zh / ja). Same key tree, fully translated.
-2. Register it in `src/localize/localize.ts`:
+2. Register it in `src/localize/localize.ts` — `import * as sv from
+   "./languages/sv.json";` at the top, then add an entry to
+   `LANGUAGE_REGISTRY`:
    ```ts
-   import * as sv from "./languages/sv.json";
-   const languages = { en, de, fr, it, es, pt, nl, zh, ja, sv };
+   { code: "sv", nativeName: "Svenska", dict: sv },
    ```
+   That single edit drives both the lookup map AND the editor's
+   language dropdown — no second list to keep in sync.
 3. `npm run build` and confirm the picker / status / editor / confirmation
    prompts switch.
 

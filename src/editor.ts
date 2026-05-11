@@ -13,7 +13,11 @@ import type {
 } from "./types";
 import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
-import { localize, resolveLang } from "./localize/localize";
+import {
+  AVAILABLE_LANGUAGES,
+  localize,
+  resolveLang,
+} from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 import { normalizeFriction } from "./friction";
 
@@ -428,20 +432,18 @@ export class SpinningWheelCardEditor
             selector: {
               select: {
                 mode: "dropdown",
+                // "Auto" + every entry from the locale registry, native-
+                // named (never translated). Adding a locale is a single
+                // edit in localize.ts — the dropdown follows.
                 options: [
                   {
                     value: "auto",
                     label: localize("editor.language_auto", lang),
                   },
-                  // Native names — never translated.
-                  { value: "en", label: "English" },
-                  { value: "de", label: "Deutsch" },
-                  { value: "fr", label: "Français" },
-                  { value: "it", label: "Italiano" },
-                  { value: "es", label: "Español" },
-                  { value: "pt", label: "Português" },
-                  { value: "zh", label: "简体中文" },
-                  { value: "ja", label: "日本語" },
+                  ...AVAILABLE_LANGUAGES.map((l) => ({
+                    value: l.code,
+                    label: l.nativeName,
+                  })),
                 ],
               },
             },
