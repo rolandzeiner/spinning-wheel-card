@@ -13,7 +13,7 @@ import type {
   TextOrientation,
   TodoItem,
 } from "./types";
-import { frictionMultiplier, normalizeFriction } from "./friction";
+import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
@@ -63,7 +63,12 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
 
-const STOP_THRESHOLD_RAD_PER_S = 0.05;
+/** Safety-net stop threshold. With Coulomb friction now driving
+ *  finite-time stop (~0.3 s settle from 0.1 rad/s at slider 5), this
+ *  is mostly a guarantee that even pathological float drift converges
+ *  to zero quickly. Was 0.05 pre-Coulomb when the viscous-only tail
+ *  could crawl below 0.1 rad/s for ~2 s before crossing the threshold. */
+const STOP_THRESHOLD_RAD_PER_S = 0.01;
 const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
 const CLICK_IMPULSE_MAX = 16;  // rad/s ≈ 2.5 rev/s
 const VELOCITY_SAMPLE_WINDOW_MS = 100;
@@ -277,6 +282,13 @@ export class SpinningWheelCard extends LitElement {
   private _angle = 0;
   // Angular velocity, rad/s. Positive = clockwise.
   private _omega = 0;
+  /** Sign of `_omega` from the most recent tick frame where it was
+   *  non-zero. Sticks after friction zeroes ω so `_finalizeStop` can
+   *  tell whether the indicator's final position represents a peg
+   *  crossing (motion + landed sides differ → no back-roll) vs the
+   *  peg blocking the spin (sides match → back-roll plausible). Reset
+   *  to 0 when a new spin begins; see `_startAnim`. */
+  private _lastSpinDirection: 1 | -1 | 0 = 0;
 
   private _dragging = false;
   private _dragMoved = false;
@@ -703,6 +715,14 @@ export class SpinningWheelCard extends LitElement {
 
   private _frictionFactor(): number {
     return frictionMultiplier(this._frictionLevel());
+  }
+
+  /** Coulomb deceleration (rad/s²) — finite-time-stop term. Composed
+   *  with `_frictionFactor()` so viscous (exponential) dominates at
+   *  high ω and Coulomb (linear) dominates near rest, removing the
+   *  asymptotic tail that used to crawl just above STOP_THRESHOLD. */
+  private _coulombDecel(): number {
+    return coulombDecel(this._frictionLevel());
   }
 
   /** Per-peg brake bump in rad/s. Scaled by the same 1–10 friction
@@ -1220,7 +1240,14 @@ export class SpinningWheelCard extends LitElement {
     );
     // 1.5 × angular half-width — clears the peg's pixel footprint
     // with a small breathing buffer. Scales with wheel size.
-    const deadzone = (pegPx / Math.max(1, radius)) * 1.5;
+    // 1.0 × angular half-width — only treat the indicator as "on the
+    // peg" when its centre overlaps the painted pixel footprint. The
+    // previous 1.5× breathing buffer caught borderline cases where
+    // the indicator was clearly past the peg edge, producing a visible
+    // "speed-up" as the settle tween moved it further out. Tighter
+    // threshold = fewer nudges; the cases that remain are the ones
+    // where the indicator genuinely overlaps the peg.
+    const deadzone = pegPx / Math.max(1, radius);
 
     // Pegs are evenly spaced around the rim (so weighted wheels still
     // show uniform pegs), so closed-form snap to the nearest one
@@ -1248,21 +1275,41 @@ export class SpinningWheelCard extends LitElement {
    *  on a peg, ease the wheel off it over ~220 ms (smooth path) so
    *  the resolution doesn't look like an instant snap. The reduced-
    *  motion path skips the tween and applies the nudge instantly per
-   *  WCAG 2.3.3. Either way, the direction may flip back against the
-   *  natural side with `proximity * PEG_BACKROLL_MAX_PROB` chance —
-   *  simulates the peg "blocking" a borderline spin so the wheel
-   *  rolls back. After settle the result is announced. */
+   *  WCAG 2.3.3.
+   *
+   *  Back-roll: the direction MAY flip back against the natural side
+   *  with `proximity * PEG_BACKROLL_MAX_PROB` chance — simulates the
+   *  peg "almost blocking" a borderline spin. But: we suppress the
+   *  flip when `_lastSpinDirection` shows the wheel CLEANLY CROSSED
+   *  the peg (motion direction opposite to landed-side direction).
+   *  Without this gate, a wheel coasting just past a peg would
+   *  randomly snap back to the side it came from — the visible "jump"
+   *  reported on long radial wheels. Back-roll stays available when
+   *  the wheel approached but didn't cross. After settle the result
+   *  is announced. */
   private _finalizeStop(smooth: boolean): void {
     const plan = this._computeOffPegPlan(this._angle);
     if (plan === null) {
       this._spinning = false;
       this._rafId = null;
       this._lastTickSeg = -1;
+      this._lastSpinDirection = 0;
       this._announceResult();
       this._draw();
       return;
     }
-    const backRollProb = plan.proximity * PEG_BACKROLL_MAX_PROB;
+    // Crossing detection: with the wheel rotating in direction `lastDir`
+    // (1 = CW, -1 = CCW), the indicator's wheel-frame angle moves in
+    // the OPPOSITE sense (`target = -angle + a0/2`). So a clean
+    // crossing leaves the indicator on the side opposite to `lastDir`
+    // — i.e. `naturalSign === -lastDir`. Match against that to
+    // suppress the back-roll for cleanly-crossed pegs.
+    const lastDir = this._lastSpinDirection;
+    const wheelCrossedPeg =
+      lastDir !== 0 && plan.naturalSign === -lastDir;
+    const backRollProb = wheelCrossedPeg
+      ? 0
+      : plan.proximity * PEG_BACKROLL_MAX_PROB;
     const flip = Math.random() < backRollProb;
     const sign = (flip ? -plan.naturalSign : plan.naturalSign) as 1 | -1;
     const newTarget = wrapAngle(plan.pegAngle + sign * plan.deadzone);
@@ -1275,6 +1322,7 @@ export class SpinningWheelCard extends LitElement {
     this._spinning = false;
     this._rafId = null;
     this._lastTickSeg = -1;
+    this._lastSpinDirection = 0;
     this._announceResult();
     this._draw();
   }
@@ -1297,7 +1345,13 @@ export class SpinningWheelCard extends LitElement {
         return;
       }
       const t = Math.min(1, (now - startMs) / durMs);
-      const eased = 1 - Math.pow(1 - t, 3);
+      // Sine ease-in-out: derivative is zero at both endpoints
+      // (`-sin(0) = -sin(π) = 0`), so the wheel starts soft and ends
+      // soft. Cubic ease-out has derivative 3 at t=0 — three times the
+      // average speed — which read as a "kick" when the user expected
+      // a settle. For a rest-to-rest micro-adjustment off a peg, smooth
+      // both ends.
+      const eased = 0.5 - 0.5 * Math.cos(Math.PI * t);
       this._angle = wrapAngle(startAngle + delta * eased);
       this._draw();
       if (t < 1) {
@@ -1307,6 +1361,7 @@ export class SpinningWheelCard extends LitElement {
       this._rafId = null;
       this._spinning = false;
       this._lastTickSeg = -1;
+      this._lastSpinDirection = 0;
       this._announceResult();
     };
     this._rafId = window.requestAnimationFrame(tween);
@@ -1371,6 +1426,7 @@ export class SpinningWheelCard extends LitElement {
     this._dragAccumulated = 0;
     this._velocitySamples = [];
     this._lastTickSeg = -1;
+    this._lastSpinDirection = 0;
     // Icon cache + loading set are module-scope now (ICON_PATH_CACHE /
     // ICON_LOADING_SET) — intentionally NOT cleared here. Every
     // reconnect re-runs the 30-frame RAF poll otherwise, which is the
@@ -1961,9 +2017,32 @@ export class SpinningWheelCard extends LitElement {
       const dt = Math.min(0.05, (now - this._lastFrameMs) / 1000);
       this._lastFrameMs = now;
 
+      // Record the direction of motion BEFORE we apply friction so
+      // `_finalizeStop` knows whether the indicator's final position
+      // resulted from the wheel crossing a peg (motion direction
+      // ≠ landed side) vs being blocked by it (motion direction
+      // = landed side). Used to suppress the visible "jump" when a
+      // cleanly-crossed peg would otherwise random-back-roll the
+      // wheel back to its origin side.
+      if (this._omega > 0) this._lastSpinDirection = 1;
+      else if (this._omega < 0) this._lastSpinDirection = -1;
+
       this._angle = wrapAngle(this._angle + this._omega * dt);
-      // Frame-rate-independent decay: at 60 fps, dt≈1/60, exponent≈1.
+      // Frame-rate-independent viscous decay: at 60 fps, dt≈1/60,
+      // exponent≈1.
       this._omega *= Math.pow(this._frictionFactor(), 60 * dt);
+
+      // Coulomb friction — constant deceleration regardless of speed,
+      // driving finite-time stop. At high ω the viscous term still
+      // dominates (same fast deceleration as before); near rest this
+      // term takes over and ω reaches exactly zero in finite time
+      // instead of asymptotically crawling toward STOP_THRESHOLD.
+      const couStep = this._coulombDecel() * dt;
+      if (Math.abs(this._omega) <= couStep) {
+        this._omega = 0;
+      } else {
+        this._omega -= couStep * Math.sign(this._omega);
+      }
 
       // Bell curve — ramp 0 → peak by TICK_PEAK_SPEED, taper to FLOOR
       // by MAX_VELOCITY so dense ticks don't pile into a wash.

@@ -38,3 +38,20 @@ export const frictionMultiplier = (level: number): number => {
   if (level <= 5) return 0.998 - (0.008 * (level - 1)) / 4;
   return 0.99 - (0.02 * (level - 5)) / 5;
 };
+
+/** Constant angular deceleration (rad/s²) for the Coulomb friction
+ *  term — physical model of dry axle / bearing friction. Independent
+ *  of speed, so unlike `frictionMultiplier` (viscous, exponential
+ *  decay → asymptotic stop) this term drives finite-time stop and
+ *  removes the "wheel crawls below the threshold then snaps" tail.
+ *
+ *  Scaled with the same 1–10 slider as viscous friction so one knob
+ *  drives both: level 5 returns the calibration value `0.3 rad/s²`,
+ *  giving a slider-5 wheel an ~0.3 s settle from 0.1 rad/s — short
+ *  enough to feel snappy, long enough to look natural.
+ *
+ *  Pure / testable. */
+export const coulombDecel = (level: number): number => {
+  const calibrated = 0.3; // rad/s² at slider 5
+  return calibrated * (level / 5);
+};
