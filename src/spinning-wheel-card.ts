@@ -210,6 +210,19 @@ interface VelocitySample {
   angleDelta: number;
 }
 
+/** HA `light.*` `supported_color_modes` values that imply the bulb
+ *  can render arbitrary RGB. Used by `_syncLights` to skip bulbs that
+ *  can't honour `rgb_color` (color_temp-only / brightness-only / on-off
+ *  / white-only). HA's `light.turn_on` would silently no-op those
+ *  upstream, but bailing here makes the misconfiguration deliberate. */
+const RGB_CAPABLE_COLOR_MODES: ReadonlySet<string> = new Set([
+  "rgb",
+  "rgbw",
+  "rgbww",
+  "hs",
+  "xy",
+]);
+
 /** Cross-instance, cross-mount icon path cache. Keys are bare icon
  *  names (`mdi:home`); values are the resolved SVG `d` string, or
  *  `null` if the probe confirmed it doesn't exist in HA's icon
@@ -2240,6 +2253,21 @@ export class SpinningWheelCard extends LitElement {
     if (!this.hass?.callService) return;
     for (const entity of entities) {
       if (typeof entity !== "string" || !/^light\.[a-z0-9_]+$/.test(entity)) {
+        continue;
+      }
+      // Skip lights without an RGB-capable colour mode. HA's selector
+      // can't filter on `supported_color_modes` (it only supports
+      // domain / integration / device_class / supported_features), so
+      // the picker shows every light. Lights that only support
+      // color_temp / brightness / on-off would silently no-op
+      // upstream; we skip earlier so it's a deliberate drop, not
+      // a service-call ghost.
+      const modes = this.hass.states?.[entity]?.attributes
+        ?.supported_color_modes;
+      if (
+        Array.isArray(modes) &&
+        !modes.some((m) => RGB_CAPABLE_COLOR_MODES.has(m as string))
+      ) {
         continue;
       }
       try {
