@@ -39,6 +39,9 @@ const STATIC_DEFAULTS = {
   segments: 8,
   friction: 5,
   text_orientation: "tangent" as const,
+  label_auto_fit: false,
+  label_font_scale: 100,
+  label_radius_offset: 0,
   sound: true,
   theme: "default" as const,
   hub_color: "theme" as const,
@@ -378,6 +381,24 @@ export class SpinningWheelCardEditor
               },
             } satisfies HaFormSchema,
           ]),
+      // Label sizing + radial-position controls. Always visible (todo
+      // mode benefits from them too — long summaries shrink, slider
+      // pushes labels off the hub or toward the rim). Placed right
+      // below text_orientation so the three "how labels look" controls
+      // cluster together visually.
+      { name: "label_auto_fit", selector: { boolean: {} } },
+      {
+        name: "label_font_scale",
+        selector: {
+          number: { min: 70, max: 150, step: 5, mode: "slider" },
+        },
+      },
+      {
+        name: "label_radius_offset",
+        selector: {
+          number: { min: -20, max: 20, step: 1, mode: "slider" },
+        },
+      },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently
       // (expandable footgun).
@@ -596,6 +617,9 @@ export class SpinningWheelCardEditor
     ["hub_text", { label: "editor.hub_text", helper: "editor.hub_text_helper" }],
     ["hub_color", { label: "editor.hub_color", helper: "editor.hub_color_helper" }],
     ["text_orientation", { label: "editor.text_orientation", helper: "editor.text_orientation_helper" }],
+    ["label_auto_fit", { label: "editor.label_auto_fit", helper: "editor.label_auto_fit_helper" }],
+    ["label_font_scale", { label: "editor.label_font_scale", helper: "editor.label_font_scale_helper" }],
+    ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
     ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
     ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
     ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
@@ -932,6 +956,15 @@ export class SpinningWheelCardEditor
     if (next.friction === STATIC_DEFAULTS.friction) delete next.friction;
     if (next.text_orientation === STATIC_DEFAULTS.text_orientation) {
       delete next.text_orientation;
+    }
+    if (next.label_auto_fit === STATIC_DEFAULTS.label_auto_fit) {
+      delete next.label_auto_fit;
+    }
+    if (next.label_font_scale === STATIC_DEFAULTS.label_font_scale) {
+      delete next.label_font_scale;
+    }
+    if (next.label_radius_offset === STATIC_DEFAULTS.label_radius_offset) {
+      delete next.label_radius_offset;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;

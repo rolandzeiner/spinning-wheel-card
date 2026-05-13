@@ -19,6 +19,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Wheel context** — opt-in: every fired action gets the winning segment merged into its `data` payload (`wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`). One generic script can then handle every segment.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
+- **Label fit controls** — auto-fit toggle shrinks long labels to fit (the new amino-acid / chemistry-wheel friendly path), plus a font-size scale (70–150 %) and a radial-position offset (-20 … +20 %) to push labels toward or away from the rim.
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
@@ -87,6 +88,9 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `result_entity` | `input_text.*` entity_id | none | Helper to receive the winning label after every spin. Editor's "Create dedicated helper" button auto-provisions one (admin only). |
 | `todo_entity` | `todo.*` entity_id | none | Fill segments from this entity's open items (4–24, deduped). `segments`, `labels`, `text_orientation` are ignored while wired. |
 | `text_orientation` | `tangent` / `radial` | `tangent` (`radial` in todo mode) | Tangent wraps text around the rim; radial reads along the spoke. |
+| `label_auto_fit` | boolean | `false` | When `true`, every label measures-and-shrinks to fit its slice down to 7 px (then ellipsis-truncates). When `false`, static labels render at the fixed `label_font_scale` size and char-truncate. Always on for `todo_entity` (arbitrary summaries can't sensibly char-truncate). |
+| `label_font_scale` | integer 70–150 | `100` | Scales the base label font in percent. With `label_auto_fit: true` this is the *starting / max* size — long labels still shrink to fit. Also scales MDI icon labels proportionally. |
+| `label_radius_offset` | integer -20…+20 | `0` | Moves labels inward (negative) or toward the rim (positive), as a percent of wheel radius added to the per-mode default (66 %, or 55 % in todo+radial). Clamped at draw time so labels never overlap the hub or run off the disc. |
 | `hub_text` | string | localised (`SPIN` / `DREH` / …) | Centre-hub label. Auto-shrinks. Empty hides. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub + indicator fill. `theme` uses HA's `--primary-color` with auto-contrast text. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
@@ -144,6 +148,37 @@ type: custom:spinning-wheel-card
 segments: 6
 labels: [mdi:pizza, mdi:hamburger, mdi:noodles, mdi:taco, mdi:food-croissant, mdi:silverware-fork-knife]
 hub_text: ""
+```
+
+**Long labels (auto-fit)** — 20 amino acids, radial labels shrink to fit:
+
+```yaml
+type: custom:spinning-wheel-card
+segments: 20
+text_orientation: radial
+label_auto_fit: true
+label_radius_offset: 10   # push labels closer to the rim for more spoke length
+labels:
+  - Alanine
+  - Arginine
+  - Asparagine
+  - Aspartic acid
+  - Cysteine
+  - Glutamic acid
+  - Glutamine
+  - Glycine
+  - Histidine
+  - Isoleucine
+  - Leucine
+  - Lysine
+  - Methionine
+  - Phenylalanine
+  - Proline
+  - Serine
+  - Threonine
+  - Tryptophan
+  - Tyrosine
+  - Valine
 ```
 
 **Per-segment actions** — fire a script per winner:

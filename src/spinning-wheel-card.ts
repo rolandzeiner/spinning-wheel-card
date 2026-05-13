@@ -107,6 +107,29 @@ export const cssToRgbTriple = (
   return null;
 };
 
+/** Walk a font size down from `startPx` until the measured width fits
+ *  `budget`, never going below `minPx`. Returns the picked size and a
+ *  `fits` flag (false = even minPx exceeds the budget, caller should
+ *  ellipsis-truncate). Pure — `measure(px)` is the only dependency on
+ *  the canvas context, making it trivially testable with a stub. Used
+ *  by `_draw` for both the todo path (always) and the static path when
+ *  `label_auto_fit: true`. */
+export const pickFontPx = (
+  measure: (px: number) => number,
+  startPx: number,
+  minPx: number,
+  budget: number,
+): { px: number; fits: boolean } => {
+  if (!Number.isFinite(budget) || budget <= 0) {
+    return { px: minPx, fits: false };
+  }
+  const start = Math.max(minPx, Math.floor(startPx));
+  for (let px = start; px >= minPx; px--) {
+    if (measure(px) <= budget) return { px, fits: true };
+  }
+  return { px: minPx, fits: false };
+};
+
 const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
 const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
 const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
@@ -427,6 +450,32 @@ export class SpinningWheelCard extends LitElement {
         config.peg_density > 4
       ) {
         throw new Error(localize("errors.peg_density_range", lang));
+      }
+    }
+    if (
+      config.label_auto_fit !== undefined &&
+      typeof config.label_auto_fit !== "boolean"
+    ) {
+      throw new Error(localize("errors.label_auto_fit_type", lang));
+    }
+    if (config.label_font_scale !== undefined) {
+      if (
+        typeof config.label_font_scale !== "number" ||
+        !Number.isInteger(config.label_font_scale) ||
+        config.label_font_scale < 70 ||
+        config.label_font_scale > 150
+      ) {
+        throw new Error(localize("errors.label_font_scale_range", lang));
+      }
+    }
+    if (config.label_radius_offset !== undefined) {
+      if (
+        typeof config.label_radius_offset !== "number" ||
+        !Number.isInteger(config.label_radius_offset) ||
+        config.label_radius_offset < -20 ||
+        config.label_radius_offset > 20
+      ) {
+        throw new Error(localize("errors.label_radius_offset_range", lang));
       }
     }
     if (
@@ -2066,8 +2115,14 @@ export class SpinningWheelCard extends LitElement {
     ctx.translate(center, center);
     ctx.rotate(this._angle - Math.PI / 2 - a0 / 2);
 
-    // ~14 px label at the 280 px calibration size.
-    const labelFontPx = Math.max(9, Math.round(size * 0.05));
+    // ~14 px label at the 280 px calibration size, scaled by the
+    // `label_font_scale` slider (70–150 %, default 100). Floor at 7 so
+    // the manual-fixed path can still render the smallest scales (auto-
+    // fit uses the same floor, so the two paths agree on the minimum).
+    const fontScale = this.config.label_font_scale ?? 100;
+    const labelFontPx = Math.max(7, Math.round(size * 0.05 * fontScale / 100));
+    const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
+    const minLabelPx = 7;
 
     // Borderless mode bleeds the canvas-clear colour through the
     // sub-pixel antialiasing along each diagonal seam between two
@@ -2107,11 +2162,18 @@ export class SpinningWheelCard extends LitElement {
         const midAngle = start + arc / 2;
         // Todo+radial: 0.55 widens the budget ~35 % vs 0.66 (the
         // rim-side margin `radius - labelRadius` is the binding
-        // constraint), fitting longer summaries before shrinking.
+        // constraint), fitting longer summaries before shrinking. The
+        // `label_radius_offset` slider adds a -20..+20 % delta on top;
+        // clamped at draw time so the label never paints inside the
+        // hub or off the disc — `labelFontPx * 0.6` reserves roughly
+        // half-x-height of breathing room at each end.
+        const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
+        const offsetFrac = (this.config.label_radius_offset ?? 0) / 100;
+        const safeRadius = Math.max(1, radius);
+        const minFrac = Math.min(0.95, (hubRadius + labelFontPx * 0.6) / safeRadius);
+        const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
         const labelRadius =
-          isTodoMode && orientation === "radial"
-            ? radius * 0.55
-            : radius * 0.66;
+          radius * Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
 
         // HA icon name (`mdi:foo`, `hass:foo`) → render the path.
         // While loading, the next redraw shows the icon.
@@ -2161,57 +2223,84 @@ export class SpinningWheelCard extends LitElement {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        let display: string;
-        if (isTodoMode) {
-          // Arbitrary user text — measure and shrink before truncating.
-          // Width budget: radial = 2 × min(labelRadius - hubRadius,
-          // radius - labelRadius) × 0.9; tangent = arc × labelRadius
-          // × 0.85. Floor at minPx, then ellipsis-truncate.
-          const minPx = 7;
-          const widthBudget =
-            orientation === "radial"
-              ? 2 *
-                Math.min(labelRadius - hubRadius, radius - labelRadius) *
-                0.9
-              : arc * labelRadius * 0.85;
-          let px = labelFontPx;
-          let fits = false;
-          while (px >= minPx) {
-            ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-            if (ctx.measureText(text).width <= widthBudget) {
-              fits = true;
-              break;
-            }
-            px -= 1;
-          }
-          if (fits) {
-            display = text;
-          } else {
-            // Chop tail until str+"…" fits; bail at 1 char so we never
-            // output just "…".
-            ctx.font = `600 ${minPx}px ui-sans-serif, system-ui, sans-serif`;
-            let truncated = text;
-            while (
-              truncated.length > 1 &&
-              ctx.measureText(truncated + "…").width > widthBudget
-            ) {
-              truncated = truncated.slice(0, -1);
-            }
-            display = truncated + "…";
-            px = minPx;
-          }
+        // Width budget for one label, shared by auto-fit + fixed paths:
+        //   radial  = full hub→rim run (with breathing room at each end)
+        //   tangent = arc × labelRadius × 0.85
+        // For radial, the budget is the full available radial channel
+        // rather than a symmetric span around labelRadius — when the
+        // user offsets labels off-centre, the smaller side would
+        // otherwise dominate and waste the larger side. `radialDrawAt`
+        // below shifts the actual draw centre inward/outward when the
+        // measured text would poke past either end, so short labels
+        // stay at labelRadius (offset slider still wins) and long
+        // labels expand into the full channel.
+        const radialInnerLimit = hubRadius + labelFontPx * 0.4;
+        const radialOuterLimit = radius - labelFontPx * 0.3;
+        const radialChannel = Math.max(
+          0,
+          radialOuterLimit - radialInnerLimit,
+        );
+        const widthBudget =
+          orientation === "radial"
+            ? radialChannel * 0.95
+            : arc * labelRadius * 0.85;
+        const radialDrawAt = (textWidth: number): number => {
+          const halfW = textWidth / 2;
+          let pos = labelRadius;
+          if (pos + halfW > radialOuterLimit) pos = radialOuterLimit - halfW;
+          if (pos - halfW < radialInnerLimit) pos = radialInnerLimit + halfW;
+          return pos;
+        };
+        // Ellipsis-truncate `text` until it fits `widthBudget` at the
+        // given font size. Returns the original string when it already
+        // fits; bails at 1 character so we never output just "…".
+        const ellipsizeAt = (px: number): string => {
           ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+          if (ctx.measureText(text).width <= widthBudget) return text;
+          let truncated = text;
+          while (
+            truncated.length > 1 &&
+            ctx.measureText(truncated + "…").width > widthBudget
+          ) {
+            truncated = truncated.slice(0, -1);
+          }
+          return truncated + "…";
+        };
+
+        let chosenPx: number;
+        if (useAutoFit) {
+          // Measure-and-shrink: walk the font down from labelFontPx until
+          // the text fits, never below minLabelPx. If even minLabelPx
+          // doesn't fit, `ellipsizeAt` then ellipsis-truncates at that
+          // size.
+          const measure = (px: number): number => {
+            ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+            return ctx.measureText(text).width;
+          };
+          const picked = pickFontPx(
+            measure,
+            labelFontPx,
+            minLabelPx,
+            widthBudget,
+          );
+          chosenPx = picked.px;
         } else {
-          // Static-labels path: fixed font + char-count truncation.
-          ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
-          const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
-          display =
-            text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
+          // Auto-fit off: keep the user-chosen font size; rely on
+          // `ellipsizeAt` to truncate ONLY when text genuinely overflows
+          // (so scaling the font down makes more characters fit before
+          // the ellipsis kicks in — char-count truncation here used to
+          // ignore font size, which is the bug this branch was missing).
+          chosenPx = labelFontPx;
         }
+        const display = ellipsizeAt(chosenPx);
+        ctx.font = `600 ${chosenPx}px ui-sans-serif, system-ui, sans-serif`;
 
         if (orientation === "radial") {
+          // Shift inward/outward when the rendered text would overflow
+          // the radial channel; otherwise sit at labelRadius.
+          const drawAt = radialDrawAt(ctx.measureText(display).width);
           ctx.rotate(midAngle);
-          ctx.translate(labelRadius, 0);
+          ctx.translate(drawAt, 0);
           ctx.rotate(Math.PI);
           ctx.fillText(display, 0, 0);
         } else {
