@@ -24,8 +24,8 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
-- **Responsive canvas** — 140–600 px, scales to the dashboard cell on both axes.
-- **Visual editor** with grouped sections (General / Segment bindings / Advanced).
+- **Responsive canvas** — 140–1000 px, scales to the dashboard cell on both axes.
+- **Visual editor** with grouped sections (General / Label layout / Segment bindings / Advanced).
 - **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
 - **WCAG 2.2 A+AA** — keyboard activation, focus-visible ring, `prefers-reduced-motion`, forced-colors fallback.
 
@@ -111,7 +111,12 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `7` | 0.982 (≈ old `high`) | ~2 s | 0.112 rad/s |
 | `10` | 0.970 | ~1.3 s | 0.160 rad/s |
 
-Decay is frame-rate independent — `ω *= friction^(60·dt)`.
+Decay is frame-rate independent. Each tick applies viscous damping
+`ω *= friction^(60·dt)` followed by a Coulomb subtraction
+`ω -= c · sign(ω) · dt` where `c` scales with the same slider. The
+viscous term dominates at high ω; Coulomb takes over near rest and
+drives finite-time stop instead of the asymptotic crawl of pure
+exponential decay.
 
 ### Theme presets
 

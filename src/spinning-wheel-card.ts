@@ -63,11 +63,9 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
 
-/** Safety-net stop threshold. With Coulomb friction now driving
- *  finite-time stop (~0.3 s settle from 0.1 rad/s at slider 5), this
- *  is mostly a guarantee that even pathological float drift converges
- *  to zero quickly. Was 0.05 pre-Coulomb when the viscous-only tail
- *  could crawl below 0.1 rad/s for ~2 s before crossing the threshold. */
+/** Safety-net stop threshold. Coulomb friction usually reaches ω = 0
+ *  in finite time before this threshold is consulted; the guard
+ *  catches pathological float drift. */
 const STOP_THRESHOLD_RAD_PER_S = 0.01;
 const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
 const CLICK_IMPULSE_MAX = 16;  // rad/s ≈ 2.5 rev/s
@@ -744,8 +742,8 @@ export class SpinningWheelCard extends LitElement {
 
   /** Coulomb deceleration (rad/s²) — finite-time-stop term. Composed
    *  with `_frictionFactor()` so viscous (exponential) dominates at
-   *  high ω and Coulomb (linear) dominates near rest, removing the
-   *  asymptotic tail that used to crawl just above STOP_THRESHOLD. */
+   *  high ω and Coulomb (linear) dominates near rest, eliminating the
+   *  asymptotic tail of pure viscous damping. */
   private _coulombDecel(): number {
     return coulombDecel(this._frictionLevel());
   }
@@ -1087,11 +1085,10 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
-  /** Cached arc widths. Memoised because `_arcs()` is called from the
-   *  RAF tick chain (segment-crossing + peg-crossing detection) where
-   *  per-frame allocation showed up in the perf audit. Invalidated by
-   *  `_invalidateDrawCache` (which already fires on config / todo /
-   *  size — every input `_arcs` depends on). */
+  /** Cached arc widths. `_arcs()` is called from the RAF tick chain
+   *  (segment-crossing + peg-crossing detection); memoising avoids
+   *  per-frame array allocation. Invalidated by `_invalidateDrawCache`
+   *  on every input `_arcs` depends on (config / todo / size). */
   private _cachedArcs: ReadonlyArray<number> | null = null;
 
   /** Arc widths in radians, summing to 2π. Honours `weights`. */
@@ -1263,15 +1260,11 @@ export class SpinningWheelCard extends LitElement {
       2,
       (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
     );
-    // 1.5 × angular half-width — clears the peg's pixel footprint
-    // with a small breathing buffer. Scales with wheel size.
     // 1.0 × angular half-width — only treat the indicator as "on the
-    // peg" when its centre overlaps the painted pixel footprint. The
-    // previous 1.5× breathing buffer caught borderline cases where
-    // the indicator was clearly past the peg edge, producing a visible
-    // "speed-up" as the settle tween moved it further out. Tighter
-    // threshold = fewer nudges; the cases that remain are the ones
-    // where the indicator genuinely overlaps the peg.
+    // peg" when its centre overlaps the painted pixel footprint. A
+    // wider buffer catches cases where the indicator is clearly past
+    // the peg edge, which produces a visible "speed-up" as the settle
+    // tween moves it further out. Scales with wheel size.
     const deadzone = pegPx / Math.max(1, radius);
 
     // Pegs are evenly spaced around the rim (so weighted wheels still
@@ -1304,14 +1297,11 @@ export class SpinningWheelCard extends LitElement {
    *
    *  Back-roll: the direction MAY flip back against the natural side
    *  with `proximity * PEG_BACKROLL_MAX_PROB` chance — simulates the
-   *  peg "almost blocking" a borderline spin. But: we suppress the
-   *  flip when `_lastSpinDirection` shows the wheel CLEANLY CROSSED
-   *  the peg (motion direction opposite to landed-side direction).
-   *  Without this gate, a wheel coasting just past a peg would
-   *  randomly snap back to the side it came from — the visible "jump"
-   *  reported on long radial wheels. Back-roll stays available when
-   *  the wheel approached but didn't cross. After settle the result
-   *  is announced. */
+   *  peg "almost blocking" a borderline spin. Suppressed when
+   *  `_lastSpinDirection` shows the wheel cleanly crossed the peg
+   *  (motion direction opposite to landed-side direction); otherwise
+   *  a wheel coasting just past a peg would randomly snap back to the
+   *  side it came from. After settle the result is announced. */
   private _finalizeStop(smooth: boolean): void {
     const plan = this._computeOffPegPlan(this._angle);
     if (plan === null) {
@@ -1452,11 +1442,10 @@ export class SpinningWheelCard extends LitElement {
     this._velocitySamples = [];
     this._lastTickSeg = -1;
     this._lastSpinDirection = 0;
-    // Icon cache + loading set are module-scope now (ICON_PATH_CACHE /
-    // ICON_LOADING_SET) — intentionally NOT cleared here. Every
-    // reconnect re-runs the 30-frame RAF poll otherwise, which is the
-    // exact case mentioned in the perf audit. HA's icon registry is
-    // stable across the disconnect/reconnect cycle.
+    // Icon caches (ICON_PATH_CACHE / ICON_LOADING_SET) are module-
+    // scope and intentionally NOT cleared here. HA's icon registry is
+    // stable across disconnect/reconnect, and clearing would re-run
+    // the 30-frame RAF probe per icon on every reconnect.
     this._invalidateDrawCache();
   }
 
@@ -1617,7 +1606,7 @@ export class SpinningWheelCard extends LitElement {
       }
 
       // Width budget: radial = full hub→rim channel; tangent = arc
-      // span at labelRadius. Same formulas as the v1.2.3 inline path.
+      // span at labelRadius.
       const widthBudget =
         orientation === "radial"
           ? radialChannel * 0.95
@@ -2380,10 +2369,10 @@ export class SpinningWheelCard extends LitElement {
    *  apply the per-peg drag (gated on `pegs`). When `pegs: true` the
    *  detector runs at 2N peg intervals so every visible peg (boundary
    *  AND mid-segment) fires; otherwise it runs at N segment intervals
-   *  (the original v1.0 audio cadence). Detection runs unconditionally
-   *  so a `sound: false` + `pegs: true` user still gets the brake on
-   *  each peg. The cursor advances even when audio is rate-limited so
-   *  the next crossing isn't spurious. */
+   *  (no pegs = audio fires at segment boundaries only). Detection
+   *  runs unconditionally so a `sound: false` + `pegs: true` user
+   *  still gets the brake on each peg. The cursor advances even when
+   *  audio is rate-limited so the next crossing isn't spurious. */
   private _onSegmentCrossing(intensity: number): void {
     const audioOn = this._soundEnabled();
     const pegsOn = this._pegsEnabled();
@@ -2756,8 +2745,7 @@ export class SpinningWheelCard extends LitElement {
     // segment overpaints the seam — invisible angular shift
     // (~0.005 rad at radius 250), no visible hairline gap. The
     // separator stroke already covers the seam when borders are on,
-    // so skip the slack in that path to keep the bordered look
-    // pixel-identical to v1.2.0.
+    // so skip the slack in that path.
     const borderless = this.config.segment_borders === false;
     const seamSlack = borderless ? 1 / Math.max(1, radius) : 0;
 
