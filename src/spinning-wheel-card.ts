@@ -1,6 +1,7 @@
 import { LitElement, html, css } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import type {
   ActionConfig,
@@ -48,7 +49,7 @@ if (!_w.customCards.some((c) => c.type === "spinning-wheel-card")) {
 
 const DEFAULT_SIZE = 280;
 const MIN_SIZE = 140;
-const MAX_SIZE = 600;
+const MAX_SIZE = 1000;
 // Geometry as fractions of size, calibrated against 280 px.
 const HUB_RADIUS_FRAC = 18 / DEFAULT_SIZE;
 const POINTER_HALF_WIDTH_FRAC = 12 / DEFAULT_SIZE;
@@ -76,6 +77,11 @@ export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI
 
 /** Pure parser for `#RRGGBB`, `#RGB`, `rgb(r,g,b)`, `rgba(r,g,b,a)`.
  *  Returns null for anything else (named colours, hsl(), CSS vars).
+ *  ALPHA IS DISCARDED — consumers that need the rendered colour (e.g.
+ *  auto-contrast luminance) should use `cssRgbForLuminance` instead.
+ *  Consumers that need the literal user-typed RGB triple (e.g. the
+ *  `wheel_color_rgb` action payload) want this function as-is so the
+ *  payload mirrors what was in YAML.
  *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
 export const cssToRgbTriple = (
   css: string,
@@ -105,6 +111,34 @@ export const cssToRgbTriple = (
     return [parseInt(m[1]!, 10), parseInt(m[2]!, 10), parseInt(m[3]!, 10)];
   }
   return null;
+};
+
+/** RGB triple appropriate for luminance / contrast calculations. Unlike
+ *  `cssToRgbTriple`, this honours the alpha channel by blending the
+ *  source colour against an assumed white backdrop — which is what an
+ *  `rgba(0,0,0,0.5)` fill actually looks like rendered on a dashboard
+ *  (i.e. mid-grey, not black). Without this, auto-contrast misjudges
+ *  translucent fills and picks the wrong text colour (WCAG 1.4.3).
+ *  Returns null for inputs `cssToRgbTriple` doesn't accept. */
+export const cssRgbForLuminance = (
+  css: string,
+): readonly [number, number, number] | null => {
+  const s = css.trim();
+  // Hex values are opaque by definition — fall through to the
+  // existing parser.
+  if (s.startsWith("#")) return cssToRgbTriple(s);
+  const m = s.match(
+    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)/i,
+  );
+  if (!m) return null;
+  const r = parseInt(m[1]!, 10);
+  const g = parseInt(m[2]!, 10);
+  const b = parseInt(m[3]!, 10);
+  if (m[4] === undefined) return [r, g, b];
+  const a = Math.max(0, Math.min(1, parseFloat(m[4]!)));
+  if (!Number.isFinite(a) || a >= 1) return [r, g, b];
+  const blend = (c: number): number => Math.round(c * a + 255 * (1 - a));
+  return [blend(r), blend(g), blend(b)];
 };
 
 /** Walk a font size down from `startPx` until the measured width fits
@@ -169,6 +203,51 @@ const DRAG_COMMIT_RAD = 0.04;
 interface VelocitySample {
   t: number;        // performance.now()
   angleDelta: number;
+}
+
+/** Cross-instance, cross-mount icon path cache. Keys are bare icon
+ *  names (`mdi:home`); values are the resolved SVG `d` string, or
+ *  `null` if the probe confirmed it doesn't exist in HA's icon
+ *  registry. Lives at module scope so a card moving across the DOM
+ *  tree (tab switch, dialog close, sections rearrange) doesn't burn
+ *  another 30-RAF poll per icon on reconnect. */
+const ICON_PATH_CACHE: Map<string, string | null> = new Map();
+/** Names currently in flight in `_loadIcon`. Module-scope guard
+ *  prevents concurrent probes of the same name from multiple card
+ *  instances on the same dashboard. */
+const ICON_LOADING_SET: Set<string> = new Set();
+
+/** Per-segment resolved render plan, built once per cache rebuild and
+ *  read on every `_draw` frame. For text labels, all measure-and-shrink
+ *  work is done up-front so the RAF tick never calls `ctx.measureText`.
+ *  For icon labels, only `isIcon` + `iconPath` are populated. */
+interface LabelRenderPlan {
+  isIcon: boolean;
+  /** Resolved icon path. `string` = ready; `null` = missing (render
+   *  literal fallback); `undefined` = still loading (skip render).
+   *  Always carried explicitly so `exactOptionalPropertyTypes: true`
+   *  accepts the pending-state assignment. */
+  iconPath: string | null | undefined;
+  /** Original label text — kept so the icon-missing fallback can show
+   *  the literal `mdi:` identifier the user typed. */
+  rawText: string;
+  /** Post-truncation render string. For icons that resolved, unused. */
+  display: string;
+  /** Chosen font size in CSS px (after auto-fit shrink). */
+  fontPx: number;
+  /** `ctx.measureText(display).width / 2` at `fontPx`. Used by the
+   *  radial draw-position shifter so it doesn't have to measure on
+   *  every frame. */
+  textHalfWidth: number;
+  /** Per-glyph code points (split for tangent rendering). */
+  chars: ReadonlyArray<string>;
+  /** Per-glyph pixel widths at `fontPx`. Mirrors `chars`. */
+  glyphWidths: ReadonlyArray<number>;
+  /** Per-glyph angle subtended at `labelRadius`. Mirrors `chars`. */
+  glyphAngularWidths: ReadonlyArray<number>;
+  /** Sum of `glyphAngularWidths` — also cached so `_drawArchedText`
+   *  doesn't `reduce` it every frame. */
+  totalAngular: number;
 }
 
 export class SpinningWheelCard extends LitElement {
@@ -523,6 +602,7 @@ export class SpinningWheelCard extends LitElement {
     }
     this.config = { ...config };
     this._invalidateThemeCache();
+    this._invalidateDrawCache();
     this._result = null;
   }
 
@@ -562,8 +642,13 @@ export class SpinningWheelCard extends LitElement {
    *  only — only `columns` accepts the `"full"` sentinel.
    *  Concrete numeric defaults match hui-clock-card (the prior
    *  `rows: "auto"` collapsed ha-card and broke the vertical-resize
-   *  drag handle — ha-lovelace-card SKILL § Vertical resize). No
-   *  `max_*` caps: canvas clamps internally at MAX_SIZE. */
+   *  drag handle — ha-lovelace-card SKILL § Vertical resize).
+   *  `max_rows` caps the height slider at the point where the canvas
+   *  reaches its `MAX_SIZE` cap; past that, extra rows just add dead
+   *  space below the wheel. Math: each row pitch is 56 px + 8 px gap,
+   *  card chrome ≈ 70 px. For full mode (1000 px wheel cap): ~17 rows.
+   *  For half mode (1000 px wide → 578 px tall via HALF_ASPECT, plus
+   *  chrome): ~10 rows. */
   public getGridOptions(): {
     columns?: number | "full";
     rows?: number | "auto";
@@ -582,6 +667,7 @@ export class SpinningWheelCard extends LitElement {
         rows: 3,
         min_columns: 4,
         min_rows: 2,
+        max_rows: 10,
       };
     }
     return {
@@ -589,6 +675,7 @@ export class SpinningWheelCard extends LitElement {
       rows: 6,
       min_columns: 4,
       min_rows: 4,
+      max_rows: 17,
     };
   }
 
@@ -662,11 +749,13 @@ export class SpinningWheelCard extends LitElement {
         unique.push(item);
       }
       this._todoItems = unique;
+      this._invalidateDrawCache();
       this._result = null;
       this._draw();
     } catch (err) {
       console.warn("[spinning-wheel-card] todo/item/list failed:", err);
       this._todoItems = [];
+      this._invalidateDrawCache();
     } finally {
       this._todoLoading = false;
     }
@@ -698,7 +787,10 @@ export class SpinningWheelCard extends LitElement {
       );
     const fills = this._segmentColors();
     const autoFallback = fills.map((fill) => {
-      const rgb = cssToRgbTriple(fill);
+      // Use the alpha-aware variant so translucent fills
+      // (`rgba(0,0,0,0.5)` etc.) get luminance computed against the
+      // effective rendered colour, not the raw RGB the user typed.
+      const rgb = cssRgbForLuminance(fill);
       if (rgb === null) return DEFAULT_LABEL_COLOR;
       return this._isLight([rgb[0], rgb[1], rgb[2]]) ? "#1a1a1a" : "#ffffff";
     });
@@ -950,8 +1042,16 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
+  /** Cached arc widths. Memoised because `_arcs()` is called from the
+   *  RAF tick chain (segment-crossing + peg-crossing detection) where
+   *  per-frame allocation showed up in the perf audit. Invalidated by
+   *  `_invalidateDrawCache` (which already fires on config / todo /
+   *  size — every input `_arcs` depends on). */
+  private _cachedArcs: ReadonlyArray<number> | null = null;
+
   /** Arc widths in radians, summing to 2π. Honours `weights`. */
   private _arcs(): ReadonlyArray<number> {
+    if (this._cachedArcs !== null) return this._cachedArcs;
     const n = this._segments();
     const src = this.config.weights;
     let weights: number[];
@@ -964,8 +1064,12 @@ export class SpinningWheelCard extends LitElement {
       });
     }
     const total = weights.reduce((a, b) => a + b, 0);
-    if (total <= 0) return Array<number>(n).fill((Math.PI * 2) / n);
-    return weights.map((w) => (w / total) * Math.PI * 2);
+    const out =
+      total <= 0
+        ? Array<number>(n).fill((Math.PI * 2) / n)
+        : weights.map((w) => (w / total) * Math.PI * 2);
+    this._cachedArcs = out;
+    return out;
   }
 
   protected override firstUpdated(_changed: PropertyValues): void {
@@ -1013,6 +1117,7 @@ export class SpinningWheelCard extends LitElement {
         // Tolerance avoids redraws on sub-pixel jitter.
         if (Math.abs(next - this._size) >= 1) {
           this._size = next;
+          this._invalidateDrawCache();
           this._applyCanvasSize();
           this._draw();
         }
@@ -1266,9 +1371,12 @@ export class SpinningWheelCard extends LitElement {
     this._dragAccumulated = 0;
     this._velocitySamples = [];
     this._lastTickSeg = -1;
-    // HA may re-register icon sources between mounts.
-    this._iconCache.clear();
-    this._iconLoading.clear();
+    // Icon cache + loading set are module-scope now (ICON_PATH_CACHE /
+    // ICON_LOADING_SET) — intentionally NOT cleared here. Every
+    // reconnect re-runs the 30-frame RAF poll otherwise, which is the
+    // exact case mentioned in the perf audit. HA's icon registry is
+    // stable across the disconnect/reconnect cycle.
+    this._invalidateDrawCache();
   }
 
   private _clampSize(w: number): number {
@@ -1288,6 +1396,274 @@ export class SpinningWheelCard extends LitElement {
    *  the CSS-var read in `_resolveTheme` could shift. */
   private _invalidateThemeCache(): void {
     this._resolvedThemeCache = null;
+  }
+
+  /** Per-spin draw cache. Everything in `_draw` that doesn't depend on
+   *  `_angle` lives here so the RAF tick avoids per-frame allocations
+   *  and `ctx.measureText` calls. Built lazily on the first `_draw`
+   *  call after invalidation; reused every subsequent frame until
+   *  config / todo / size / icon-load triggers `_invalidateDrawCache`.
+   *  The cache rebuild is one full pass of measure-and-shrink (~200
+   *  `measureText` calls for a 20-segment radial wheel with long
+   *  labels) — but only ONCE per spin instead of every frame, taking
+   *  the per-frame work from ~600 measureText calls to zero. */
+  private _drawCache: {
+    arcs: ReadonlyArray<number>;
+    expandedLabels: ReadonlyArray<string>;
+    segmentColors: ReadonlyArray<string>;
+    segmentLabelColors: ReadonlyArray<string>;
+    labelFontPx: number;
+    labelRadius: number;
+    useAutoFit: boolean;
+    flip: boolean;
+    orientation: TextOrientation;
+    isTodoMode: boolean;
+    labelPlans: ReadonlyArray<LabelRenderPlan>;
+    pegRadius: number;
+    pegSize: number;
+    pegStep: number;
+    totalPegs: number;
+    pegsEnabled: boolean;
+    /** "" when the hub label is hidden (empty config OR selector mode). */
+    hubText: string;
+    /** Already shrunk to fit `hubRadius * 1.7` — no per-frame measure
+     *  loop. 0 when `hubText` is empty. */
+    hubFontPx: number;
+  } | null = null;
+
+  /** Drop the draw cache. Called from setConfig, _fetchTodoItems'
+   *  success path, the ResizeObserver size-change branch, and after
+   *  an icon path resolves in `_loadIcon`. Cheap (just nulls the
+   *  field); next `_draw` rebuilds. */
+  private _invalidateDrawCache(): void {
+    this._drawCache = null;
+    this._cachedArcs = null;
+  }
+
+  /** Build all per-spin-invariant state from config + size + icon
+   *  status. Runs once after invalidation; the result powers every
+   *  subsequent `_draw` frame. The expensive bits — measure-and-shrink
+   *  font selection, per-glyph width measurement for tangent text —
+   *  happen here so the RAF tick never calls `ctx.measureText`. */
+  private _buildDrawCache(ctx: CanvasRenderingContext2D): NonNullable<
+    typeof this._drawCache
+  > {
+    const arcs = this._arcs();
+    const n = arcs.length;
+    const expandedLabels = this._expandedLabels();
+    const segmentColors = this._segmentColors();
+    const segmentLabelColors = this._segmentLabelColors();
+
+    const size = this._size;
+    const radius = size / 2 - size * RIM_INSET_FRAC;
+    const hubRadius = size * HUB_RADIUS_FRAC;
+
+    const fontScale = this.config.label_font_scale ?? 100;
+    const labelFontPx = Math.max(
+      7,
+      Math.round((size * 0.05 * fontScale) / 100),
+    );
+    const isTodoMode = this._isTodoMode();
+    const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
+    const minLabelPx = 7;
+    const flip = this.config.label_flip === true;
+    const orientation = this._textOrientation();
+
+    const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
+    const offsetFrac = (this.config.label_radius_offset ?? 0) / 100;
+    const safeRadius = Math.max(1, radius);
+    const minFrac = Math.min(
+      0.95,
+      (hubRadius + labelFontPx * 0.6) / safeRadius,
+    );
+    const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
+    const labelRadius =
+      radius *
+      Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
+
+    const radialInnerLimit = hubRadius + labelFontPx * 0.4;
+    const radialOuterLimit = radius - labelFontPx * 0.3;
+    const radialChannel = Math.max(
+      0,
+      radialOuterLimit - radialInnerLimit,
+    );
+
+    const labelPlans: LabelRenderPlan[] = [];
+    for (let i = 0; i < n; i++) {
+      const arc = arcs[i] ?? 0;
+      const text = expandedLabels[i] ?? "";
+
+      // Icon (`mdi:foo`) → cache the resolved iconPath state. Success
+      // path uses iconPath only; missing falls through to text render
+      // of the literal so the user spots a typo; pending skips render
+      // until the next cache rebuild (icon-load triggers invalidate).
+      if (this._looksLikeIcon(text)) {
+        const iconPath = this._getIconPath(text);
+        if (typeof iconPath === "string" || iconPath === undefined) {
+          labelPlans.push({
+            isIcon: true,
+            iconPath,
+            rawText: text,
+            display: text,
+            fontPx: labelFontPx,
+            textHalfWidth: 0,
+            chars: [],
+            glyphWidths: [],
+            glyphAngularWidths: [],
+            totalAngular: 0,
+          });
+          continue;
+        }
+        // iconPath === null → fall through to text rendering below.
+      }
+
+      // Arc too narrow (< ~15°) for any readable label — store an
+      // empty plan so indices align; `_draw` will skip rendering.
+      if (arc <= 0.26) {
+        labelPlans.push({
+          isIcon: false,
+          iconPath: null,
+          rawText: text,
+          display: "",
+          fontPx: labelFontPx,
+          textHalfWidth: 0,
+          chars: [],
+          glyphWidths: [],
+          glyphAngularWidths: [],
+          totalAngular: 0,
+        });
+        continue;
+      }
+
+      // Width budget: radial = full hub→rim channel; tangent = arc
+      // span at labelRadius. Same formulas as the v1.2.3 inline path.
+      const widthBudget =
+        orientation === "radial"
+          ? radialChannel * 0.95
+          : arc * labelRadius * 0.85;
+
+      // Pick font size — auto-fit shrinks; fixed keeps labelFontPx.
+      let chosenPx: number;
+      if (useAutoFit) {
+        const measure = (px: number): number => {
+          ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+          return ctx.measureText(text).width;
+        };
+        const picked = pickFontPx(
+          measure,
+          labelFontPx,
+          minLabelPx,
+          widthBudget,
+        );
+        chosenPx = picked.px;
+      } else {
+        chosenPx = labelFontPx;
+      }
+
+      // Ellipsize at chosen px so each label has its final render form
+      // baked into the cache.
+      ctx.font = `600 ${chosenPx}px ui-sans-serif, system-ui, sans-serif`;
+      let display: string;
+      if (ctx.measureText(text).width <= widthBudget) {
+        display = text;
+      } else {
+        let truncated = text;
+        while (
+          truncated.length > 1 &&
+          ctx.measureText(truncated + "…").width > widthBudget
+        ) {
+          truncated = truncated.slice(0, -1);
+        }
+        display = truncated + "…";
+      }
+
+      const textHalfWidth = ctx.measureText(display).width / 2;
+
+      // Tangent: pre-compute per-glyph widths + angular subtensions at
+      // labelRadius so `_drawArchedText` never measures during a spin.
+      let chars: ReadonlyArray<string> = [];
+      let glyphWidths: ReadonlyArray<number> = [];
+      let glyphAngularWidths: ReadonlyArray<number> = [];
+      let totalAngular = 0;
+      if (orientation === "tangent") {
+        const charArr = Array.from(display);
+        const gw = charArr.map((c) => ctx.measureText(c).width);
+        const aw = gw.map((w) => w / Math.max(1, labelRadius));
+        chars = charArr;
+        glyphWidths = gw;
+        glyphAngularWidths = aw;
+        totalAngular = aw.reduce((s, a) => s + a, 0);
+      }
+
+      labelPlans.push({
+        isIcon: false,
+        iconPath: null,
+        rawText: text,
+        display,
+        fontPx: chosenPx,
+        textHalfWidth,
+        chars,
+        glyphWidths,
+        glyphAngularWidths,
+        totalAngular,
+      });
+    }
+
+    const pegsEnabled = this._pegsEnabled();
+    const pegSize = pegsEnabled
+      ? Math.max(2, (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE)
+      : 0;
+    const pegRadius = pegsEnabled ? radius * PEG_RADIUS_FRAC : 0;
+    const totalPegs = pegsEnabled ? this._pegsPerSegment() * n : 0;
+    const pegStep = pegsEnabled && totalPegs > 0 ? TWO_PI / totalPegs : 0;
+
+    // Hub text + pre-shrunk font size. Selector mode hides the hub
+    // label (the centre prompt no longer matches drag-to-pick). The
+    // shrink loop runs once here at cache build time so `_draw` only
+    // does fillText + the static save/restore per frame.
+    const rawHubText = this._hubText();
+    const hubTextOn = !!rawHubText && !this._isSelectorMode();
+    let hubText = "";
+    let hubFontPx = 0;
+    if (hubTextOn) {
+      hubText = rawHubText;
+      const baseSize = Math.max(7, Math.round(size * 0.038));
+      const minSize = Math.max(6, Math.round(baseSize * 0.55));
+      const maxWidth = hubRadius * 1.7;
+      let fontSize = baseSize;
+      ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      while (
+        ctx.measureText(hubText).width > maxWidth &&
+        fontSize > minSize
+      ) {
+        fontSize -= 1;
+        ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      }
+      hubFontPx = fontSize;
+    }
+
+    const cache = {
+      arcs,
+      expandedLabels,
+      segmentColors,
+      segmentLabelColors,
+      labelFontPx,
+      labelRadius,
+      useAutoFit,
+      flip,
+      orientation,
+      isTodoMode,
+      labelPlans,
+      pegRadius,
+      pegSize,
+      pegStep,
+      totalPegs,
+      pegsEnabled,
+      hubText,
+      hubFontPx,
+    };
+    this._drawCache = cache;
+    return cache;
   }
 
   private _resolveTheme(ctx: CanvasRenderingContext2D): {
@@ -1390,20 +1766,21 @@ export class SpinningWheelCard extends LitElement {
    *  rotated to be locally tangent. Caller owns font/fillStyle/align.
    *  When `flip` is true, chars walk CW→CCW and glyph tops face the
    *  wheel centre instead of the rim — the "text on the bottom of a
-   *  coin" convention used by `label_flip`. */
+   *  coin" convention used by `label_flip`.
+   *
+   *  Glyph widths are passed in pre-computed so the RAF tick avoids
+   *  `ctx.measureText` calls — they're cached in `_drawCache.labelPlans`
+   *  and refreshed only when config / size / label changes. */
   private _drawArchedText(
     ctx: CanvasRenderingContext2D,
-    text: string,
+    chars: ReadonlyArray<string>,
+    angularWidths: ReadonlyArray<number>,
+    totalAngular: number,
     midAngle: number,
     radius: number,
-    flip = false,
+    flip: boolean,
   ): void {
-    if (!text || radius <= 0) return;
-    const chars = Array.from(text);
-    const widths = chars.map((c) => ctx.measureText(c).width);
-    // Convert each glyph width to the angle it subtends at this radius.
-    const angularWidths = widths.map((w) => w / radius);
-    const totalAngular = angularWidths.reduce((s, a) => s + a, 0);
+    if (chars.length === 0 || radius <= 0) return;
     if (flip) {
       // Walk from CW end of the arc back to CCW; rotate each glyph
       // -π/2 so the local +X tangent direction is CCW and glyph tops
@@ -1437,12 +1814,24 @@ export class SpinningWheelCard extends LitElement {
   }
 
   // Icon labels (`mdi:foo`, `hass:foo`) borrow the SVG path from a
-  // hidden ha-icon at runtime — no @mdi/js bundle.
+  // hidden ha-icon at runtime — no @mdi/js bundle. The cache and the
+  // "currently loading" set live at MODULE scope so they persist across
+  // the disconnect/reconnect cycles HA fires when the user opens or
+  // closes the more-info dialog, switches tabs, or rearranges sections:
+  // otherwise every reconnect re-runs the 30-frame RAF probe per icon
+  // and a typoed `mdi:foo` would re-poll on every mount. The cache also
+  // de-duplicates across multiple card instances on the same dashboard.
 
-  /** path | null (missing) | undefined (not yet looked up). */
-  private _iconCache = new Map<string, string | null>();
-  /** Prevents N redundant DOM queries per redraw. */
-  private _iconLoading = new Set<string>();
+  /** path | null (missing) | undefined (not yet looked up).
+   *  Module-scope so it survives HACS re-imports + Lit disconnects. */
+  private get _iconCache(): Map<string, string | null> {
+    return ICON_PATH_CACHE;
+  }
+  /** Prevents N redundant DOM queries per redraw. Module-scope for the
+   *  same reason as `_iconCache`. */
+  private get _iconLoading(): Set<string> {
+    return ICON_LOADING_SET;
+  }
 
   /** Matches `mdi:foo` / `hass:foo` / any namespaced HA icon ref. */
   private _looksLikeIcon(label: string): boolean {
@@ -1506,6 +1895,9 @@ export class SpinningWheelCard extends LitElement {
       // probe into document.body.
       probe.remove();
       this._iconLoading.delete(name);
+      // Per-label plans cache iconPath state — drop so the next draw
+      // re-resolves with the freshly cached path (or null for missing).
+      this._invalidateDrawCache();
       if (this.isConnected) this._draw();
     }
   }
@@ -1610,21 +2002,29 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
-  /** Rotate so the segment under the pointer lands centred at 12. Pure
-   *  setter on `_angle` — caller owns redraw + announce. */
-  private _snapToSegmentUnderPointer(): void {
+  /** Rotate so the segment at `idx` lands centred at 12. Wraps idx into
+   *  `[0, arcs.length)`. Pure setter on `_angle` — caller owns redraw +
+   *  announce. */
+  private _snapToSegmentIndex(idx: number): void {
     const arcs = this._arcs();
-    if (arcs.length === 0) return;
-    const idx = this._segmentIndexUnderPointer();
+    const n = arcs.length;
+    if (n === 0) return;
+    const safeIdx = ((idx % n) + n) % n;
     let cumStart = 0;
-    for (let i = 0; i < idx; i++) cumStart += arcs[i] ?? 0;
-    const arc = arcs[idx] ?? 0;
-    const a0 = arcs[0] ?? TWO_PI / arcs.length;
+    for (let i = 0; i < safeIdx; i++) cumStart += arcs[i] ?? 0;
+    const arc = arcs[safeIdx] ?? 0;
+    const a0 = arcs[0] ?? TWO_PI / n;
     // Inverse of `_segmentIndexUnderPointer`: that function reads the
     // segment whose local-frame range contains `target = -angle + a0/2`.
     // To centre segment idx we want `target = cumStart + arc/2`, i.e.
     // `angle = a0/2 - target`.
     this._angle = wrapAngle(a0 / 2 - cumStart - arc / 2);
+  }
+
+  /** Rotate so the segment under the pointer lands centred at 12. Pure
+   *  setter on `_angle` — caller owns redraw + announce. */
+  private _snapToSegmentUnderPointer(): void {
+    this._snapToSegmentIndex(this._segmentIndexUnderPointer());
   }
 
   /** Segment under the 12-o'clock pointer. Walks cumulative arcs until
@@ -2037,7 +2437,12 @@ export class SpinningWheelCard extends LitElement {
 
   /** Keyboard equivalent for click-to-spin. WCAG 2.1.1. */
   private _onKeyDown = (ev: KeyboardEvent): void => {
-    if (ev.key !== " " && ev.key !== "Enter") return;
+    const isSelector = this._isSelectorMode();
+    // Selector mode adds ArrowLeft/ArrowRight for keyboard ±1-segment
+    // navigation (mouse uses drag; this closes the parity gap).
+    const isArrow =
+      isSelector && (ev.key === "ArrowRight" || ev.key === "ArrowLeft");
+    if (ev.key !== " " && ev.key !== "Enter" && !isArrow) return;
     ev.preventDefault();
     // Warm audio on first user gesture (same pathway as pointerdown).
     if (this._soundEnabled()) {
@@ -2051,7 +2456,19 @@ export class SpinningWheelCard extends LitElement {
           .catch(() => {});
       }
     }
-    if (this._isSelectorMode()) {
+    if (isSelector) {
+      if (isArrow) {
+        const arcs = this._arcs();
+        const n = arcs.length;
+        if (n === 0) return;
+        const cur = this._segmentIndexUnderPointer();
+        const next =
+          ev.key === "ArrowRight" ? (cur + 1) % n : (cur - 1 + n) % n;
+        this._snapToSegmentIndex(next);
+        this._announceResult();
+        this._draw();
+        return;
+      }
       // Re-fire the existing selection. Gated on `_result !== null`
       // so Tab+Space on a fresh card can't fire segment 0 unintended.
       if (this._result === null) return;
@@ -2106,8 +2523,13 @@ export class SpinningWheelCard extends LitElement {
     // here would clearRect pixels that no longer exist.
     const canvasH = this._canvasCssHeight();
 
-    // DPR scaling — backing store W×H×dpr, draw in CSS px.
-    const dpr = window.devicePixelRatio || 1;
+    // DPR scaling — backing store W×H×dpr, draw in CSS px. Cap effective
+    // DPR at 2: on 3× retina with MAX_SIZE=1000 the unbounded backing
+    // store is 3000² = 9 MP per frame, with no perceptible benefit over
+    // 2000² for typography/circular fills. 2× covers every consumer
+    // display that matters; mobile high-DPR panels gain back ~50 % fill
+    // budget per RAF tick.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const wantW = Math.max(1, Math.round(size * dpr));
     const wantH = Math.max(1, Math.round(canvasH * dpr));
     if (c.width !== wantW || c.height !== wantH) {
@@ -2117,14 +2539,17 @@ export class SpinningWheelCard extends LitElement {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, canvasH);
 
-    const arcs = this._arcs();
+    const cache = this._drawCache ?? this._buildDrawCache(ctx);
+    const arcs = cache.arcs;
     const n = arcs.length;
-    const labels = this._expandedLabels();
-    const colors = this._segmentColors();
-    const labelColors = this._segmentLabelColors();
-    const orientation = this._textOrientation();
+    const colors = cache.segmentColors;
+    const labelColors = cache.segmentLabelColors;
+    const orientation = cache.orientation;
     const theme = this._resolveTheme(ctx);
-    const isTodoMode = this._isTodoMode();
+    const labelFontPx = cache.labelFontPx;
+    const labelRadius = cache.labelRadius;
+    const labelFlip = cache.flip;
+    const labelPlans = cache.labelPlans;
 
     // Half-circle: clip disc paint to the upper half (the lower half
     // still rotates internally). Hub + pointer paint AFTER restore, so
@@ -2142,16 +2567,6 @@ export class SpinningWheelCard extends LitElement {
     ctx.save();
     ctx.translate(center, center);
     ctx.rotate(this._angle - Math.PI / 2 - a0 / 2);
-
-    // ~14 px label at the 280 px calibration size, scaled by the
-    // `label_font_scale` slider (70–150 %, default 100). Floor at 7 so
-    // the manual-fixed path can still render the smallest scales (auto-
-    // fit uses the same floor, so the two paths agree on the minimum).
-    const fontScale = this.config.label_font_scale ?? 100;
-    const labelFontPx = Math.max(7, Math.round(size * 0.05 * fontScale / 100));
-    const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
-    const minLabelPx = 7;
-    const labelFlip = this.config.label_flip === true;
 
     // Borderless mode bleeds the canvas-clear colour through the
     // sub-pixel antialiasing along each diagonal seam between two
@@ -2184,166 +2599,64 @@ export class SpinningWheelCard extends LitElement {
         ctx.stroke();
       }
 
-      // Below ~15° (≈ 4 %) there's no readable space.
-      if (arc > 0.26) {
-        const text = labels[i] ?? "";
-        const fillColor = labelColors[i] ?? "#1a1a1a";
+      // Below ~15° (≈ 4 %) there's no readable space; cache marks
+      // those plans with empty `display` so we can skip cheaply.
+      const plan = labelPlans[i];
+      if (plan && arc > 0.26) {
         const midAngle = start + arc / 2;
-        // Todo+radial: 0.55 widens the budget ~35 % vs 0.66 (the
-        // rim-side margin `radius - labelRadius` is the binding
-        // constraint), fitting longer summaries before shrinking. The
-        // `label_radius_offset` slider adds a -20..+20 % delta on top;
-        // clamped at draw time so the label never paints inside the
-        // hub or off the disc — `labelFontPx * 0.6` reserves roughly
-        // half-x-height of breathing room at each end.
-        const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
-        const offsetFrac = (this.config.label_radius_offset ?? 0) / 100;
-        const safeRadius = Math.max(1, radius);
-        const minFrac = Math.min(0.95, (hubRadius + labelFontPx * 0.6) / safeRadius);
-        const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
-        const labelRadius =
-          radius * Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
+        const fillColor = labelColors[i] ?? "#1a1a1a";
 
-        // HA icon name (`mdi:foo`, `hass:foo`) → render the path.
-        // While loading, the next redraw shows the icon.
-        if (this._looksLikeIcon(text)) {
-          const path = this._getIconPath(text);
-          if (typeof path === "string") {
-            // ~1.5× text font — icons read smaller per pixel.
-            const iconPx = Math.round(labelFontPx * 1.5);
-            this._drawSegmentIcon(
+        // Resolved icon → paint the SVG path; no text rendering.
+        if (plan.isIcon && typeof plan.iconPath === "string") {
+          const iconPx = Math.round(labelFontPx * 1.5);
+          this._drawSegmentIcon(
+            ctx,
+            plan.iconPath,
+            midAngle,
+            labelRadius,
+            iconPx,
+            fillColor,
+            orientation,
+          );
+        } else if (plan.isIcon && plan.iconPath === undefined) {
+          // Pending — async load triggers _invalidateDrawCache + redraw.
+        } else if (plan.display.length > 0) {
+          // Text label OR icon-missing fallback (rendered as literal).
+          // Display string + chosen font + glyph widths all baked into
+          // the plan — zero `measureText` calls on this frame.
+          ctx.save();
+          ctx.fillStyle = fillColor;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = `600 ${plan.fontPx}px ui-sans-serif, system-ui, sans-serif`;
+
+          if (orientation === "radial") {
+            // Shift draw centre inward/outward when text would
+            // otherwise poke past the hub edge or rim. `textHalfWidth`
+            // is the pre-computed `measureText(display).width / 2`.
+            const radialInnerLimit = hubRadius + plan.fontPx * 0.4;
+            const radialOuterLimit = radius - plan.fontPx * 0.3;
+            let pos = labelRadius;
+            const halfW = plan.textHalfWidth;
+            if (pos + halfW > radialOuterLimit) pos = radialOuterLimit - halfW;
+            if (pos - halfW < radialInnerLimit) pos = radialInnerLimit + halfW;
+            ctx.rotate(midAngle);
+            ctx.translate(pos, 0);
+            if (!labelFlip) ctx.rotate(Math.PI);
+            ctx.fillText(plan.display, 0, 0);
+          } else {
+            this._drawArchedText(
               ctx,
-              path,
+              plan.chars,
+              plan.glyphAngularWidths,
+              plan.totalAngular,
               midAngle,
               labelRadius,
-              iconPx,
-              fillColor,
-              orientation,
+              labelFlip,
             );
-          } else if (path === null) {
-            // Icon missing — render literal so the user spots a typo.
-            ctx.save();
-            ctx.fillStyle = fillColor;
-            ctx.font = `600 ${labelFontPx}px ui-sans-serif, system-ui, sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            const maxChars = Math.max(3, Math.floor((arc / 0.26) * 4));
-            const display =
-              text.length > maxChars
-                ? text.slice(0, maxChars - 1) + "…"
-                : text;
-            if (orientation === "radial") {
-              ctx.rotate(midAngle);
-              ctx.translate(labelRadius, 0);
-              if (!labelFlip) ctx.rotate(Math.PI);
-              ctx.fillText(display, 0, 0);
-            } else {
-              this._drawArchedText(
-                ctx,
-                display,
-                midAngle,
-                labelRadius,
-                labelFlip,
-              );
-            }
-            ctx.restore();
           }
-          // undefined → still loading; the async load re-triggers _draw.
-          cursor += arc;
-          continue;
+          ctx.restore();
         }
-
-        ctx.save();
-        ctx.fillStyle = fillColor;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        // Width budget for one label, shared by auto-fit + fixed paths:
-        //   radial  = full hub→rim run (with breathing room at each end)
-        //   tangent = arc × labelRadius × 0.85
-        // For radial, the budget is the full available radial channel
-        // rather than a symmetric span around labelRadius — when the
-        // user offsets labels off-centre, the smaller side would
-        // otherwise dominate and waste the larger side. `radialDrawAt`
-        // below shifts the actual draw centre inward/outward when the
-        // measured text would poke past either end, so short labels
-        // stay at labelRadius (offset slider still wins) and long
-        // labels expand into the full channel.
-        const radialInnerLimit = hubRadius + labelFontPx * 0.4;
-        const radialOuterLimit = radius - labelFontPx * 0.3;
-        const radialChannel = Math.max(
-          0,
-          radialOuterLimit - radialInnerLimit,
-        );
-        const widthBudget =
-          orientation === "radial"
-            ? radialChannel * 0.95
-            : arc * labelRadius * 0.85;
-        const radialDrawAt = (textWidth: number): number => {
-          const halfW = textWidth / 2;
-          let pos = labelRadius;
-          if (pos + halfW > radialOuterLimit) pos = radialOuterLimit - halfW;
-          if (pos - halfW < radialInnerLimit) pos = radialInnerLimit + halfW;
-          return pos;
-        };
-        // Ellipsis-truncate `text` until it fits `widthBudget` at the
-        // given font size. Returns the original string when it already
-        // fits; bails at 1 character so we never output just "…".
-        const ellipsizeAt = (px: number): string => {
-          ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-          if (ctx.measureText(text).width <= widthBudget) return text;
-          let truncated = text;
-          while (
-            truncated.length > 1 &&
-            ctx.measureText(truncated + "…").width > widthBudget
-          ) {
-            truncated = truncated.slice(0, -1);
-          }
-          return truncated + "…";
-        };
-
-        let chosenPx: number;
-        if (useAutoFit) {
-          // Measure-and-shrink: walk the font down from labelFontPx until
-          // the text fits, never below minLabelPx. If even minLabelPx
-          // doesn't fit, `ellipsizeAt` then ellipsis-truncates at that
-          // size.
-          const measure = (px: number): number => {
-            ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-            return ctx.measureText(text).width;
-          };
-          const picked = pickFontPx(
-            measure,
-            labelFontPx,
-            minLabelPx,
-            widthBudget,
-          );
-          chosenPx = picked.px;
-        } else {
-          // Auto-fit off: keep the user-chosen font size; rely on
-          // `ellipsizeAt` to truncate ONLY when text genuinely overflows
-          // (so scaling the font down makes more characters fit before
-          // the ellipsis kicks in — char-count truncation here used to
-          // ignore font size, which is the bug this branch was missing).
-          chosenPx = labelFontPx;
-        }
-        const display = ellipsizeAt(chosenPx);
-        ctx.font = `600 ${chosenPx}px ui-sans-serif, system-ui, sans-serif`;
-
-        if (orientation === "radial") {
-          // Shift inward/outward when the rendered text would overflow
-          // the radial channel; otherwise sit at labelRadius. The
-          // additional rotate(π) is the default rim→hub orientation;
-          // skip it when `label_flip` is on to read hub→rim.
-          const drawAt = radialDrawAt(ctx.measureText(display).width);
-          ctx.rotate(midAngle);
-          ctx.translate(drawAt, 0);
-          if (!labelFlip) ctx.rotate(Math.PI);
-          ctx.fillText(display, 0, 0);
-        } else {
-          this._drawArchedText(ctx, display, midAngle, labelRadius, labelFlip);
-        }
-        ctx.restore();
       }
 
       cursor += arc;
@@ -2365,16 +2678,12 @@ export class SpinningWheelCard extends LitElement {
     // ring tint; the half-circle clip handles the lower half. Colour
     // matches the indicator/hub accent so the pegs read against any
     // segment fill.
-    if (this._pegsEnabled()) {
-      const pegSize = Math.max(
-        2,
-        (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
-      );
-      const pegRadius = radius * PEG_RADIUS_FRAC;
-      const totalPegs = this._pegsPerSegment() * n;
-      const pegStep = TWO_PI / totalPegs;
+    if (cache.pegsEnabled) {
       ctx.fillStyle = theme.indicatorFill;
-      for (let i = 0; i < totalPegs; i++) {
+      const pegRadius = cache.pegRadius;
+      const pegSize = cache.pegSize;
+      const pegStep = cache.pegStep;
+      for (let i = 0; i < cache.totalPegs; i++) {
         const a = i * pegStep;
         ctx.beginPath();
         ctx.arc(
@@ -2408,25 +2717,16 @@ export class SpinningWheelCard extends LitElement {
     ctx.strokeStyle = theme.hubStroke;
     ctx.stroke();
 
-    // Hub text auto-shrinks. Hidden in selector mode — the centre
-    // "SPIN" prompt no longer matches the drag-to-pick gesture.
-    // Half-circle keeps it visible (just paints over the cut line).
-    const hubText = this._hubText();
-    if (hubText && !this._isSelectorMode()) {
+    // Hub text — chosen `hubFontPx` is pre-shrunk in `_buildDrawCache`
+    // so no per-frame `measureText` loop. Selector mode and empty text
+    // are both encoded as `hubText === ""` in the cache.
+    if (cache.hubText.length > 0) {
       ctx.save();
-      const baseSize = Math.max(7, Math.round(size * 0.038));
-      const minSize = Math.max(6, Math.round(baseSize * 0.55));
-      const maxWidth = hubRadius * 1.7;
-      let fontSize = baseSize;
-      ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      while (ctx.measureText(hubText).width > maxWidth && fontSize > minSize) {
-        fontSize -= 1;
-        ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      }
+      ctx.font = `700 ${cache.hubFontPx}px ui-sans-serif, system-ui, sans-serif`;
       ctx.fillStyle = theme.hubText;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(hubText, center, center);
+      ctx.fillText(cache.hubText, center, center);
       ctx.restore();
     }
 
@@ -2563,13 +2863,16 @@ export class SpinningWheelCard extends LitElement {
           <div class=${halfMode ? "wheel-wrap wheel-wrap-half" : "wheel-wrap"}>
             <canvas
               id="wheel"
+              class=${classMap({ "wheel-resting": !this._spinning })}
               width=${DEFAULT_SIZE}
               height=${DEFAULT_SIZE}
-              role="img"
+              role="button"
               tabindex="0"
               aria-roledescription=${localize("a11y.wheel_role", lang)}
               aria-label=${localize("a11y.wheel_label", lang)}
-              aria-keyshortcuts="Space Enter"
+              aria-keyshortcuts=${this._isSelectorMode()
+                ? "Space Enter ArrowLeft ArrowRight"
+                : "Space Enter"}
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -2589,6 +2892,7 @@ export class SpinningWheelCard extends LitElement {
               : "status"}
             aria-live="polite"
             aria-atomic="true"
+            aria-busy=${this._spinning ? "true" : "false"}
           >
             ${this.config.show_status === false ? statusText : statusNode}
           </div>
@@ -2673,11 +2977,19 @@ export class SpinningWheelCard extends LitElement {
     }
     #wheel {
       display: block;
-      max-width: 600px;
-      max-height: 600px;
+      max-width: 1000px;
+      max-height: 1000px;
       touch-action: none;        /* pointer handler owns gestures */
       cursor: grab;
       user-select: none;
+    }
+    /* Drop-shadow is a 14 px Gaussian blur over the full canvas — on
+       weak GPUs (mid-tier mobile) that costs ~10–30 ms per RAF tick at
+       1000 × DPR². Apply only when the wheel is at rest so the spin
+       animation isn't gated by shadow compositing. Returns the instant
+       _spinning flips back to false (RAF stop / drag commit / settle
+       tween completion). */
+    #wheel.wheel-resting {
       filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
     }
     #wheel:active {
@@ -2724,7 +3036,7 @@ export class SpinningWheelCard extends LitElement {
     /* RAF short-circuits in _startAnim; this catches any future CSS
        transitions so they don't bypass the user's choice. */
     @media (prefers-reduced-motion: reduce) {
-      #wheel {
+      #wheel.wheel-resting {
         filter: none;
       }
       *,

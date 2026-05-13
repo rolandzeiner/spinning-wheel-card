@@ -35,7 +35,15 @@ export default {
     commonjs(),
     typescript(),
     json(),
-    !dev && terser({ format: { comments: /Spinning Wheel Card/ } }),
+    // Strip `console.warn` / `console.error` calls from prod bundles —
+    // the card's only console writes are benign instrumentation (failed
+    // callWS, failed icon resolve) that surface as user-visible no-ops
+    // anyway. Keeps the bundle a touch smaller and the user's HA log clean.
+    !dev &&
+      terser({
+        format: { comments: /Spinning Wheel Card/ },
+        compress: { drop_console: ["warn", "error"] },
+      }),
   ].filter(Boolean),
   onwarn,
 };
