@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { cssToRgbTriple, wrapAngle } from "../src/spinning-wheel-card";
+import { cssToRgbTriple, pickFontPx, wrapAngle } from "../src/spinning-wheel-card";
 
 const TWO_PI = Math.PI * 2;
 
@@ -106,5 +106,58 @@ describe("cssToRgbTriple", () => {
     expect(cssToRgbTriple("#ffffff")).toEqual([255, 255, 255]);
     expect(cssToRgbTriple("#000")).toEqual([0, 0, 0]);
     expect(cssToRgbTriple("#fff")).toEqual([255, 255, 255]);
+  });
+});
+
+describe("pickFontPx", () => {
+  // Stub: width scales linearly with px (a reasonable proxy for the real
+  // canvas measureText — exact glyph widths vary by font/glyph, but the
+  // monotonic "smaller font → narrower text" relationship is what the
+  // shrink loop relies on).
+  const linear = (textWidthAt1Px: number) => (px: number): number =>
+    textWidthAt1Px * px;
+
+  it("returns startPx when text already fits", () => {
+    // 4 px-wide text, budget 100, start at 14 → fits immediately.
+    const out = pickFontPx(linear(4), 14, 7, 100);
+    expect(out).toEqual({ px: 14, fits: true });
+  });
+
+  it("walks down one step at a time until it fits", () => {
+    // 10 px-wide text, budget 90 → fits exactly at px=9 (90/10).
+    const out = pickFontPx(linear(10), 14, 7, 90);
+    expect(out).toEqual({ px: 9, fits: true });
+  });
+
+  it("stops at minPx with fits=false when budget too tight", () => {
+    // 10 px-wide text, budget 50, minPx 7 → even at 7 it needs 70 > 50.
+    const out = pickFontPx(linear(10), 14, 7, 50);
+    expect(out).toEqual({ px: 7, fits: false });
+  });
+
+  it("returns minPx with fits=false for non-positive budgets", () => {
+    expect(pickFontPx(linear(10), 14, 7, 0)).toEqual({ px: 7, fits: false });
+    expect(pickFontPx(linear(10), 14, 7, -5)).toEqual({ px: 7, fits: false });
+    expect(pickFontPx(linear(10), 14, 7, NaN)).toEqual({ px: 7, fits: false });
+  });
+
+  it("clamps startPx up to at least minPx", () => {
+    // startPx below minPx — should still try minPx, fit since 1×5=5 ≤ 100.
+    const out = pickFontPx(linear(1), 5, 7, 100);
+    expect(out).toEqual({ px: 7, fits: true });
+  });
+
+  it("never measures more than (startPx - minPx + 1) times", () => {
+    // Stub that counts invocations; budget impossible so it walks fully.
+    let calls = 0;
+    const counter = (_px: number): number => {
+      calls += 1;
+      return 1000;
+    };
+    const out = pickFontPx(counter, 14, 7, 50);
+    expect(out.px).toBe(7);
+    expect(out.fits).toBe(false);
+    // Inclusive walk from 14 to 7 = 8 steps.
+    expect(calls).toBe(8);
   });
 });

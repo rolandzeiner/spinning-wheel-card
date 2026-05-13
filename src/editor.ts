@@ -39,6 +39,10 @@ const STATIC_DEFAULTS = {
   segments: 8,
   friction: 5,
   text_orientation: "tangent" as const,
+  label_auto_fit: false,
+  label_font_scale: 100,
+  label_radius_offset: 0,
+  label_flip: false,
   sound: true,
   theme: "default" as const,
   hub_color: "theme" as const,
@@ -359,25 +363,68 @@ export class SpinningWheelCardEditor
                 },
               },
             } satisfies HaFormSchema,
-            {
-              name: "text_orientation",
-              selector: {
-                select: {
-                  mode: "dropdown",
-                  options: [
-                    {
-                      value: "tangent",
-                      label: localize("editor.orientation_tangent", lang),
-                    },
-                    {
-                      value: "radial",
-                      label: localize("editor.orientation_radial", lang),
-                    },
-                  ],
-                },
-              },
-            } satisfies HaFormSchema,
           ]),
+      // Label layout expandable — orientation + sizing + radial-position
+      // cluster together. `flatten: true` so its inner fields write
+      // straight to the top-level config (expandable footgun if missing).
+      // text_orientation only renders here when NOT in todo mode (todo
+      // forces radial internally); the three sizing/position controls
+      // are always available because they benefit todo mode too (long
+      // summaries shrink, slider pushes labels off hub or toward rim).
+      {
+        type: "expandable" as const,
+        name: "label_layout",
+        title: localize("editor.label_layout", lang),
+        flatten: true,
+        schema: [
+          ...(todoActive
+            ? []
+            : [
+                {
+                  name: "text_orientation",
+                  selector: {
+                    select: {
+                      mode: "dropdown",
+                      options: [
+                        {
+                          value: "tangent",
+                          label: localize("editor.orientation_tangent", lang),
+                        },
+                        {
+                          value: "radial",
+                          label: localize("editor.orientation_radial", lang),
+                        },
+                      ],
+                    },
+                  },
+                } satisfies HaFormSchema,
+              ]),
+          { name: "label_auto_fit", selector: { boolean: {} } },
+          {
+            name: "label_font_scale",
+            selector: {
+              number: { min: 70, max: 150, step: 5, mode: "slider" },
+            },
+          },
+          {
+            name: "label_radius_offset",
+            selector: {
+              number: { min: -20, max: 20, step: 1, mode: "slider" },
+            },
+          },
+          { name: "label_flip", selector: { boolean: {} } },
+        ],
+      },
+      // Light colour sync. Lives directly below Label layout because
+      // it's a "set up once and forget" convenience: pick lights, every
+      // future spin auto-matches them to the winning segment fill.
+      // Independent of Actions / Segment bindings (those still fire);
+      // skipping this in favour of a per-segment perform-action would
+      // need a script per colour. Empty = feature disabled.
+      {
+        name: "light_sync_entities",
+        selector: { entity: { domain: "light", multiple: true } },
+      },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently
       // (expandable footgun).
@@ -596,6 +643,11 @@ export class SpinningWheelCardEditor
     ["hub_text", { label: "editor.hub_text", helper: "editor.hub_text_helper" }],
     ["hub_color", { label: "editor.hub_color", helper: "editor.hub_color_helper" }],
     ["text_orientation", { label: "editor.text_orientation", helper: "editor.text_orientation_helper" }],
+    ["label_auto_fit", { label: "editor.label_auto_fit", helper: "editor.label_auto_fit_helper" }],
+    ["label_font_scale", { label: "editor.label_font_scale", helper: "editor.label_font_scale_helper" }],
+    ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
+    ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
+    ["light_sync_entities", { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" }],
     ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
     ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
     ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
@@ -932,6 +984,25 @@ export class SpinningWheelCardEditor
     if (next.friction === STATIC_DEFAULTS.friction) delete next.friction;
     if (next.text_orientation === STATIC_DEFAULTS.text_orientation) {
       delete next.text_orientation;
+    }
+    if (next.label_auto_fit === STATIC_DEFAULTS.label_auto_fit) {
+      delete next.label_auto_fit;
+    }
+    if (next.label_font_scale === STATIC_DEFAULTS.label_font_scale) {
+      delete next.label_font_scale;
+    }
+    if (next.label_radius_offset === STATIC_DEFAULTS.label_radius_offset) {
+      delete next.label_radius_offset;
+    }
+    if (next.label_flip === STATIC_DEFAULTS.label_flip) {
+      delete next.label_flip;
+    }
+    // Empty entity list = feature off; strip so saved YAML stays minimal.
+    if (
+      !Array.isArray(next.light_sync_entities) ||
+      next.light_sync_entities.length === 0
+    ) {
+      delete next.light_sync_entities;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;

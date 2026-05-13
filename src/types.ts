@@ -271,6 +271,42 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   /** Label orientation. `tangent` wraps along the rim; `radial` reads
    *  along the spoke from rim toward centre. */
   text_orientation?: TextOrientation;
+  /** When true, BOTH the static-labels path and the todo path run the
+   *  measure-and-shrink loop down to `minPx = 7` so long labels fit
+   *  their slice. When false, the static path uses today's fixed font
+   *  + char-count truncation; todo mode still auto-fits (arbitrary
+   *  summaries can't sensibly char-truncate). Default false — existing
+   *  wheels render unchanged. */
+  label_auto_fit?: boolean;
+  /** Scale of the base label font in percent (70..150, integer).
+   *  Default 100 (no change). Acts as the *starting / max* font size:
+   *  with `label_auto_fit: true` the measure-shrink loop shrinks from
+   *  here down to the minimum. Also scales the MDI icon glyph
+   *  (`iconPx = labelFontPx * 1.5`) so icons stay proportional. */
+  label_font_scale?: number;
+  /** Radial position offset for labels in percent of wheel radius
+   *  (-20..+20, integer). Default 0. Added to the per-mode base
+   *  fraction (0.66 for most, 0.55 for todo+radial). Clamped at draw
+   *  time so the label never paints inside the hub or off the disc. */
+  label_radius_offset?: number;
+  /** Optional list of `light.*` entity_ids to sync to the winning
+   *  segment's fill colour after every spin. Independent of `actions`
+   *  — lights sync regardless of whether per-segment actions are
+   *  configured. Calls `light.turn_on` with `rgb_color`. Lights that
+   *  are off get turned on with the colour; lights already on switch
+   *  colour. Colours that can't be parsed to RGB (named colours,
+   *  `var(--...)`) are silently skipped — the spin result and any
+   *  configured actions still fire. */
+  light_sync_entities?: ReadonlyArray<string>;
+  /** Reverse the label reading direction. Default false.
+   *  - Radial: default reads rim→hub (first char at rim). Flipped
+   *    reads hub→rim (first char at hub).
+   *  - Tangent: default places chars CCW→CW with glyph tops away
+   *    from the wheel centre. Flipped places chars CW→CCW with
+   *    glyph tops toward the centre — the "text on the bottom of a
+   *    coin" convention, useful when labels typically land at the
+   *    bottom half of the wheel. */
+  label_flip?: boolean;
   /** Per-segment action fired when the segment wins. Entries are either
    *  a `script.<name>` shorthand (expanded to `perform-action` at
    *  runtime), a full Lovelace `ActionConfig`, or `null`. Same cycling +
