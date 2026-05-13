@@ -479,6 +479,12 @@ export class SpinningWheelCard extends LitElement {
       }
     }
     if (
+      config.label_flip !== undefined &&
+      typeof config.label_flip !== "boolean"
+    ) {
+      throw new Error(localize("errors.label_flip_type", lang));
+    }
+    if (
       config.wheel_context !== undefined &&
       typeof config.wheel_context !== "boolean"
     ) {
@@ -1381,12 +1387,16 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** Text along an arc of radius R, centred on midAngle. Each glyph
-   *  rotated to be locally tangent. Caller owns font/fillStyle/align. */
+   *  rotated to be locally tangent. Caller owns font/fillStyle/align.
+   *  When `flip` is true, chars walk CW→CCW and glyph tops face the
+   *  wheel centre instead of the rim — the "text on the bottom of a
+   *  coin" convention used by `label_flip`. */
   private _drawArchedText(
     ctx: CanvasRenderingContext2D,
     text: string,
     midAngle: number,
     radius: number,
+    flip = false,
   ): void {
     if (!text || radius <= 0) return;
     const chars = Array.from(text);
@@ -1394,6 +1404,24 @@ export class SpinningWheelCard extends LitElement {
     // Convert each glyph width to the angle it subtends at this radius.
     const angularWidths = widths.map((w) => w / radius);
     const totalAngular = angularWidths.reduce((s, a) => s + a, 0);
+    if (flip) {
+      // Walk from CW end of the arc back to CCW; rotate each glyph
+      // -π/2 so the local +X tangent direction is CCW and glyph tops
+      // point inward.
+      let angle = midAngle + totalAngular / 2;
+      for (let i = 0; i < chars.length; i++) {
+        const aw = angularWidths[i] ?? 0;
+        const charAngle = angle - aw / 2;
+        ctx.save();
+        ctx.rotate(charAngle);
+        ctx.translate(radius, 0);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(chars[i] ?? "", 0, 0);
+        ctx.restore();
+        angle -= aw;
+      }
+      return;
+    }
     let angle = midAngle - totalAngular / 2;
     for (let i = 0; i < chars.length; i++) {
       const aw = angularWidths[i] ?? 0;
@@ -2123,6 +2151,7 @@ export class SpinningWheelCard extends LitElement {
     const labelFontPx = Math.max(7, Math.round(size * 0.05 * fontScale / 100));
     const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
     const minLabelPx = 7;
+    const labelFlip = this.config.label_flip === true;
 
     // Borderless mode bleeds the canvas-clear colour through the
     // sub-pixel antialiasing along each diagonal seam between two
@@ -2206,10 +2235,16 @@ export class SpinningWheelCard extends LitElement {
             if (orientation === "radial") {
               ctx.rotate(midAngle);
               ctx.translate(labelRadius, 0);
-              ctx.rotate(Math.PI);
+              if (!labelFlip) ctx.rotate(Math.PI);
               ctx.fillText(display, 0, 0);
             } else {
-              this._drawArchedText(ctx, display, midAngle, labelRadius);
+              this._drawArchedText(
+                ctx,
+                display,
+                midAngle,
+                labelRadius,
+                labelFlip,
+              );
             }
             ctx.restore();
           }
@@ -2297,14 +2332,16 @@ export class SpinningWheelCard extends LitElement {
 
         if (orientation === "radial") {
           // Shift inward/outward when the rendered text would overflow
-          // the radial channel; otherwise sit at labelRadius.
+          // the radial channel; otherwise sit at labelRadius. The
+          // additional rotate(π) is the default rim→hub orientation;
+          // skip it when `label_flip` is on to read hub→rim.
           const drawAt = radialDrawAt(ctx.measureText(display).width);
           ctx.rotate(midAngle);
           ctx.translate(drawAt, 0);
-          ctx.rotate(Math.PI);
+          if (!labelFlip) ctx.rotate(Math.PI);
           ctx.fillText(display, 0, 0);
         } else {
-          this._drawArchedText(ctx, display, midAngle, labelRadius);
+          this._drawArchedText(ctx, display, midAngle, labelRadius, labelFlip);
         }
         ctx.restore();
       }

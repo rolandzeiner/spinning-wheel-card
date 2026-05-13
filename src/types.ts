@@ -289,6 +289,15 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  fraction (0.66 for most, 0.55 for todo+radial). Clamped at draw
    *  time so the label never paints inside the hub or off the disc. */
   label_radius_offset?: number;
+  /** Reverse the label reading direction. Default false.
+   *  - Radial: default reads rim→hub (first char at rim). Flipped
+   *    reads hub→rim (first char at hub).
+   *  - Tangent: default places chars CCW→CW with glyph tops away
+   *    from the wheel centre. Flipped places chars CW→CCW with
+   *    glyph tops toward the centre — the "text on the bottom of a
+   *    coin" convention, useful when labels typically land at the
+   *    bottom half of the wheel. */
+  label_flip?: boolean;
   /** Per-segment action fired when the segment wins. Entries are either
    *  a `script.<name>` shorthand (expanded to `perform-action` at
    *  runtime), a full Lovelace `ActionConfig`, or `null`. Same cycling +

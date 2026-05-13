@@ -19,7 +19,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Wheel context** — opt-in: every fired action gets the winning segment merged into its `data` payload (`wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`). One generic script can then handle every segment.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
-- **Label fit controls** — auto-fit toggle shrinks long labels to fit (the new amino-acid / chemistry-wheel friendly path), plus a font-size scale (70–150 %) and a radial-position offset (-20 … +20 %) to push labels toward or away from the rim.
+- **Label layout controls** (grouped in a collapsible section in the editor) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
@@ -91,6 +91,7 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `label_auto_fit` | boolean | `false` | When `true`, every label measures-and-shrinks to fit its slice down to 7 px (then ellipsis-truncates). When `false`, static labels render at the fixed `label_font_scale` size and char-truncate. Always on for `todo_entity` (arbitrary summaries can't sensibly char-truncate). |
 | `label_font_scale` | integer 70–150 | `100` | Scales the base label font in percent. With `label_auto_fit: true` this is the *starting / max* size — long labels still shrink to fit. Also scales MDI icon labels proportionally. |
 | `label_radius_offset` | integer -20…+20 | `0` | Moves labels inward (negative) or toward the rim (positive), as a percent of wheel radius added to the per-mode default (66 %, or 55 % in todo+radial). Clamped at draw time so labels never overlap the hub or run off the disc. |
+| `label_flip` | boolean | `false` | Reverse the label reading direction. Radial: reads hub→rim instead of rim→hub. Tangent: glyph tops face the wheel centre and chars walk the opposite way — the "text on the bottom of a coin" convention, handy when labels often land at the lower half of the wheel. |
 | `hub_text` | string | localised (`SPIN` / `DREH` / …) | Centre-hub label. Auto-shrinks. Empty hides. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub + indicator fill. `theme` uses HA's `--primary-color` with auto-contrast text. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
