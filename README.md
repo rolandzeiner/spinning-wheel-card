@@ -17,6 +17,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **MDI icons as labels** — type `mdi:home` and the icon paints in place of text. The result line shows the icon glyph too, not the literal `mdi:` identifier.
 - **Result helper** — write the winning label into an `input_text.*` so HA automations trigger on `platform: state`.
 - **Wheel context** — opt-in: every fired action gets the winning segment merged into its `data` payload (`wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`). One generic script can then handle every segment.
+- **Light colour sync** — opt-in entity picker: pick one or more `light.*` entities and they auto-match the winning segment's fill colour after every spin. No script required; runs independently of `actions`.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
 - **Label layout controls** (grouped in a collapsible section in the editor) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
@@ -86,6 +87,7 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `pegs` | boolean | `false` | Render small pegs at the rim. Each peg fires a peg-click sound (gated by `sound`) and a small velocity bump as it passes the indicator. The wheel smoothly settles off any peg whose pixel footprint the indicator overlaps on stop; back-roll only fires when the wheel approached but didn't cross the peg (no random snap-back across cleanly-crossed pegs). |
 | `peg_density` | integer 0–4 | `1` | Extra pegs per segment beyond the always-present boundary peg. `0` = boundary pegs only (`segments` total); `1` = boundary + 1 mid (`2 × segments`, default); `4` = densely studded (`5 × segments`). Ignored when `pegs: false`. |
 | `result_entity` | `input_text.*` entity_id | none | Helper to receive the winning label after every spin. Editor's "Create dedicated helper" button auto-provisions one (admin only). |
+| `light_sync_entities` | array of `light.*` entity_ids | none | Lights that automatically match the winning segment's fill colour after every spin (`light.turn_on` with `rgb_color`). Independent of `actions` — no script needed. Colours that can't be parsed (named CSS colours, `var(--…)`) skip silently. |
 | `todo_entity` | `todo.*` entity_id | none | Fill segments from this entity's open items (4–24, deduped). `segments`, `labels`, `text_orientation` are ignored while wired. |
 | `text_orientation` | `tangent` / `radial` | `tangent` (`radial` in todo mode) | Tangent wraps text around the rim; radial reads along the spoke. |
 | `label_auto_fit` | boolean | `false` | When `true`, every label measures-and-shrinks to fit its slice down to 7 px (then ellipsis-truncates). When `false`, static labels render at the fixed `label_font_scale` size and char-truncate. Always on for `todo_entity` (arbitrary summaries can't sensibly char-truncate). |
@@ -257,6 +259,19 @@ sequence:
       entity_id: light.living_room
     data:
       rgb_color: "{{ wheel_color_rgb }}"
+```
+
+**Light colour sync — same result, zero scripts:**
+
+`light_sync_entities` picks one or more lights and auto-matches them to the winning segment's fill colour after every spin. Equivalent to the wheel-context example above, but configured entirely in the visual editor (no `script.set_light_colour`, no per-segment action, no `wheel_context: true`).
+
+```yaml
+type: custom:spinning-wheel-card
+labels: [Red, Green, Blue]
+colors: ["#e40303", "#008026", "#004dff"]
+light_sync_entities:
+  - light.living_room
+  - light.bed_strip
 ```
 
 **Real-prize-wheel** — densely studded rim, click + brake on every peg:

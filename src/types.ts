@@ -289,6 +289,15 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  fraction (0.66 for most, 0.55 for todo+radial). Clamped at draw
    *  time so the label never paints inside the hub or off the disc. */
   label_radius_offset?: number;
+  /** Optional list of `light.*` entity_ids to sync to the winning
+   *  segment's fill colour after every spin. Independent of `actions`
+   *  — lights sync regardless of whether per-segment actions are
+   *  configured. Calls `light.turn_on` with `rgb_color`. Lights that
+   *  are off get turned on with the colour; lights already on switch
+   *  colour. Colours that can't be parsed to RGB (named colours,
+   *  `var(--...)`) are silently skipped — the spin result and any
+   *  configured actions still fire. */
+  light_sync_entities?: ReadonlyArray<string>;
   /** Reverse the label reading direction. Default false.
    *  - Radial: default reads rim→hub (first char at rim). Flipped
    *    reads hub→rim (first char at hub).

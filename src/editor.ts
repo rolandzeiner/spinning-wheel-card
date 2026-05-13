@@ -415,6 +415,16 @@ export class SpinningWheelCardEditor
           { name: "label_flip", selector: { boolean: {} } },
         ],
       },
+      // Light colour sync. Lives directly below Label layout because
+      // it's a "set up once and forget" convenience: pick lights, every
+      // future spin auto-matches them to the winning segment fill.
+      // Independent of Actions / Segment bindings (those still fire);
+      // skipping this in favour of a per-segment perform-action would
+      // need a script per colour. Empty = feature disabled.
+      {
+        name: "light_sync_entities",
+        selector: { entity: { domain: "light", multiple: true } },
+      },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently
       // (expandable footgun).
@@ -637,6 +647,7 @@ export class SpinningWheelCardEditor
     ["label_font_scale", { label: "editor.label_font_scale", helper: "editor.label_font_scale_helper" }],
     ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
     ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
+    ["light_sync_entities", { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" }],
     ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
     ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
     ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
@@ -985,6 +996,13 @@ export class SpinningWheelCardEditor
     }
     if (next.label_flip === STATIC_DEFAULTS.label_flip) {
       delete next.label_flip;
+    }
+    // Empty entity list = feature off; strip so saved YAML stays minimal.
+    if (
+      !Array.isArray(next.light_sync_entities) ||
+      next.light_sync_entities.length === 0
+    ) {
+      delete next.light_sync_entities;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;

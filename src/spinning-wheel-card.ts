@@ -592,6 +592,18 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.result_entity_invalid", lang));
       }
     }
+    if (config.light_sync_entities !== undefined) {
+      if (!Array.isArray(config.light_sync_entities)) {
+        throw new Error(localize("errors.light_sync_entities_type", lang));
+      }
+      for (const e of config.light_sync_entities) {
+        if (typeof e !== "string" || !/^light\.[a-z0-9_]+$/.test(e)) {
+          throw new Error(
+            localize("errors.light_sync_entities_invalid", lang, { value: String(e) }),
+          );
+        }
+      }
+    }
     // Drop stale items on todo_entity swap so they don't render briefly
     // before the next state change triggers a refetch.
     const prevTodo = this.config.todo_entity ?? null;
@@ -2146,6 +2158,14 @@ export class SpinningWheelCard extends LitElement {
     // on the entity state-change should see the new value by the time
     // they run. Fire-and-forget; a deleted helper mustn't break the chain.
     void this._writeResultToEntity(this._result);
+    // Sync configured lights to the segment colour. Fire-and-forget;
+    // independent of `actions` so the lights still match even when the
+    // user hasn't wired per-segment scripts.
+    const segmentColor = this._segmentColors()[idx];
+    if (typeof segmentColor === "string") {
+      const rgb = this._resolveSegmentRgb(segmentColor);
+      if (rgb !== null) void this._syncLights(rgb);
+    }
     // window.confirm blocks the await, so a held click during the
     // prompt can't double-fire.
     const actions = this._segmentActions();
@@ -2179,6 +2199,60 @@ export class SpinningWheelCard extends LitElement {
         "[spinning-wheel-card] input_text.set_value failed:",
         err,
       );
+    }
+  }
+
+  /** Resolve a CSS colour string to an `[r, g, b]` triple suitable
+   *  for HA's `rgb_color` service field. Tries the pure parser first
+   *  (hex / rgb() / rgba()); for named colours and the like, falls
+   *  back to a canvas `fillStyle` round-trip. `var(--…)` cannot be
+   *  resolved this way and returns null — caller should skip silently. */
+  private _resolveSegmentRgb(
+    color: string,
+  ): readonly [number, number, number] | null {
+    const direct = cssToRgbTriple(color);
+    if (direct !== null) return direct;
+    const c = this.shadowRoot?.getElementById("wheel") as
+      | HTMLCanvasElement
+      | null;
+    const ctx = c?.getContext("2d");
+    if (!ctx) return null;
+    const prev = ctx.fillStyle;
+    ctx.fillStyle = color;
+    const canon = String(ctx.fillStyle);
+    ctx.fillStyle = prev;
+    // Canvas rejects unknown colour strings by leaving fillStyle
+    // unchanged — if canon matches the previous canonicalised value,
+    // the input wasn't a valid CSS colour.
+    if (canon === String(prev)) return null;
+    return cssToRgbTriple(canon);
+  }
+
+  /** Set every entity in `light_sync_entities` to the winning segment's
+   *  fill colour. Fire-and-forget — failures are logged and the spin
+   *  result / configured actions still fire. Skips lights silently
+   *  when the colour can't be resolved to RGB. */
+  private async _syncLights(
+    rgb: readonly [number, number, number],
+  ): Promise<void> {
+    const entities = this.config.light_sync_entities;
+    if (!Array.isArray(entities) || entities.length === 0) return;
+    if (!this.hass?.callService) return;
+    for (const entity of entities) {
+      if (typeof entity !== "string" || !/^light\.[a-z0-9_]+$/.test(entity)) {
+        continue;
+      }
+      try {
+        await this.hass.callService("light", "turn_on", {
+          entity_id: entity,
+          rgb_color: [rgb[0], rgb[1], rgb[2]],
+        });
+      } catch (err) {
+        console.warn(
+          `[spinning-wheel-card] light.turn_on failed for ${entity}:`,
+          err,
+        );
+      }
     }
   }
 
