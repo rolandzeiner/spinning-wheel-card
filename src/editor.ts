@@ -415,15 +415,33 @@ export class SpinningWheelCardEditor
           { name: "label_flip", selector: { boolean: {} } },
         ],
       },
-      // Light colour sync. Lives directly below Label layout because
-      // it's a "set up once and forget" convenience: pick lights, every
-      // future spin auto-matches them to the winning segment fill.
-      // Independent of Actions / Segment bindings (those still fire);
-      // skipping this in favour of a per-segment perform-action would
-      // need a script per colour. Empty = feature disabled.
+      // Integrations expandable — colour sync + TTS announcement. Both
+      // are "set up once and forget" hooks that wire the winning
+      // segment to other HA entities: lights match the fill colour,
+      // speakers announce the label. Independent of Actions / Segment
+      // bindings (those still fire). flatten:true so inner fields write
+      // straight to top-level config (expandable footgun if missing).
       {
-        name: "light_sync_entities",
-        selector: { entity: { domain: "light", multiple: true } },
+        type: "expandable" as const,
+        name: "integrations",
+        title: localize("editor.integrations", lang),
+        flatten: true,
+        schema: [
+          {
+            name: "light_sync_entities",
+            selector: { entity: { domain: "light", multiple: true } },
+          },
+          // HA's `tts.speak` needs both a TTS engine entity and a
+          // media_player target; both must be set for TTS to fire.
+          {
+            name: "tts_engine",
+            selector: { entity: { domain: "tts" } },
+          },
+          {
+            name: "tts_announce_entities",
+            selector: { entity: { domain: "media_player", multiple: true } },
+          },
+        ],
       },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently
@@ -648,6 +666,8 @@ export class SpinningWheelCardEditor
     ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
     ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
     ["light_sync_entities", { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" }],
+    ["tts_engine", { label: "editor.tts_engine", helper: "editor.tts_engine_helper" }],
+    ["tts_announce_entities", { label: "editor.tts_announce_entities", helper: "editor.tts_announce_entities_helper" }],
     ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
     ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
     ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
@@ -1003,6 +1023,15 @@ export class SpinningWheelCardEditor
       next.light_sync_entities.length === 0
     ) {
       delete next.light_sync_entities;
+    }
+    if (next.tts_engine === "" || next.tts_engine == null) {
+      delete next.tts_engine;
+    }
+    if (
+      !Array.isArray(next.tts_announce_entities) ||
+      next.tts_announce_entities.length === 0
+    ) {
+      delete next.tts_announce_entities;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;

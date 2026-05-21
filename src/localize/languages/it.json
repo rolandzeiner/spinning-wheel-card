@@ -11,7 +11,7 @@
     "wheel_label": "Far girare la ruota"
   },
   "confirm": {
-    "run_action": "Eseguire \"{action}\" per \"{value}\"?"
+    "run_action": "Eseguire «{action}» per «{value}»?"
   },
   "hub": {
     "default_text": "GIRA"
@@ -40,6 +40,8 @@
     "label_radius_offset": "Distanza dal bordo",
     "label_flip": "Inverti direzione di lettura",
     "light_sync_entities": "Sincronizza colori delle luci",
+    "tts_engine": "Motore TTS",
+    "tts_announce_entities": "Annuncia sugli altoparlanti",
     "sound": "Suono del clic",
     "show_status": "Mostra barra di stato",
     "actions": "Azioni",
@@ -59,6 +61,7 @@
     "result_entity_create_failed": "Creazione dell'helper di risultato fallita. Vedi la console del browser per i dettagli.",
     "general": "Generale",
     "label_layout": "Disposizione etichette",
+    "integrations": "Integrazioni",
     "bindings": "Associazioni di segmenti",
     "binding_color": "Colore di riempimento",
     "binding_label_color": "Colore del testo etichetta",
@@ -90,6 +93,8 @@
     "label_radius_offset_helper": "Sposta l'etichetta verso l'interno (negativo) o verso il bordo (positivo), da -20 a +20 % del raggio della ruota. Predefinito 0. Utile per etichette radiali su ruote affollate. Limitato in modo che l'etichetta non si sovrapponga mai al mozzo né esca dal disco.",
     "label_flip_helper": "Inverte la direzione di lettura delle etichette. Radial: legge mozzo→bordo invece di bordo→mozzo. Tangent: la cima dei glifi punta verso il centro e i caratteri vanno nella direzione opposta — la convenzione «testo sul fondo di una moneta», utile quando le etichette si fermano spesso nella metà inferiore della ruota.",
     "light_sync_entities_helper": "Opzionale. Una o più entità `light.*` che dopo ogni giro assumono automaticamente il colore del segmento vincente. Chiama `light.turn_on` con `rgb_color`. Le luci spente si accendono con quel colore; quelle accese cambiano colore. Si attiva indipendentemente da Azioni / Associazioni — nessuno script richiesto. Solo le lampadine RGB rispondono (`supported_color_modes` contiene `rgb` / `rgbw` / `rgbww` / `hs` / `xy`); quelle a temperatura colore / luminosità / on-off vengono saltate silenziosamente. Anche i colori non analizzabili (nomi CSS, `var(--…)`) vengono saltati.",
+    "tts_engine_helper": "Opzionale. L'entità motore `tts.*` usata per pronunciare l'etichetta vincente dopo ogni giro. Va abbinata a uno o più altoparlanti qui sotto — il motore da solo non fa nulla.",
+    "tts_announce_entities_helper": "Opzionale. Uno o più altoparlanti `media_player.*` che annunciano l'etichetta vincente dopo ogni giro, tramite il motore TTS qui sopra. Si attiva indipendentemente da Azioni / Associazioni — nessuno script richiesto. Le etichette icona MDI vengono pronunciate senza il prefisso `mdi:` (`mdi:food-croissant` → «food croissant»). La pronuncia segue l'impostazione della lingua del motore.",
     "sound_helper": "Riproduce un suono di clic a ogni passaggio di segmento. Il volume scala con la velocità della ruota.",
     "show_status_helper": "Mostra la riga sotto la ruota (`Gira…` / `Risultato: X` / suggerimento di inattività). Off per un look più minimale.",
     "actions_helper": "Selezione multipla di entità script da attivare alla vincita, indicizzata sulle etichette uniche. Le modifiche qui SOSTITUISCONO ogni voce stringa; gli oggetti ActionConfig completi da YAML sono accodati. Per sicurezza per riga, usa Associazioni di segmenti.",
@@ -148,6 +153,10 @@
     "label_flip_type": "label_flip deve essere un booleano",
     "light_sync_entities_type": "light_sync_entities deve essere un array di entity_id light.*",
     "light_sync_entities_invalid": "una voce di light_sync_entities deve essere una entity_id light.* (era: {value})",
+    "tts_engine_type": "tts_engine deve essere una stringa",
+    "tts_engine_invalid": "tts_engine deve essere una entity_id tts.*",
+    "tts_announce_entities_type": "tts_announce_entities deve essere un array di entity_id media_player.*",
+    "tts_announce_entities_invalid": "una voce di tts_announce_entities deve essere una entity_id media_player.* (era: {value})",
     "wheel_context_type": "wheel_context deve essere un booleano",
     "result_entity_type": "result_entity deve essere una stringa",
     "result_entity_invalid": "result_entity deve essere un entity_id input_text.*"

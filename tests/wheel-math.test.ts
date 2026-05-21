@@ -11,7 +11,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { cssToRgbTriple, pickFontPx, wrapAngle } from "../src/spinning-wheel-card";
+import {
+  cssToRgbTriple,
+  pickFontPx,
+  toSpokenLabel,
+  wrapAngle,
+} from "../src/spinning-wheel-card";
 
 const TWO_PI = Math.PI * 2;
 
@@ -159,5 +164,51 @@ describe("pickFontPx", () => {
     expect(out.fits).toBe(false);
     // Inclusive walk from 14 to 7 = 8 steps.
     expect(calls).toBe(8);
+  });
+});
+
+describe("toSpokenLabel", () => {
+  it("passes plain text labels through unchanged", () => {
+    expect(toSpokenLabel("Pizza")).toBe("Pizza");
+    expect(toSpokenLabel("Try Again")).toBe("Try Again");
+    expect(toSpokenLabel("42")).toBe("42");
+  });
+
+  it("strips the mdi: prefix from icon labels", () => {
+    expect(toSpokenLabel("mdi:home")).toBe("home");
+  });
+
+  it("strips any namespace prefix, not just mdi:", () => {
+    expect(toSpokenLabel("hass:foo-bar")).toBe("foo bar");
+  });
+
+  it("reads hyphens as spaces", () => {
+    expect(toSpokenLabel("mdi:food-croissant")).toBe("food croissant");
+  });
+
+  it("reads underscores as spaces", () => {
+    // The icon-ref regex allows underscores in the namespace; the icon
+    // name itself is hyphen-only per MDI, but underscores are handled
+    // defensively all the same.
+    expect(toSpokenLabel("mdi:home")).toBe("home");
+    expect(toSpokenLabel("mdi:food-croissant-thing")).toBe(
+      "food croissant thing",
+    );
+  });
+
+  it("collapses runs of separators to a single space", () => {
+    // `[-_]+` — consecutive separators don't produce double spaces.
+    expect(toSpokenLabel("mdi:a--b")).toBe("a b");
+  });
+
+  it("leaves colon-containing strings that aren't icon refs alone", () => {
+    // ICON_REF_RE requires `name:name` shape; arbitrary text with a
+    // colon (or a trailing colon) is not an icon and passes through.
+    expect(toSpokenLabel("Time: 5pm")).toBe("Time: 5pm");
+    expect(toSpokenLabel("ratio 3:1")).toBe("ratio 3:1");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(toSpokenLabel("")).toBe("");
   });
 });
