@@ -167,9 +167,32 @@ export const pickFontPx = (
   return { px: minPx, fits: false };
 };
 
-const TICK_RATE_LIMIT_MS = 30;      // ≈33 Hz tick ceiling
-const TICK_PEAK_SPEED = 12;         // rad/s where ticks are loudest
-const TICK_HIGH_SPEED_FLOOR = 0.3;  // intensity floor at MAX_VELOCITY
+/** Matches `mdi:foo` / `hass:foo` / any namespaced HA icon ref.
+ *  Stateless (no `g` flag) — safe to share between `_looksLikeIcon`
+ *  and `toSpokenLabel`. */
+const ICON_REF_RE = /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i;
+
+/** The winning label as plain spoken text for TTS. MDI icon labels
+ *  (`mdi:food-croissant`) drop the `namespace:` prefix and read
+ *  hyphens / underscores as spaces ("food croissant"). Plain text
+ *  labels pass through unchanged. Pure — exported for tests. */
+export const toSpokenLabel = (label: string): string => {
+  if (!ICON_REF_RE.test(label)) return label;
+  const name = label.slice(label.indexOf(":") + 1);
+  return name.replace(/[-_]+/g, " ").trim();
+};
+
+// Peg-click loudness/brightness curve. Intensity (0..1) is a single
+// MONOTONIC function of rim speed shared by the spin loop and the
+// mouse-drag path — a faster strike is always a harder click, never
+// quieter. `TICK_MIN_INTENSITY` is the floor so even the slowest hand-
+// drag crossing is a solid, woody click rather than a thin blip.
+const TICK_FULL_SPEED = 18; // rad/s at which the click reaches full strength
+const TICK_MIN_INTENSITY = 0.4; // intensity floor at near-zero speed
+// Safety ceiling on clicks scheduled in one frame — a hitched frame
+// could otherwise sweep dozens of pegs; you cannot hear more than a
+// few per ~16 ms anyway.
+const TICK_MAX_PER_FRAME = 8;
 
 /** Per-segment-crossing brake bump at slider level 5 (the new default).
  *  `_pegDrag()` scales linearly with the 1–10 friction slider so light
@@ -611,6 +634,31 @@ export class SpinningWheelCard extends LitElement {
         if (typeof e !== "string" || !/^light\.[a-z0-9_]+$/.test(e)) {
           throw new Error(
             localize("errors.light_sync_entities_invalid", lang, { value: String(e) }),
+          );
+        }
+      }
+    }
+    if (config.tts_engine !== undefined) {
+      if (typeof config.tts_engine !== "string") {
+        throw new Error(localize("errors.tts_engine_type", lang));
+      }
+      if (
+        config.tts_engine !== "" &&
+        !/^tts\.[a-z0-9_]+$/.test(config.tts_engine)
+      ) {
+        throw new Error(localize("errors.tts_engine_invalid", lang));
+      }
+    }
+    if (config.tts_announce_entities !== undefined) {
+      if (!Array.isArray(config.tts_announce_entities)) {
+        throw new Error(localize("errors.tts_announce_entities_type", lang));
+      }
+      for (const e of config.tts_announce_entities) {
+        if (typeof e !== "string" || !/^media_player\.[a-z0-9_]+$/.test(e)) {
+          throw new Error(
+            localize("errors.tts_announce_entities_invalid", lang, {
+              value: String(e),
+            }),
           );
         }
       }
@@ -1905,7 +1953,7 @@ export class SpinningWheelCard extends LitElement {
 
   /** Matches `mdi:foo` / `hass:foo` / any namespaced HA icon ref. */
   private _looksLikeIcon(label: string): boolean {
-    return /^[a-z][a-z0-9_-]*:[a-z0-9-]+$/i.test(label);
+    return ICON_REF_RE.test(label);
   }
 
   /** Path when ready, null when missing, undefined while loading. */
@@ -2058,22 +2106,9 @@ export class SpinningWheelCard extends LitElement {
         this._omega -= couStep * Math.sign(this._omega);
       }
 
-      // Bell curve — ramp 0 → peak by TICK_PEAK_SPEED, taper to FLOOR
-      // by MAX_VELOCITY so dense ticks don't pile into a wash.
-      const omegaAbs = Math.abs(this._omega);
-      let intensity: number;
-      if (omegaAbs <= TICK_PEAK_SPEED) {
-        intensity = omegaAbs / TICK_PEAK_SPEED;
-      } else {
-        const overshoot =
-          (omegaAbs - TICK_PEAK_SPEED) /
-          (MAX_VELOCITY_RAD_PER_S - TICK_PEAK_SPEED);
-        intensity = Math.max(
-          TICK_HIGH_SPEED_FLOOR,
-          1 - overshoot * (1 - TICK_HIGH_SPEED_FLOOR),
-        );
-      }
-      this._onSegmentCrossing(intensity);
+      // Click on every peg swept this frame; `_onSegmentCrossing` maps
+      // rim speed → intensity and staggers the clicks across `dt`.
+      this._onSegmentCrossing(Math.abs(this._omega), dt);
 
       this._draw();
 
@@ -2168,6 +2203,9 @@ export class SpinningWheelCard extends LitElement {
       const rgb = this._resolveSegmentRgb(segmentColor);
       if (rgb !== null) void this._syncLights(rgb);
     }
+    // Speak the winning label through the configured TTS speakers.
+    // Fire-and-forget; independent of `actions`.
+    if (this._result !== null) void this._announceLabel(this._result);
     // window.confirm blocks the await, so a held click during the
     // prompt can't double-fire.
     const actions = this._segmentActions();
@@ -2273,14 +2311,46 @@ export class SpinningWheelCard extends LitElement {
     }
   }
 
+  /** Speak the winning label through the configured TTS engine +
+   *  speakers. Fire-and-forget — failures log and don't break the spin
+   *  result or configured actions. No-op unless BOTH `tts_engine` and
+   *  at least one valid `tts_announce_entities` entry are configured.
+   *  `language` is intentionally NOT passed to `tts.speak`: the
+   *  engine's own language config governs pronunciation, and forcing a
+   *  card-detected language an engine can't handle would hard-error. */
+  private async _announceLabel(label: string): Promise<void> {
+    const engine = this.config.tts_engine;
+    const speakers = this.config.tts_announce_entities;
+    if (typeof engine !== "string" || !/^tts\.[a-z0-9_]+$/.test(engine)) {
+      return;
+    }
+    if (!Array.isArray(speakers) || speakers.length === 0) return;
+    if (!this.hass?.callService) return;
+    const targets = speakers.filter(
+      (e) => typeof e === "string" && /^media_player\.[a-z0-9_]+$/.test(e),
+    );
+    if (targets.length === 0) return;
+    const spoken = toSpokenLabel(label);
+    if (!spoken) return;
+    try {
+      await this.hass.callService(
+        "tts",
+        "speak",
+        { media_player_entity_id: targets, message: spoken },
+        { entity_id: engine },
+      );
+    } catch (err) {
+      console.warn("[spinning-wheel-card] tts.speak failed:", err);
+    }
+  }
+
   private _audioCtx: AudioContext | null = null;
-  /** True once `ctx.resume()` has resolved. _playTick bails until then
-   *  to avoid scheduling against a stale `currentTime` on a still-
-   *  suspended context (Safari race). */
+  /** True once `ctx.resume()` has resolved. `_onSegmentCrossing` skips
+   *  the click until then to avoid scheduling against a stale
+   *  `currentTime` on a still-suspended context (Safari race). */
   private _audioReady = false;
   /** -1 = no baseline yet. */
   private _lastTickSeg = -1;
-  private _lastTickMs = 0;
 
   private _ensureAudio(): AudioContext | null {
     if (this._audioCtx) return this._audioCtx;
@@ -2306,27 +2376,52 @@ export class SpinningWheelCard extends LitElement {
     return this._audioCtx;
   }
 
-  private _playTick(intensity: number): void {
-    if (!this._soundEnabled()) return;
-    const ctx = this._ensureAudio();
-    if (!ctx) return;
-    if (!this._audioReady || ctx.state !== "running") {
-      if (ctx.state === "suspended") {
-        void ctx
-          .resume()
-          .then(() => {
-            this._audioReady = true;
-          })
-          .catch(() => {});
-      }
-      return;
-    }
-    const t0 = ctx.currentTime;
-    const I = Math.max(0, Math.min(1, intensity));
-    const dur = 0.025 + 0.015 * I; // 25..40 ms
+  /** Map rim speed (rad/s) to click intensity 0..1. Monotonic — a
+   *  faster strike is always a harder click — with a `pow < 1` curve
+   *  that lifts the low end so a slow hand-drag still gets a solid,
+   *  woody click, never a thin blip. Floored at `TICK_MIN_INTENSITY`.
+   *  Shared by both callers so drag and spin use one scale. */
+  private _tickIntensity(speed: number): number {
+    const norm = Math.min(1, Math.max(0, speed) / TICK_FULL_SPEED);
+    return TICK_MIN_INTENSITY + (1 - TICK_MIN_INTENSITY) * Math.pow(norm, 0.6);
+  }
 
-    // Quadratic decay envelope on a noise burst — rounder back-end
-    // than exponential.
+  /** Number of click boundaries around the rim — peg intervals when
+   *  `pegs: true`, segment count otherwise. Matches the index space of
+   *  `_pegIntervalIndex` / `_segmentIndexUnderPointer`. */
+  private _tickBoundaryCount(): number {
+    const n = this._arcs().length;
+    if (n === 0) return 1;
+    return this._pegsEnabled() ? this._pegsPerSegment() * n : n;
+  }
+
+  /** Peg-click sound — a single focused filtered-noise burst: the dry
+   *  "tok" of a flapper striking a plastic peg. One layer, bandpassed
+   *  tight (Q≈3) at a mid frequency so it reads as a rounded "tok", not
+   *  a bright broadband "tss" — a low Q or a high centre is what makes
+   *  a noise click sound like crackling. A quadratic decay is baked
+   *  into the noise buffer for a rounded back-end, and the gain adds a
+   *  2 ms attack ramp (no sample-zero cliff) and an exponential tail.
+   *
+   *  `intensity` (rim speed mapped to 0..1) scales the click INVERSELY
+   *  in length: a slow strike is a longer, woody "tok"; a hard, fast
+   *  strike is short, tight and bright, so a dense fast-spin peg train
+   *  reads as a crisp rattle instead of overlapping into a smear. A
+   *  hard strike is also a touch louder and brighter. `when` is the
+   *  audio-clock start time — the caller staggers the clicks of one
+   *  frame across the frame interval rather than stacking them on
+   *  `currentTime`. The node chain is torn down in `onended`;
+   *  BufferSource nodes never self-disconnect, and on a fast spin
+   *  firing several clicks per frame an un-freed chain is a real leak. */
+  private _playTick(ctx: AudioContext, intensity: number, when: number): void {
+    const I = Math.max(0, Math.min(1, intensity));
+    const t0 = Math.max(when, ctx.currentTime);
+    // Shorter when fast → a crisp rattle; longer when slow → a woody
+    // tok. The fast end is very short so a dense peg train barely
+    // overlaps; the slow end is unchanged from the tuning that landed.
+    const dur = 0.061 - 0.048 * I; // 61 ms slow → 13 ms fast
+
+    // White-noise burst with a quadratic decay envelope baked in.
     const sampleRate = ctx.sampleRate;
     const samples = Math.max(1, Math.floor(sampleRate * dur));
     const buf = ctx.createBuffer(1, samples, sampleRate);
@@ -2339,41 +2434,60 @@ export class SpinningWheelCard extends LitElement {
     const src = ctx.createBufferSource();
     src.buffer = buf;
 
-    // Bandpass at 1700 Hz Q=3 → less "ping", more "tok".
+    // Tight bandpass → focused "tok"; centre rises with intensity so a
+    // fast strike is crisper. ±8 % jitter so a fast train doesn't sound
+    // like one repeated sample.
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 1700;
+    bp.frequency.value = (1500 + 550 * I) * (1 + (Math.random() - 0.5) * 0.16);
     bp.Q.value = 3;
 
-    // Lowpass takes the ice-pick edge off.
+    // Lowpass takes the ice-pick edge off — opens up when fast for snap.
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 4000;
+    lp.frequency.value = 3300 + 2200 * I;
     lp.Q.value = 0.7;
 
-    // 2 ms attack ramp — without it the click starts on a sample-zero
-    // cliff, which is most of what makes a synthetic click sound hard.
     const gainNode = ctx.createGain();
-    const peak = 0.03 + 0.13 * I;
+    // Flatter loudness curve: fast clicks overlap and sum, so the per-
+    // click peak stays lower at speed (slow-drag level is unchanged).
+    const peak = 0.09 + 0.08 * I;
+    // Snappier attack when fast (1.1 ms) vs. softer when slow (2.4 ms).
+    const attack = 0.0024 - 0.0013 * I;
     gainNode.gain.setValueAtTime(0, t0);
-    gainNode.gain.linearRampToValueAtTime(peak, t0 + 0.002);
+    gainNode.gain.linearRampToValueAtTime(peak, t0 + attack);
     gainNode.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
 
     src.connect(bp).connect(lp).connect(gainNode).connect(ctx.destination);
     src.start(t0);
-    src.stop(t0 + dur + 0.01);
+    src.stop(t0 + dur + 0.02);
+    src.onended = (): void => {
+      src.disconnect();
+      bp.disconnect();
+      lp.disconnect();
+      gainNode.disconnect();
+    };
   }
 
-  /** Detect a peg or segment crossing and react: fire the audio click
-   *  (rate-limited to TICK_RATE_LIMIT_MS, gated on `sound`) and / or
-   *  apply the per-peg drag (gated on `pegs`). When `pegs: true` the
-   *  detector runs at 2N peg intervals so every visible peg (boundary
-   *  AND mid-segment) fires; otherwise it runs at N segment intervals
-   *  (no pegs = audio fires at segment boundaries only). Detection
-   *  runs unconditionally so a `sound: false` + `pegs: true` user
-   *  still gets the brake on each peg. The cursor advances even when
-   *  audio is rate-limited so the next crossing isn't spurious. */
-  private _onSegmentCrossing(intensity: number): void {
+  /** Detect peg / segment crossings since the previous call and react:
+   *  fire the audio clicks (gated on `sound`) and / or apply the per-peg
+   *  brake (gated on `pegs`). When `pegs: true` the detector runs at
+   *  K*N peg intervals so every visible peg fires; otherwise it runs at
+   *  N segment intervals. Detection runs unconditionally so a
+   *  `sound: false` + `pegs: true` user still gets the brake.
+   *
+   *  `speed` is rim speed in rad/s; `frameDtSec` is the elapsed time of
+   *  the frame / pointer event being processed. Crucially this counts
+   *  EVERY boundary swept since the last call — a fast wheel can cross
+   *  several pegs in one 16 ms frame, and firing only one click per
+   *  frame is what made a fast spin a fixed buzz instead of a rattle.
+   *  The clicks of one frame are staggered across `frameDtSec` on the
+   *  audio clock (not stacked on `currentTime`) so they read as a
+   *  decelerating rattle rather than a metronomic frame-rate tone.
+   *
+   *  The brake is applied once per call (not once per peg) — matching
+   *  the long-standing physics; only the audio path counts every peg. */
+  private _onSegmentCrossing(speed: number, frameDtSec: number): void {
     const audioOn = this._soundEnabled();
     const pegsOn = this._pegsEnabled();
     if (!audioOn && !pegsOn) {
@@ -2387,14 +2501,39 @@ export class SpinningWheelCard extends LitElement {
       this._lastTickSeg = cur;
       return;
     }
-    if (cur === this._lastTickSeg) return;
+
+    // Signed boundary delta, unwrapped across the 0/count seam. Per
+    // frame the wheel turns < ~2 rad, i.e. well under half the rim, so
+    // a jump greater than count/2 must be a wrap, not real motion.
+    const count = this._tickBoundaryCount();
+    let nCross = cur - this._lastTickSeg;
+    if (nCross > count / 2) nCross -= count;
+    else if (nCross < -count / 2) nCross += count;
+    if (nCross === 0) return;
+    this._lastTickSeg = cur;
+
     if (audioOn) {
-      const now = performance.now();
-      if (now - this._lastTickMs >= TICK_RATE_LIMIT_MS) {
-        this._playTick(intensity);
-        this._lastTickMs = now;
+      const ctx = this._ensureAudio();
+      if (ctx && this._audioReady && ctx.state === "running") {
+        const clicks = Math.min(Math.abs(nCross), TICK_MAX_PER_FRAME);
+        const intensity = this._tickIntensity(speed);
+        const audioNow = ctx.currentTime;
+        const span = Math.max(0, Math.min(0.05, frameDtSec));
+        for (let j = 0; j < clicks; j++) {
+          // Even spacing + sub-slot jitter → a rattle, not a grid tone.
+          const frac = (j + Math.random()) / clicks;
+          this._playTick(ctx, intensity, audioNow + frac * span);
+        }
+      } else if (ctx && ctx.state === "suspended") {
+        void ctx
+          .resume()
+          .then(() => {
+            this._audioReady = true;
+          })
+          .catch(() => {});
       }
     }
+
     if (pegsOn) {
       // Brake bump opposite to current motion. Capped at zero so
       // an at-rest wheel doesn't reverse direction on residual ω.
@@ -2403,7 +2542,6 @@ export class SpinningWheelCard extends LitElement {
       this._omega =
         Math.sign(next) === sign || next === 0 ? next : 0;
     }
-    this._lastTickSeg = cur;
   }
 
   private _wheelRect(): DOMRect | null {
@@ -2493,6 +2631,11 @@ export class SpinningWheelCard extends LitElement {
     this._angle = wrapAngle(this._angle + delta);
 
     const t = ev.timeStamp || performance.now();
+    // Elapsed since the previous pointer move — the drag's frame `dt`.
+    const prevSample = this._velocitySamples[this._velocitySamples.length - 1];
+    const dtSec = prevSample
+      ? Math.max(0.001, (t - prevSample.t) / 1000)
+      : 0.016;
     this._velocitySamples.push({ t, angleDelta: delta });
     const cutoff = t - VELOCITY_SAMPLE_WINDOW_MS;
     while (
@@ -2502,7 +2645,9 @@ export class SpinningWheelCard extends LitElement {
       this._velocitySamples.shift();
     }
 
-    this._onSegmentCrossing(Math.min(1, Math.abs(delta) * 6));
+    // True angular speed of the drag (rad/s) — same scale the spin loop
+    // feeds in, so a slow careful drag and a hard spin are comparable.
+    this._onSegmentCrossing(Math.abs(delta) / dtSec, dtSec);
     this._draw();
   };
 

@@ -298,6 +298,18 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
    *  `var(--...)`) are silently skipped — the spin result and any
    *  configured actions still fire. */
   light_sync_entities?: ReadonlyArray<string>;
+  /** Optional `tts.*` engine entity_id. Paired with
+   *  `tts_announce_entities`, enables a spoken announcement of the
+   *  winning label after every spin via `tts.speak`. Both must be set
+   *  for TTS to fire — engine alone (or speakers alone) is a silent
+   *  no-op. Independent of `actions`. */
+  tts_engine?: string;
+  /** Optional list of `media_player.*` entity_ids that speak the
+   *  winning label after every spin, through the `tts_engine` above.
+   *  MDI icon labels (`mdi:food-croissant`) are spoken without the
+   *  `mdi:` prefix and with hyphens/underscores read as spaces
+   *  ("food croissant"). Requires `tts_engine` to also be set. */
+  tts_announce_entities?: ReadonlyArray<string>;
   /** Reverse the label reading direction. Default false.
    *  - Radial: default reads rim→hub (first char at rim). Flipped
    *    reads hub→rim (first char at hub).

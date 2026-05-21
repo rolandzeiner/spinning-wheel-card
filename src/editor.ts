@@ -425,6 +425,18 @@ export class SpinningWheelCardEditor
         name: "light_sync_entities",
         selector: { entity: { domain: "light", multiple: true } },
       },
+      // TTS announcement of the winning label — sits right below light
+      // sync, the audio sibling of the colour sync. Two selectors
+      // because HA's `tts.speak` needs both a TTS engine entity and a
+      // media_player target; both must be set for TTS to fire.
+      {
+        name: "tts_engine",
+        selector: { entity: { domain: "tts" } },
+      },
+      {
+        name: "tts_announce_entities",
+        selector: { entity: { domain: "media_player", multiple: true } },
+      },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently
       // (expandable footgun).
@@ -648,6 +660,8 @@ export class SpinningWheelCardEditor
     ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
     ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
     ["light_sync_entities", { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" }],
+    ["tts_engine", { label: "editor.tts_engine", helper: "editor.tts_engine_helper" }],
+    ["tts_announce_entities", { label: "editor.tts_announce_entities", helper: "editor.tts_announce_entities_helper" }],
     ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
     ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
     ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
@@ -1003,6 +1017,15 @@ export class SpinningWheelCardEditor
       next.light_sync_entities.length === 0
     ) {
       delete next.light_sync_entities;
+    }
+    if (next.tts_engine === "" || next.tts_engine == null) {
+      delete next.tts_engine;
+    }
+    if (
+      !Array.isArray(next.tts_announce_entities) ||
+      next.tts_announce_entities.length === 0
+    ) {
+      delete next.tts_announce_entities;
     }
     if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
     if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
