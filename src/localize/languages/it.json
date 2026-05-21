@@ -11,7 +11,7 @@
     "wheel_label": "Far girare la ruota"
   },
   "confirm": {
-    "run_action": "Eseguire \"{action}\" per \"{value}\"?"
+    "run_action": "Eseguire «{action}» per «{value}»?"
   },
   "hub": {
     "default_text": "GIRA"
