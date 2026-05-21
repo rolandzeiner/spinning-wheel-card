@@ -415,27 +415,33 @@ export class SpinningWheelCardEditor
           { name: "label_flip", selector: { boolean: {} } },
         ],
       },
-      // Light colour sync. Lives directly below Label layout because
-      // it's a "set up once and forget" convenience: pick lights, every
-      // future spin auto-matches them to the winning segment fill.
-      // Independent of Actions / Segment bindings (those still fire);
-      // skipping this in favour of a per-segment perform-action would
-      // need a script per colour. Empty = feature disabled.
+      // Integrations expandable — colour sync + TTS announcement. Both
+      // are "set up once and forget" hooks that wire the winning
+      // segment to other HA entities: lights match the fill colour,
+      // speakers announce the label. Independent of Actions / Segment
+      // bindings (those still fire). flatten:true so inner fields write
+      // straight to top-level config (expandable footgun if missing).
       {
-        name: "light_sync_entities",
-        selector: { entity: { domain: "light", multiple: true } },
-      },
-      // TTS announcement of the winning label — sits right below light
-      // sync, the audio sibling of the colour sync. Two selectors
-      // because HA's `tts.speak` needs both a TTS engine entity and a
-      // media_player target; both must be set for TTS to fire.
-      {
-        name: "tts_engine",
-        selector: { entity: { domain: "tts" } },
-      },
-      {
-        name: "tts_announce_entities",
-        selector: { entity: { domain: "media_player", multiple: true } },
+        type: "expandable" as const,
+        name: "integrations",
+        title: localize("editor.integrations", lang),
+        flatten: true,
+        schema: [
+          {
+            name: "light_sync_entities",
+            selector: { entity: { domain: "light", multiple: true } },
+          },
+          // HA's `tts.speak` needs both a TTS engine entity and a
+          // media_player target; both must be set for TTS to fire.
+          {
+            name: "tts_engine",
+            selector: { entity: { domain: "tts" } },
+          },
+          {
+            name: "tts_announce_entities",
+            selector: { entity: { domain: "media_player", multiple: true } },
+          },
+        ],
       },
       // flatten:true on every binding layer — without it ha-form nests
       // values under data["bindings"] and writes fail silently

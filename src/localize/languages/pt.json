@@ -61,6 +61,7 @@
     "result_entity_create_failed": "Falha ao criar o helper de resultado. Veja a consola do navegador para detalhes.",
     "general": "Geral",
     "label_layout": "Disposição das etiquetas",
+    "integrations": "Integrações",
     "bindings": "Associações de segmentos",
     "binding_color": "Cor de preenchimento",
     "binding_label_color": "Cor do texto da etiqueta",

@@ -61,6 +61,7 @@
     "result_entity_create_failed": "Aanmaken van resultaathelper mislukt. Zie de browserconsole voor details.",
     "general": "Algemeen",
     "label_layout": "Labelopmaak",
+    "integrations": "Integraties",
     "bindings": "Segmentkoppelingen",
     "binding_color": "Vulkleur",
     "binding_label_color": "Labeltekstkleur",

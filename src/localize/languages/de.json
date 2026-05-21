@@ -61,6 +61,7 @@
     "result_entity_create_failed": "Erstellung des Ergebnis-Helfers fehlgeschlagen. Details in der Browser-Konsole.",
     "general": "Allgemein",
     "label_layout": "Beschriftungslayout",
+    "integrations": "Integrationen",
     "bindings": "Segment-Bindungen",
     "binding_color": "Füllfarbe",
     "binding_label_color": "Beschriftungsfarbe",

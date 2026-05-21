@@ -61,6 +61,7 @@
     "result_entity_create_failed": "結果ヘルパーの作成に失敗しました。詳細はブラウザのコンソールを確認してください。",
     "general": "一般",
     "label_layout": "ラベルのレイアウト",
+    "integrations": "インテグレーション",
     "bindings": "セグメント割り当て",
     "binding_color": "塗りつぶし色",
     "binding_label_color": "ラベル文字色",

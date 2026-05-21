@@ -61,6 +61,7 @@
     "result_entity_create_failed": "Failed to create result helper. See browser console for details.",
     "general": "General",
     "label_layout": "Label layout",
+    "integrations": "Integrations",
     "bindings": "Segment bindings",
     "binding_color": "Fill colour",
     "binding_label_color": "Label text colour",

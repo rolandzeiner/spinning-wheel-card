@@ -61,6 +61,7 @@
     "result_entity_create_failed": "创建结果助手失败。详情请查看浏览器控制台。",
     "general": "通用",
     "label_layout": "标签布局",
+    "integrations": "集成",
     "bindings": "扇形绑定",
     "binding_color": "填充颜色",
     "binding_label_color": "标签文字颜色",
