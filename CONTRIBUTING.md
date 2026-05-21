@@ -33,12 +33,13 @@ For live testing in a Home Assistant install:
 ## Verification gate (must pass before PR)
 
 ```bash
+npm test                         # vitest unit suite
 npx tsc --noEmit                 # strict type-check
 npm run build                    # rollup must succeed clean
 node -c dist/spinning-wheel-card.js   # syntax sanity-check
 ```
 
-CI runs the same three plus `npm audit --omit=dev --audit-level=high`,
+CI runs the same four plus `npm audit --omit=dev --audit-level=high`,
 HACS plugin validation, and CodeQL JS/TS analysis.
 
 ## Branching

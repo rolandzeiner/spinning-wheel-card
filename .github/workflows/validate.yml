@@ -73,6 +73,11 @@ jobs:
         # in CI instead of slipping into the bundle.
         run: npx tsc --noEmit
 
+      - name: Test
+        # vitest unit suite — runs against the TypeScript sources
+        # directly, independent of the Rollup bundle.
+        run: npm test
+
       - name: Build bundle
         run: npm run build
 
