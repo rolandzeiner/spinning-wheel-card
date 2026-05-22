@@ -87,9 +87,9 @@ export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI
  *  payload mirrors what was in YAML.
  *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
 export const cssToRgbTriple = (
-  css: string,
+  value: string,
 ): readonly [number, number, number] | null => {
-  const s = css.trim();
+  const s = value.trim();
   if (s.startsWith("#")) {
     if (s.length === 7) {
       const r = parseInt(s.slice(1, 3), 16);
@@ -124,9 +124,9 @@ export const cssToRgbTriple = (
  *  translucent fills and picks the wrong text colour (WCAG 1.4.3).
  *  Returns null for inputs `cssToRgbTriple` doesn't accept. */
 export const cssRgbForLuminance = (
-  css: string,
+  value: string,
 ): readonly [number, number, number] | null => {
-  const s = css.trim();
+  const s = value.trim();
   // Hex values are opaque by definition — fall through to the
   // existing parser.
   if (s.startsWith("#")) return cssToRgbTriple(s);
@@ -194,12 +194,15 @@ const TICK_MIN_INTENSITY = 0.4; // intensity floor at near-zero speed
 // few per ~16 ms anyway.
 const TICK_MAX_PER_FRAME = 8;
 
-/** Per-segment-crossing brake bump at slider level 5 (the new default).
- *  `_pegDrag()` scales linearly with the 1–10 friction slider so light
- *  setups (level 1) get ~0.016 rad/s per peg, heavy setups (level 10)
- *  get ~0.16. Capped at zero in the use-site so the brake can't reverse
- *  the spin direction. Composes with the continuous friction decay;
- *  one slider drives both. */
+/** Peg brake bump at slider level 5 (the new default). Applied once
+ *  per `_onSegmentCrossing` call — once per animation frame while
+ *  spinning, or once per pointer-move while dragging — regardless of
+ *  how many pegs were swept that call; only the audio path clicks per
+ *  peg. `_pegDrag()` scales linearly with the 1–10 friction slider so
+ *  light setups (level 1) get ~0.016 rad/s per braked frame, heavy
+ *  setups (level 10) get ~0.16. Capped at zero in the use-site so the
+ *  brake can't reverse the spin direction. Composes with the
+ *  continuous friction decay; one slider drives both. */
 const PEG_DRAG_RAD_PER_S = 0.08;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
@@ -842,7 +845,9 @@ export class SpinningWheelCard extends LitElement {
       this._todoItems = unique;
       this._invalidateDrawCache();
       this._result = null;
-      this._draw();
+      // _todoItems / _result are @state — assigning them schedules the
+      // reactive update, and updated() runs _draw() (changed has
+      // _todoItems). No explicit draw needed; mirrors the catch branch.
     } catch (err) {
       console.warn("[spinning-wheel-card] todo/item/list failed:", err);
       this._todoItems = [];
@@ -1391,10 +1396,12 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** RAF tween: ease `_angle` from current to `targetAngle` over ~220 ms
-   *  with cubic ease-out. `_spinning` stays true during the tween (the
-   *  status line keeps reading "Spinning…" so the result announcement
-   *  doesn't flash before the wheel actually rests). Cancellable via
-   *  `_cancelSettleTween` when a fresh click claims the RAF slot. */
+   *  with a sine ease-in-out (soft at both ends — see the inline note
+   *  below for why not cubic ease-out). `_spinning` stays true during
+   *  the tween (the status line keeps reading "Spinning…" so the result
+   *  announcement doesn't flash before the wheel actually rests).
+   *  Cancellable via `_cancelSettleTween` when a fresh click claims the
+   *  RAF slot. */
   private _startSettleTween(targetAngle: number): void {
     const startAngle = this._angle;
     let delta = targetAngle - startAngle;
@@ -2106,8 +2113,9 @@ export class SpinningWheelCard extends LitElement {
         this._omega -= couStep * Math.sign(this._omega);
       }
 
-      // Click on every peg swept this frame; `_onSegmentCrossing` maps
-      // rim speed → intensity and staggers the clicks across `dt`.
+      // Peg/segment-crossing handler: fires staggered audio clicks for
+      // every peg swept this frame (gated on `sound`) AND applies the
+      // per-frame peg brake to `_omega` (gated on `pegs`).
       this._onSegmentCrossing(Math.abs(this._omega), dt);
 
       this._draw();
@@ -3096,20 +3104,31 @@ export class SpinningWheelCard extends LitElement {
       changed.has("_todoItems");
     if (changed.has("config")) {
       // half_circle toggle reshapes the canvas without changing the
-      // wrap; ResizeObserver wouldn't refire on its own. Idempotent
-      // when diameter is unchanged.
-      const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
-        | HTMLElement
-        | null;
-      if (wrap) {
-        const rect = wrap.getBoundingClientRect();
-        if (rect.width > 0 || rect.height > 0) {
-          this._size = this._clampSize(
-            this._fitDim(rect.width, rect.height),
-          );
+      // wrap; ResizeObserver wouldn't refire on its own. Gated to the
+      // first render and actual half_circle flips — the editor emits a
+      // fresh config object on every keystroke, and re-running
+      // getBoundingClientRect() + resize for each one is a forced
+      // layout per keystroke. Idempotent when diameter is unchanged.
+      const prevConfig = changed.get("config") as
+        | SpinningWheelCardConfig
+        | undefined;
+      if (
+        prevConfig === undefined ||
+        prevConfig.half_circle !== this.config.half_circle
+      ) {
+        const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
+          | HTMLElement
+          | null;
+        if (wrap) {
+          const rect = wrap.getBoundingClientRect();
+          if (rect.width > 0 || rect.height > 0) {
+            this._size = this._clampSize(
+              this._fitDim(rect.width, rect.height),
+            );
+          }
         }
+        this._applyCanvasSize();
       }
-      this._applyCanvasSize();
     }
     if (changed.has("hass") && this.hass) {
       const dark = this.hass.themes?.darkMode;

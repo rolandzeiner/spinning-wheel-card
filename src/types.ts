@@ -240,7 +240,8 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   language?: string;
   /** Segment count (4–24). Default 8. */
   segments?: number;
-  /** Deceleration preset. Default "medium". */
+  /** Wheel dampening, integer 1–10 (pre-v1.2 string presets `low` /
+   *  `medium` / `high` still accepted as aliases). Default 5. */
   friction?: Friction;
   /** Per-segment labels (1..segments). Shorter arrays cycle around the
    *  wheel. Defaults to "1".."N". */
