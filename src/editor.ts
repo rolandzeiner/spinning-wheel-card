@@ -20,6 +20,7 @@ import {
 } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 import { normalizeFriction } from "./friction";
+import { fetchOpenTodoItems, uniqueTodoItems } from "./todo";
 
 // Editor projects array config (labels / weights / colors / label_colors)
 // as `*_csv` strings and per-unique-label values as synthetic
@@ -200,31 +201,15 @@ export class SpinningWheelCardEditor
     }
   }
 
-  /** Mirrors the card's _fetchTodoItems so editor and runtime agree on
-   *  which items become unique-label slots. */
+  /** Uses the card's shared fetch (`./todo`) so editor and runtime agree
+   *  on which items become unique-label slots. */
   private async _fetchTodoItems(): Promise<void> {
     const entity = this._config.todo_entity;
     if (!entity || !this.hass?.callWS) return;
     if (this._todoLoading) return;
     this._todoLoading = true;
     try {
-      const reply = (await this.hass.callWS({
-        type: "todo/item/list",
-        entity_id: entity,
-      })) as { items?: ReadonlyArray<TodoItem> } | undefined;
-      const all = reply?.items ?? [];
-      const open = all.filter(
-        (i) => (i.status ?? "needs_action") === "needs_action",
-      );
-      const seen = new Set<string>();
-      const unique: TodoItem[] = [];
-      for (const item of open) {
-        const key = item.summary ?? "";
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        unique.push(item);
-      }
-      this._todoItems = unique;
+      this._todoItems = (await fetchOpenTodoItems(this.hass, entity)) ?? [];
     } catch (err) {
       console.warn(
         "[spinning-wheel-card editor] todo/item/list failed:",
@@ -243,15 +228,7 @@ export class SpinningWheelCardEditor
   private _uniqueLabels(): ReadonlyArray<string> {
     if (this._config.todo_entity) {
       if (!this._todoItems || this._todoItems.length === 0) return [];
-      const seen = new Set<string>();
-      const out: string[] = [];
-      for (const item of this._todoItems) {
-        const summary = item.summary ?? "";
-        if (!summary || seen.has(summary)) continue;
-        seen.add(summary);
-        out.push(summary);
-      }
-      return out;
+      return uniqueTodoItems(this._todoItems).map((item) => item.summary);
     }
     const segments = this._config.segments ?? DEFAULT_SEGMENTS;
     const src = this._config.labels;

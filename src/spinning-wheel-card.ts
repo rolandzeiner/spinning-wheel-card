@@ -14,6 +14,7 @@ import type {
   TodoItem,
 } from "./types";
 import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction";
+import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 
@@ -819,30 +820,17 @@ export class SpinningWheelCard extends LitElement {
     return Array.from({ length: n }, (_, i) => src[i % src.length] ?? "");
   }
 
-  /** Fetch open todo items via `todo/item/list`. Dedups by summary —
-   *  the same-label-same-colour rule would otherwise collapse two
-   *  segments visually. */
+  /** Refresh open todo items from `todo/item/list` (fetch + filter +
+   *  summary-dedup live in `./todo`, shared with the editor). On success
+   *  invalidates the draw cache and clears the last result; on failure
+   *  falls back to an empty wheel. */
   private async _fetchTodoItems(): Promise<void> {
     const entity = this.config.todo_entity;
     if (!entity || !this.hass?.callWS) return;
     if (this._todoLoading) return;
     this._todoLoading = true;
     try {
-      const reply = (await this.hass.callWS({
-        type: "todo/item/list",
-        entity_id: entity,
-      })) as { items?: ReadonlyArray<TodoItem> } | undefined;
-      const all = reply?.items ?? [];
-      const open = all.filter((i) => (i.status ?? "needs_action") === "needs_action");
-      const seen = new Set<string>();
-      const unique: TodoItem[] = [];
-      for (const item of open) {
-        const key = item.summary ?? "";
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        unique.push(item);
-      }
-      this._todoItems = unique;
+      this._todoItems = (await fetchOpenTodoItems(this.hass, entity)) ?? [];
       this._invalidateDrawCache();
       this._result = null;
       // _todoItems / _result are @state — assigning them schedules the
@@ -2559,12 +2547,18 @@ export class SpinningWheelCard extends LitElement {
     return c?.getBoundingClientRect() ?? null;
   }
 
-  // Client (x, y) → angle from canvas centre. 0 = +X axis, CCW.
+  // Client (x, y) → angle from the wheel centre. 0 = +X axis, CCW.
+  // The wheel is drawn centred at (size/2, size/2) in `_draw`, and the
+  // canvas CSS width is always `size` (`_applyCanvasSize`), so the true
+  // centre is rect.width/2 on BOTH axes. We deliberately use rect.width
+  // (not rect.height) for the vertical pivot: in half mode the canvas BOX
+  // is only size·HALF_ASPECT tall, so rect.height/2 would land ~0.21·size
+  // above the real centre and skew drag-to-rotate + flick sampling.
   private _angleFrom(ev: PointerEvent): number | null {
     const rect = this._wheelRect();
     if (!rect) return null;
     const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
+    const cy = rect.top + rect.width / 2;
     return Math.atan2(ev.clientY - cy, ev.clientX - cx);
   }
 
