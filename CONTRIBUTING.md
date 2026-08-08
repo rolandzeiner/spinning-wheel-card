@@ -36,10 +36,16 @@ For live testing in a Home Assistant install:
 npm test                         # vitest unit suite
 npx tsc --noEmit                 # strict type-check
 npm run build                    # rollup must succeed clean
+git diff --exit-code -- dist/    # committed bundle must match that build
 node -c dist/spinning-wheel-card.js   # syntax sanity-check
 ```
 
-CI runs the same four plus `npm audit --omit=dev --audit-level=high`,
+Commit `dist/` alongside your `src/` change. HACS serves the committed
+bundle directly, so a `src/` edit without a rebuild ships code that no
+longer matches the source — the fourth command is what catches it, and
+CI fails the build on the same check.
+
+CI runs the same five plus `npm audit --omit=dev --audit-level=high`,
 HACS plugin validation, and CodeQL JS/TS analysis.
 
 ## Branching
