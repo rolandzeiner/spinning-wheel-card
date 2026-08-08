@@ -3,6 +3,16 @@ name: CodeQL
 # JavaScript/TypeScript-only — this repo ships a Lovelace card, no
 # Python. Runs on every push to main/dev, every PR targeting main,
 # and weekly on Tuesday 04:23 UTC for advisories on stale code.
+#
+# workflow_dispatch exists to re-run a scan that GitHub's own
+# infrastructure killed. During the 2026-08-06 Actions outage the
+# CodeQL jobs were cancelled before they got a runner, and with only
+# push/PR/weekly triggers the sole recovery options were an empty
+# commit or a four-day wait for the Tuesday cron.
+#
+# NOTE: GitHub reads dispatchability from the DEFAULT branch, not the
+# ref you target. This trigger does nothing until it lands on main —
+# `gh workflow run CodeQL --ref dev` returns HTTP 422 until then.
 
 on:
   push:
@@ -11,6 +21,7 @@ on:
     branches: [main]
   schedule:
     - cron: "23 4 * * 2"
+  workflow_dispatch:
 
 jobs:
   analyze:
@@ -34,7 +45,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.3
+        uses: github/codeql-action/init@v4.37.6
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -44,6 +55,6 @@ jobs:
               - 'node_modules/**'
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.3
+        uses: github/codeql-action/analyze@v4.37.6
         with:
           category: "/language:${{ matrix.language }}"

@@ -2,7 +2,9 @@ name: Validate
 
 on:
   push:
+    branches: [main, dev]
   pull_request:
+    branches: [main]
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
@@ -80,6 +82,24 @@ jobs:
 
       - name: Build bundle
         run: npm run build
+
+      - name: Assert the committed bundle matches a fresh build
+        # The build above regenerates dist/ from src/. Any diff means the
+        # committed bundle is stale — someone changed src/ and didn't
+        # rebuild. Nothing else in the gate catches it: tsc and vitest
+        # both run against the TypeScript sources and never look at the
+        # built artefact.
+        #
+        # This repo ships dist/ to HACS users directly, so a stale bundle
+        # means every install runs code that no longer matches src/ —
+        # invisible in review, and the next `npm run build` silently
+        # "fixes" it without anyone learning what shipped.
+        run: |
+          if ! git diff --exit-code -- dist/; then
+            echo "::error::Committed card bundle differs from a fresh build."
+            echo "::error::Run 'npm run build' and commit dist/."
+            exit 1
+          fi
 
       - name: Syntax-check bundle
         # `node -c` parses without executing — cheapest check that
