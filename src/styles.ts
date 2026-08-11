@@ -14,13 +14,13 @@ export const editorStyles = css`
   .editor-section {
     background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
     border-radius: var(--ha-border-radius-lg, 12px);
-    padding: var(--ha-space-3, 14px) var(--ha-space-4, 16px);
+    padding: var(--ha-space-3, 12px) var(--ha-space-4, 16px);
     display: flex;
     flex-direction: column;
-    gap: var(--ha-space-2, 10px);
+    gap: var(--ha-space-2, 8px);
   }
   .section-header {
-    font-size: var(--ha-font-size-xs, 11px);
+    font-size: var(--ha-font-size-xs, 10px);
     font-weight: 600;
     letter-spacing: 0.6px;
     text-transform: uppercase;
