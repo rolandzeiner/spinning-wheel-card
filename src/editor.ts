@@ -306,7 +306,7 @@ export class SpinningWheelCardEditor
       ...this._buildGeneralBlock(lang),
       {
         name: "todo_entity",
-        selector: { entity: { domain: "todo" } },
+        selector: { entity: { filter: { domain: "todo" } } },
       },
       // Friction lives at top level (not in General) and stays visible in
       // both todo and labels modes — spin physics are independent of
@@ -406,17 +406,19 @@ export class SpinningWheelCardEditor
         schema: [
           {
             name: "light_sync_entities",
-            selector: { entity: { domain: "light", multiple: true } },
+            selector: { entity: { multiple: true, filter: { domain: "light" } } },
           },
           // HA's `tts.speak` needs both a TTS engine entity and a
           // media_player target; both must be set for TTS to fire.
           {
             name: "tts_engine",
-            selector: { entity: { domain: "tts" } },
+            selector: { entity: { filter: { domain: "tts" } } },
           },
           {
             name: "tts_announce_entities",
-            selector: { entity: { domain: "media_player", multiple: true } },
+            selector: {
+              entity: { multiple: true, filter: { domain: "media_player" } },
+            },
           },
         ],
       },
@@ -447,7 +449,7 @@ export class SpinningWheelCardEditor
           {
             name: "actions",
             selector: {
-              entity: { domain: "script", multiple: true },
+              entity: { multiple: true, filter: { domain: "script" } },
             },
           },
         ],
@@ -603,7 +605,7 @@ export class SpinningWheelCardEditor
         },
         {
           name: `binding_${i}_action`,
-          selector: { entity: { domain: "script" } },
+          selector: { entity: { filter: { domain: "script" } } },
         },
       ],
     }));
@@ -1146,7 +1148,7 @@ export class SpinningWheelCardEditor
         <div class="result-entity-row">
           <ha-selector
             .hass=${this.hass}
-            .selector=${{ entity: { domain: "input_text" } }}
+            .selector=${{ entity: { filter: { domain: "input_text" } } }}
             .value=${this._config.result_entity ?? ""}
             .label=${localize("editor.result_entity", lang)}
             .helper=${localize("editor.result_entity_helper", lang)}
