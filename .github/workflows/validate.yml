@@ -65,20 +65,20 @@ jobs:
         run: npm ci
 
       - name: Audit production deps
-        # --omit=dev keeps the gate enforceable; without it Rollup-plugin
+        # --omit=dev keeps the gate enforceable; without it build-tooling
         # advisories (which never ship to users) flood the report.
         run: npm audit --omit=dev --audit-level=high
 
       - name: Type-check (strict)
         # This is the ONLY type-check in the pipeline. The bundler
-        # (@rollup/plugin-swc) transpiles TypeScript by stripping types and
-        # never checks them, so without this step a type error would sail
+        # (Rolldown) transpiles TypeScript by stripping types and never
+        # checks them, so without this step a type error would sail
         # straight into a green build. Keep it ahead of the build.
         run: npx tsc --noEmit
 
       - name: Test
         # vitest unit suite — runs against the TypeScript sources
-        # directly, independent of the Rollup bundle.
+        # directly, independent of the Rolldown bundle.
         run: npm test
 
       - name: Build bundle
@@ -104,5 +104,5 @@ jobs:
 
       - name: Syntax-check bundle
         # `node -c` parses without executing — cheapest check that
-        # Rollup didn't produce malformed JS.
+        # Rolldown didn't produce malformed JS.
         run: node -c dist/spinning-wheel-card.js

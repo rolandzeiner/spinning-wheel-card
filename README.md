@@ -338,7 +338,7 @@ Chrome / Edge / Firefox / Safari current major + previous. Uses Web Audio, Resiz
 ```bash
 npm install
 npm run build       # → dist/spinning-wheel-card.js
-npm run dev         # rollup watch mode
+npm run dev         # rolldown watch mode
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

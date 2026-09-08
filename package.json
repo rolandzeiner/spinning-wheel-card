@@ -5,20 +5,15 @@
   "description": "Standalone Lovelace custom card — a click-to-spin / drag-to-flick wheel with momentum-based physics.",
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
-    "dev": "rollup -c -w",
-    "build:push": "rollup -c && ./scripts/dev-push.sh --quiet",
+    "build": "rolldown -c",
+    "dev": "rolldown -c -w",
+    "build:push": "rolldown -c && ./scripts/dev-push.sh --quiet",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-swc": "0.4.1",
-    "@rollup/plugin-terser": "^1.0.0",
-    "@swc/core": "1.16.2",
     "happy-dom": "20.14.0",
-    "rollup": "^4.63.1",
+    "rolldown": "1.2.7",
     "typescript": "7.0.2",
     "vitest": "5.0.0"
   },

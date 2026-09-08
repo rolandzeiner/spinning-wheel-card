@@ -62,7 +62,7 @@ node_modules/
 *.js.map
 
 # Bundler caches
-.rollup.cache/
+.rolldown.cache/
 .vite-cache/
 .parcel-cache/
 
