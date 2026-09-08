@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment happy-dom
+ *
  * Unit tests for the pure-math helpers in `src/spinning-wheel-card.ts`.
  *
  * Covers angle wrapping (used everywhere in the physics loop and segment
