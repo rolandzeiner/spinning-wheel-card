@@ -16,6 +16,7 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-swc": "0.4.1",
     "@rollup/plugin-terser": "^1.0.0",
+    "@swc/core": "1.16.2",
     "happy-dom": "20.14.0",
     "rollup": "^4.63.1",
     "typescript": "7.0.2",
