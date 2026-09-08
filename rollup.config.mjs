@@ -5,12 +5,23 @@
 // load with "Cannot read properties of undefined (reading 'ES2015')".
 // @rollup/plugin-typescript has had no release since 2025-10, i.e. none that
 // knows about TS 7. swc transpiles instead; `tsc --noEmit` still type-checks.
+import { readFileSync } from "node:fs";
+
 import { swc } from "@rollup/plugin-swc";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import json from "@rollup/plugin-json";
 
 const dev = !!process.env.ROLLUP_WATCH;
+
+// Derive swc's transpile settings from tsconfig.json rather than restating
+// them. swc has its own decorator implementation, so if these ever disagree
+// with tsconfig the bundle silently stops matching what tsc type-checked —
+// and the failure mode (Lit reactivity quietly dead) does not look like a
+// config bug. Reading them here makes that class of drift impossible.
+const tsconfig = JSON.parse(readFileSync("./tsconfig.json", "utf8"));
+const { target, experimentalDecorators, useDefineForClassFields } =
+  tsconfig.compilerOptions;
 
 const banner =
   "// Spinning Wheel Card — bundled by Rollup. Edit sources in src/, then `npm run build`.";
@@ -42,18 +53,18 @@ export default {
       include: /\.ts$/,
       swc: {
         jsc: {
-          // These four must mirror tsconfig.json. Lit 3's @customElement /
-          // @property are LEGACY (experimental) decorators, so swc needs
-          // legacyDecorator; and useDefineForClassFields must stay false or
-          // class fields overwrite Lit's accessors and reactivity silently
-          // stops working. swc does no type-checking at all — `tsc --noEmit`
-          // is the only thing standing between a type error and a green build.
-          target: "es2022",
-          parser: { syntax: "typescript", decorators: true },
+          // Lit 3's @customElement / @property are LEGACY (experimental)
+          // decorators, and useDefineForClassFields must stay false or class
+          // fields overwrite Lit's accessors and reactivity silently dies.
+          // Both come from tsconfig above. swc does no type-checking at all —
+          // `tsc --noEmit` is the only thing between a type error and a green
+          // build, which is why CI runs it as a separate step.
+          target,
+          parser: { syntax: "typescript", decorators: experimentalDecorators },
           transform: {
-            legacyDecorator: true,
+            legacyDecorator: experimentalDecorators,
             decoratorMetadata: false,
-            useDefineForClassFields: false,
+            useDefineForClassFields,
           },
         },
       },
