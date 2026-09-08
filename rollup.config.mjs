@@ -1,5 +1,4 @@
 import typescript from "@rollup/plugin-typescript";
-import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import json from "@rollup/plugin-json";
@@ -8,18 +7,6 @@ const dev = !!process.env.ROLLUP_WATCH;
 
 const banner =
   "// Spinning Wheel Card — bundled by Rollup. Edit sources in src/, then `npm run build`.";
-
-// Suppress noisy node_modules `this` warnings from CommonJS internals
-// after Rollup converts them. Real warnings still surface.
-const onwarn = (warning, warn) => {
-  if (
-    warning.code === "THIS_IS_UNDEFINED" &&
-    warning.id?.includes("/node_modules/")
-  ) {
-    return;
-  }
-  warn(warning);
-};
 
 export default {
   input: "src/spinning-wheel-card.ts",
@@ -31,9 +18,14 @@ export default {
     inlineDynamicImports: true,
   },
   plugins: [
+    // Load-bearing, and it fails quietly if dropped: without it Rollup can't
+    // resolve the bare `lit` specifier, so it treats lit as external and
+    // still exits 0 — emitting a bundle that opens with `import ... from
+    // "lit"`, which 404s in the browser. The only signal is an "Unresolved
+    // dependencies" warning. Don't remove it on the strength of a green build.
     nodeResolve(),
-    commonjs(),
     typescript(),
+    // src/localize/localize.ts imports the nine language files as JSON.
     json(),
     // Strip `console.warn` / `console.error` calls from prod bundles —
     // the card's only console writes are benign instrumentation (failed
@@ -45,5 +37,4 @@ export default {
         compress: { drop_console: ["warn", "error"] },
       }),
   ].filter(Boolean),
-  onwarn,
 };
