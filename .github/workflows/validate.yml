@@ -70,9 +70,10 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Type-check (strict)
-        # Rollup's @rollup/plugin-typescript is more permissive than tsc
-        # in strict mode. Run tsc separately so TS regressions surface
-        # in CI instead of slipping into the bundle.
+        # This is the ONLY type-check in the pipeline. The bundler
+        # (@rollup/plugin-swc) transpiles TypeScript by stripping types and
+        # never checks them, so without this step a type error would sail
+        # straight into a green build. Keep it ahead of the build.
         run: npx tsc --noEmit
 
       - name: Test
