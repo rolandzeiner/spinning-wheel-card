@@ -12,10 +12,10 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "happy-dom": "20.14.0",
+    "happy-dom": "20.14.5",
     "rolldown": "1.2.9",
     "typescript": "7.0.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.1"
   },
   "dependencies": {
     "lit": "^3.3.3"
