@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "happy-dom": "20.14.0",
-    "rolldown": "1.2.7",
+    "rolldown": "1.2.9",
     "typescript": "7.0.2",
     "vitest": "5.0.0"
   },
