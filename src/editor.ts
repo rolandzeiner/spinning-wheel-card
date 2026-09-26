@@ -8,7 +8,6 @@ import type {
   HomeAssistant,
   LovelaceCardEditor,
   SpinningWheelCardConfig,
-  Theme,
   TodoItem,
 } from "./types";
 import { fireEvent } from "./types";
@@ -20,6 +19,7 @@ import {
 } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 import { normalizeFriction } from "./friction";
+import { normaliseConfig, textOrientationDefault, tidyConfig } from "./config";
 import { fetchOpenTodoItems, uniqueTodoItems } from "./todo";
 
 // Editor projects array config (labels / weights / colors / label_colors)
@@ -32,31 +32,6 @@ type EditorData = SpinningWheelCardConfig & {
   label_colors_csv?: string;
   [syntheticKey: string]: unknown;
 };
-
-// Form prefill so first-open dropdowns/toggles reflect operating values;
-// stripped in _onFormChanged so saved YAML stays minimal. hub_text is
-// excluded — see _formDefaults.
-const STATIC_DEFAULTS = {
-  segments: 8,
-  friction: 5,
-  text_orientation: "tangent" as const,
-  label_auto_fit: false,
-  label_font_scale: 100,
-  label_radius_offset: 0,
-  label_flip: false,
-  sound: true,
-  theme: "default" as const,
-  hub_color: "theme" as const,
-  show_status: true,
-  disable_confirm_actions: false,
-  disable_boost: false,
-  half_circle: false,
-  selector_mode: false,
-  segment_borders: true,
-  pegs: false,
-  peg_density: 1,
-  wheel_context: false,
-} satisfies Partial<SpinningWheelCardConfig>;
 
 /** Parse CSV / newline-separated colour list. Empty positions become
  *  `null` sentinels so `#a,,#c` produces `["#a", null, "#c"]` — the
@@ -139,9 +114,6 @@ export const isRgbTuple = (v: unknown): v is readonly [number, number, number] =
   typeof v[0] === "number" &&
   typeof v[1] === "number" &&
   typeof v[2] === "number";
-
-const DEFAULT_THEME: Theme = "default";
-const DEFAULT_SEGMENTS = 8;
 
 export class SpinningWheelCardEditor
   extends LitElement
@@ -230,7 +202,7 @@ export class SpinningWheelCardEditor
       if (!this._todoItems || this._todoItems.length === 0) return [];
       return uniqueTodoItems(this._todoItems).map((item) => item.summary);
     }
-    const segments = this._config.segments ?? DEFAULT_SEGMENTS;
+    const segments = normaliseConfig(this._config).segments;
     const src = this._config.labels;
     const expanded =
       src && src.length > 0
@@ -251,7 +223,7 @@ export class SpinningWheelCardEditor
    *  default rainbow. Cycles shorter sources. */
   private _resolvedColors(): ReadonlyArray<string> {
     const uniques = this._uniqueLabels();
-    const themeName = this._config.theme ?? DEFAULT_THEME;
+    const themeName = normaliseConfig(this._config).theme;
     const fallback = THEME_PALETTES[themeName] ?? THEME_PALETTES.default;
     const custom = this._config.colors;
     const src = custom && custom.length > 0 ? custom : fallback;
@@ -703,13 +675,6 @@ export class SpinningWheelCardEditor
     return entry?.helper ? localize(entry.helper, this._lang()) : undefined;
   };
 
-  /** hub_text is NOT prefilled — otherwise ha-form would re-fill it
-   *  with the localised default after every render, making "no hub
-   *  label" impossible. */
-  private _formDefaults(): Record<string, unknown> {
-    return { ...STATIC_DEFAULTS };
-  }
-
   /** Last projection given to ha-form. _onFormChanged diffs against it
    *  to detect which surface (bindings panel / Advanced CSV / Advanced
    *  multi-picker) produced the change, so a stale projection on one
@@ -972,39 +937,27 @@ export class SpinningWheelCardEditor
       }
     }
 
-    // 7. hub_text + defaults stripping.
+    // 7. hub_text, the special cases, then the defaults. tidyConfig drops
+    // every value equal to DEFAULTS and every cleared field (config.ts);
+    // what stays here are the fields whose "unset" it can't know about.
     const hadHubText = typeof this._config.hub_text === "string";
     const formClearedHubText =
       next.hub_text === undefined || next.hub_text === null;
     if (hadHubText && formClearedHubText) {
       next.hub_text = "";
     }
-    if (next.segments === STATIC_DEFAULTS.segments) delete next.segments;
-    if (next.friction === STATIC_DEFAULTS.friction) delete next.friction;
-    if (next.text_orientation === STATIC_DEFAULTS.text_orientation) {
+    // text_orientation's default is dynamic, so it isn't in DEFAULTS.
+    // The field is only offered outside todo mode, where it is tangent.
+    if (next.text_orientation === textOrientationDefault(false)) {
       delete next.text_orientation;
     }
-    if (next.label_auto_fit === STATIC_DEFAULTS.label_auto_fit) {
-      delete next.label_auto_fit;
-    }
-    if (next.label_font_scale === STATIC_DEFAULTS.label_font_scale) {
-      delete next.label_font_scale;
-    }
-    if (next.label_radius_offset === STATIC_DEFAULTS.label_radius_offset) {
-      delete next.label_radius_offset;
-    }
-    if (next.label_flip === STATIC_DEFAULTS.label_flip) {
-      delete next.label_flip;
-    }
-    // Empty entity list = feature off; strip so saved YAML stays minimal.
+    if (next.language === "auto") delete next.language;
+    // Empty entity list = feature off.
     if (
       !Array.isArray(next.light_sync_entities) ||
       next.light_sync_entities.length === 0
     ) {
       delete next.light_sync_entities;
-    }
-    if (next.tts_engine === "" || next.tts_engine == null) {
-      delete next.tts_engine;
     }
     if (
       !Array.isArray(next.tts_announce_entities) ||
@@ -1012,44 +965,9 @@ export class SpinningWheelCardEditor
     ) {
       delete next.tts_announce_entities;
     }
-    if (next.sound === STATIC_DEFAULTS.sound) delete next.sound;
-    if (next.theme === STATIC_DEFAULTS.theme) delete next.theme;
-    if (next.hub_color === STATIC_DEFAULTS.hub_color) delete next.hub_color;
-    if (next.show_status === STATIC_DEFAULTS.show_status) {
-      delete next.show_status;
-    }
-    if (
-      next.disable_confirm_actions === STATIC_DEFAULTS.disable_confirm_actions
-    ) {
-      delete next.disable_confirm_actions;
-    }
-    if (next.disable_boost === STATIC_DEFAULTS.disable_boost) {
-      delete next.disable_boost;
-    }
-    if (next.half_circle === STATIC_DEFAULTS.half_circle) {
-      delete next.half_circle;
-    }
-    if (next.selector_mode === STATIC_DEFAULTS.selector_mode) {
-      delete next.selector_mode;
-    }
-    if (next.segment_borders === STATIC_DEFAULTS.segment_borders) {
-      delete next.segment_borders;
-    }
-    if (next.pegs === STATIC_DEFAULTS.pegs) {
-      delete next.pegs;
-      // Density is meaningless when pegs are off — strip too so it
-      // doesn't leak into saved YAML after a toggle-on / toggle-off.
-      delete next.peg_density;
-    } else if (next.peg_density === STATIC_DEFAULTS.peg_density) {
-      delete next.peg_density;
-    }
-    if (next.wheel_context === STATIC_DEFAULTS.wheel_context) {
-      delete next.wheel_context;
-    }
-    if (next.language === "auto") delete next.language;
-    if (next.todo_entity === "" || next.todo_entity == null) {
-      delete next.todo_entity;
-    }
+    // Density is meaningless when pegs are off — strip it so it doesn't
+    // leak into saved YAML after a toggle-on / toggle-off.
+    if (next.pegs !== true) delete next.peg_density;
     // result_entity is owned by the standalone widget — preserve from
     // _config; whatever ha-form emits here is stale.
     if (this._config.result_entity) {
@@ -1057,6 +975,7 @@ export class SpinningWheelCardEditor
     } else {
       delete next.result_entity;
     }
+    const saved = tidyConfig(next);
 
     // 8. Cache CSV verbatim; regenerate when the binding side authored
     // the change so the next render's CSV view stays in sync.
@@ -1073,16 +992,22 @@ export class SpinningWheelCardEditor
       ? labelColorsCsvNext
       : (next.label_colors ?? []).map((c) => c ?? "").join(", ");
 
-    this._config = next;
-    fireEvent(this, "config-changed", { config: next });
+    this._config = saved;
+    fireEvent(this, "config-changed", { config: saved });
   };
 
   protected override render(): TemplateResult {
     const lang = this._lang();
-    // Spread order: defaults < user config < CSV synthetics < bindings.
+    // Defaults filled in (config.ts), then the projections below.
+    // hub_text is deliberately not defaulted: its default is localised,
+    // and re-filling it on every render would make "no hub label"
+    // impossible.
     const data: EditorData = {
-      ...this._formDefaults(),
-      ...this._config,
+      ...normaliseConfig(this._config),
+      // Offered only outside todo mode (see _buildSchema), where the
+      // dynamic default is always tangent.
+      text_orientation:
+        this._config.text_orientation ?? textOrientationDefault(false),
       // Map "no override" to the Auto sentinel so the dropdown isn't blank.
       language: this._config.language ?? "auto",
       // multi:true entity selector expects string[]; object-form

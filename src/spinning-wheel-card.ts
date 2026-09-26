@@ -17,6 +17,11 @@ import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction"
 import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
+import {
+  type NormalisedConfig,
+  normaliseConfig,
+  textOrientationDefault,
+} from "./config";
 
 import "./editor";
 
@@ -301,16 +306,18 @@ export class SpinningWheelCard extends LitElement {
   }
 
   public static getStubConfig(): Record<string, unknown> {
-    // Omit `name` — render() falls back to localised default so the
-    // header tracks the user's language without baking a string into YAML.
-    return { segments: 8, friction: 5 };
+    // Empty on purpose. `name` is left out so render() falls back to the
+    // localised default and the header tracks the user's language; the
+    // rest come from DEFAULTS. A default written in here is saved into the
+    // YAML, where it stays pinned even if DEFAULTS changes.
+    return {};
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @state() private config: SpinningWheelCardConfig = {
+  @state() private config: NormalisedConfig = normaliseConfig({
     type: "spinning-wheel-card",
-  };
+  });
 
   @state() private _result: string | null = null;
   @state() private _spinning = false;
@@ -357,6 +364,10 @@ export class SpinningWheelCard extends LitElement {
     if (!config || typeof config !== "object") {
       throw new Error(localize("errors.invalid_config", lang));
     }
+    // Validation below reads the raw config, so a mistyped value still
+    // throws; everything after it reads the normalised one. Defaults come
+    // from the one table the editor also reads — see config.ts.
+    const next = normaliseConfig(config);
     if (config.name !== undefined && typeof config.name !== "string") {
       throw new Error(localize("errors.name_type", lang));
     }
@@ -386,7 +397,7 @@ export class SpinningWheelCard extends LitElement {
         throw new Error(localize("errors.friction_range", lang));
       }
     }
-    const segments = config.segments ?? 8;
+    const segments = next.segments;
     if (config.labels !== undefined) {
       if (
         !Array.isArray(config.labels) ||
@@ -670,7 +681,7 @@ export class SpinningWheelCard extends LitElement {
     // Drop stale items on todo_entity swap so they don't render briefly
     // before the next state change triggers a refetch.
     const prevTodo = this.config.todo_entity ?? null;
-    const nextTodo = config.todo_entity ?? null;
+    const nextTodo = next.todo_entity ?? null;
     if (prevTodo !== nextTodo) {
       this._todoItems = null;
       this._todoLastEntityState = null;
@@ -680,14 +691,13 @@ export class SpinningWheelCard extends LitElement {
     // baseline so the next crossing detection re-seeds in the new
     // scale instead of comparing across scales (would fire a spurious
     // click on the next frame).
-    const prevPegsOn = this.config.pegs ?? false;
-    const nextPegsOn = config.pegs ?? false;
-    const prevDensity = this.config.peg_density ?? 1;
-    const nextDensity = config.peg_density ?? 1;
-    if (prevPegsOn !== nextPegsOn || prevDensity !== nextDensity) {
+    if (
+      this.config.pegs !== next.pegs ||
+      this.config.peg_density !== next.peg_density
+    ) {
       this._lastTickSeg = -1;
     }
-    this.config = { ...config };
+    this.config = next;
     this._invalidateThemeCache();
     this._invalidateDrawCache();
     this._result = null;
@@ -702,16 +712,13 @@ export class SpinningWheelCard extends LitElement {
     return this.config.hub_text ?? localize("hub.default_text", this._lang());
   }
   private _soundEnabled(): boolean {
-    return this.config.sound ?? true;
+    return this.config.sound;
   }
   private _textOrientation(): TextOrientation {
-    if (this.config.text_orientation !== undefined) {
-      return this.config.text_orientation;
-    }
-    // Long todo summaries read better along the spoke than wrapped on
-    // the rim — default radial when filled from a todo list.
-    if (this._isTodoMode()) return "radial";
-    return "tangent";
+    return (
+      this.config.text_orientation ??
+      textOrientationDefault(this._isTodoMode())
+    );
   }
 
   /** Todo mode = entity wired AND ≥1 open items being rendered. */
@@ -780,7 +787,7 @@ export class SpinningWheelCard extends LitElement {
       // Clamp to 4..24; < 4 items still render via label cycling.
       return Math.max(4, Math.min(24, todo.length));
     }
-    return this.config.segments ?? 8;
+    return this.config.segments;
   }
   /** Resolved 1–10 slider level for the current config, with pre-v1.2
    *  string presets transparently aliased. */
@@ -845,7 +852,7 @@ export class SpinningWheelCard extends LitElement {
     }
   }
   private _themePalette(): ReadonlyArray<string> {
-    return THEME_PALETTES[this.config.theme ?? "default"];
+    return THEME_PALETTES[this.config.theme];
   }
 
   /** Per-segment fill colour. Walks labels in order; each new unique
@@ -1000,7 +1007,7 @@ export class SpinningWheelCard extends LitElement {
    *  `confirmation: false` opts a single action out. Falls through to
    *  `window.confirm` — dep-free, blocking. */
   private async _confirmAction(cfg: ActionConfig): Promise<boolean> {
-    if (this.config.disable_confirm_actions === true) return true;
+    if (this.config.disable_confirm_actions) return true;
     const cfgConfirm: ConfirmationConfig | undefined =
       "confirmation" in cfg
         ? (cfg.confirmation as ConfirmationConfig | undefined)
@@ -1227,19 +1234,19 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _isHalfMode(): boolean {
-    return this.config.half_circle === true;
+    return this.config.half_circle;
   }
 
   private _isSelectorMode(): boolean {
-    return this.config.selector_mode === true;
+    return this.config.selector_mode;
   }
 
   private _pegsEnabled(): boolean {
-    return this.config.pegs === true;
+    return this.config.pegs;
   }
 
   private _wheelContextEnabled(): boolean {
-    return this.config.wheel_context === true;
+    return this.config.wheel_context;
   }
 
   /** Class shim around the module-level `cssToRgbTriple` — kept so any
@@ -1571,19 +1578,19 @@ export class SpinningWheelCard extends LitElement {
     const radius = size / 2 - size * RIM_INSET_FRAC;
     const hubRadius = size * HUB_RADIUS_FRAC;
 
-    const fontScale = this.config.label_font_scale ?? 100;
+    const fontScale = this.config.label_font_scale;
     const labelFontPx = Math.max(
       7,
       Math.round((size * 0.05 * fontScale) / 100),
     );
     const isTodoMode = this._isTodoMode();
-    const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
+    const useAutoFit = isTodoMode || this.config.label_auto_fit;
     const minLabelPx = 7;
-    const flip = this.config.label_flip === true;
+    const flip = this.config.label_flip;
     const orientation = this._textOrientation();
 
     const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
-    const offsetFrac = (this.config.label_radius_offset ?? 0) / 100;
+    const offsetFrac = this.config.label_radius_offset / 100;
     const safeRadius = Math.max(1, radius);
     const minFrac = Math.min(
       0.95,
@@ -1792,7 +1799,7 @@ export class SpinningWheelCard extends LitElement {
       cs.getPropertyValue("--divider-color").trim() ||
       "rgba(0,0,0,0.45)";
 
-    const choice: HubColor = this.config.hub_color ?? "theme";
+    const choice: HubColor = this.config.hub_color;
 
     if (choice === "black") {
       // Subtle gradient (dark grey highlight → black edge) so the hub
@@ -2669,7 +2676,7 @@ export class SpinningWheelCard extends LitElement {
       } else {
         const wasSpinning =
           Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
-        if (wasSpinning && this.config.disable_boost === true) {
+        if (wasSpinning && this.config.disable_boost) {
           // disable_boost: ignore clicks during motion (drag-to-throw
           // is a different path and unaffected).
         } else {
@@ -2796,7 +2803,7 @@ export class SpinningWheelCard extends LitElement {
     }
     const wasSpinning = Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
     // Same `disable_boost` gate as the pointer path.
-    if (wasSpinning && this.config.disable_boost === true) return;
+    if (wasSpinning && this.config.disable_boost) return;
     const mag =
       CLICK_IMPULSE_MIN +
       Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
@@ -2893,7 +2900,7 @@ export class SpinningWheelCard extends LitElement {
     // (~0.005 rad at radius 250), no visible hairline gap. The
     // separator stroke already covers the seam when borders are on,
     // so skip the slack in that path.
-    const borderless = this.config.segment_borders === false;
+    const borderless = !this.config.segment_borders;
     const seamSlack = borderless ? 1 / Math.max(1, radius) : 0;
 
     let cursor = 0;
@@ -3214,14 +3221,14 @@ export class SpinningWheelCard extends LitElement {
                but kept in the DOM as a polite live region — disabling
                the indicator is a layout choice, not an a11y choice. -->
           <div
-            class=${this.config.show_status === false
+            class=${!this.config.show_status
               ? "status status-sr-only"
               : "status"}
             aria-live="polite"
             aria-atomic="true"
             aria-busy=${this._spinning ? "true" : "false"}
           >
-            ${this.config.show_status === false ? statusText : statusNode}
+            ${!this.config.show_status ? statusText : statusNode}
           </div>
         </div>
       </ha-card>
