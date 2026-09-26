@@ -898,10 +898,14 @@ export class SpinningWheelCardEditor
         while (out.length > 0 && out[out.length - 1] === null) out.pop();
         if (out.length === 0) delete next.actions;
         else next.actions = out;
-      } else if (next.actions === undefined || next.actions === null) {
-        // Empty picker AND no binding edit — preserve object-only
-        // config from a fresh YAML setConfig.
-        if (oldObjects.length > 0) next.actions = [...oldObjects];
+      } else {
+        // Neither the picker nor a binding row touched actions: keep them
+        // exactly as saved. The picker's projection holds strings only, so
+        // writing it back dropped object-form actions and the null
+        // placeholders that keep each action at its own segment — toggling
+        // an unrelated option moved scripts onto the wrong segment — and
+        // turned "no actions" into `actions: []`.
+        if (oldActions.length > 0) next.actions = [...oldActions];
         else delete next.actions;
       }
     }
