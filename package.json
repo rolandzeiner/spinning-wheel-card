@@ -7,7 +7,7 @@
   "scripts": {
     "build": "rolldown -c",
     "dev": "rolldown -c -w",
-    "build:push": "rolldown -c && ./scripts/dev-push.sh --quiet",
+    "build:push": "./scripts/dev-push.sh --quiet",
     "test": "vitest run",
     "test:watch": "vitest"
   },
