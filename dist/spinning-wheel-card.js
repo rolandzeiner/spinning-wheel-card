@@ -78,7 +78,7 @@ const Oe={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
   }
 
   /* Native <button> rather than <mwc-button> — mwc-* is being phased
-     out of HA's frontend (ha-lovelace-card SKILL.md). */
+     out of HA's frontend. */
   .result-entity-row {
     display: block;
     margin-top: var(--ha-space-2, 8px);

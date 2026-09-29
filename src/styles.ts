@@ -33,7 +33,7 @@ export const editorStyles = css`
   }
 
   /* Native <button> rather than <mwc-button> — mwc-* is being phased
-     out of HA's frontend (ha-lovelace-card SKILL.md). */
+     out of HA's frontend. */
   .result-entity-row {
     display: block;
     margin-top: var(--ha-space-2, 8px);
