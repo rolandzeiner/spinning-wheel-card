@@ -104,7 +104,7 @@ export type LovelaceCard = HTMLElement;
  *  the editor's shadow boundary and reaches the dashboard's
  *  card-editor listener. */
 export function fireEvent<T>(
-  node: HTMLElement,
+  node: EventTarget,
   type: string,
   detail: T,
 ): void {

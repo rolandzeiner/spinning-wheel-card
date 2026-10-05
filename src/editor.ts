@@ -115,6 +115,170 @@ export const isRgbTuple = (v: unknown): v is readonly [number, number, number] =
   typeof v[1] === "number" &&
   typeof v[2] === "number";
 
+/** `colors` / `label_colors` as the Advanced text field shows them. A
+ *  `null` entry (= "use theme palette here") is an empty slot between
+ *  commas, so the CSV round-trips faithfully: `parseColorList` turns
+ *  those empties back into `null`. */
+const colourCsv = (list: ReadonlyArray<string | null> | undefined): string =>
+  (list ?? []).map((c) => c ?? "").join(", ");
+
+const nonEmpty = <L extends ReadonlyArray<unknown>>(list: L): L | null =>
+  list.length > 0 ? list : null;
+
+/** Save `value` under `key`, or drop the key when there is nothing to
+ *  save (`null`). */
+const put = (config: EditorData, key: string, value: unknown): void => {
+  if (value === null) delete config[key];
+  else config[key] = value;
+};
+
+/** Label chips trimmed, empties dropped (the paste of a trailing comma
+ *  can leave one). `null` when no label is left. */
+const cleanLabels = (raw: unknown): string[] | null => {
+  if (!Array.isArray(raw)) return null;
+  return nonEmpty(
+    raw
+      .filter((l): l is string => typeof l === "string")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0),
+  );
+};
+
+/** What the form was last shown of the fields it only sees a projection
+ *  of: the per-label rows, the multi-picker's strings, the CSV texts. */
+interface FormProjection {
+  bindings: Record<string, unknown>;
+  actionsStrings: ReadonlyArray<string>;
+  colorsCsv: string;
+  labelColorsCsv: string;
+  weightsCsv: string;
+}
+
+/** Strip the Advanced CSV texts from `next` and return each one the
+ *  user changed since the form was last shown; `null` = untouched. */
+const takeCsvEdits = (
+  next: EditorData,
+  shown: FormProjection | null,
+): {
+  weights: string | null;
+  colors: string | null;
+  labelColors: string | null;
+} => {
+  const take = (key: string, was: string | undefined): string | null => {
+    const now = (next[key] as string | undefined) ?? "";
+    delete next[key];
+    return shown !== null && now !== was ? now : null;
+  };
+  return {
+    weights: take("weights_csv", shown?.weightsCsv),
+    colors: take("colors_csv", shown?.colorsCsv),
+    labelColors: take("label_colors_csv", shown?.labelColorsCsv),
+  };
+};
+
+/** One edit in the per-label rows: the row, and the value it now holds. */
+type RowEdit = readonly [row: number, value: unknown];
+
+/** Strip the per-label row fields (`binding_<row>_<field>`) from `next`
+ *  and return those that differ from what the form was last shown — the
+ *  user's edits — grouped by field. */
+const takeRowEdits = (
+  next: EditorData,
+  shown: Record<string, unknown> | undefined,
+): Map<string, RowEdit[]> => {
+  const edits = new Map<string, RowEdit[]>();
+  for (const key of Object.keys(next)) {
+    if (!key.startsWith("binding_") && key !== "bindings") continue;
+    const m = /^binding_(\d+)_(.+)$/.exec(key);
+    if (m && shown && next[key] !== shown[key]) {
+      const field = m[2] ?? "";
+      edits.set(field, [
+        ...(edits.get(field) ?? []),
+        [Number(m[1]), next[key]],
+      ]);
+    }
+    delete next[key];
+  }
+  return edits;
+};
+
+/** Row weights laid over the resolved ones. `null` when every weight is
+ *  1 — default-equal cycling, nothing to save. */
+const mergeWeightEdits = (
+  resolved: ReadonlyArray<number>,
+  edits: ReadonlyArray<RowEdit>,
+): number[] | null => {
+  const out = resolved.slice();
+  for (const [row, value] of edits) {
+    if (
+      row < out.length &&
+      typeof value === "number" &&
+      Number.isFinite(value) &&
+      value > 0
+    ) {
+      out[row] = value;
+    }
+  }
+  return out.some((w) => w !== 1) ? out : null;
+};
+
+/** Row colour picks laid over the saved sparse list, padded to one slot
+ *  per row. Rows the user never picked stay `null`, so theme-derived
+ *  positions stay theme-derived. `null` when no explicit colour is left. */
+const mergeColourEdits = (
+  saved: ReadonlyArray<string | null>,
+  rows: number,
+  edits: ReadonlyArray<RowEdit>,
+): Array<string | null> | null => {
+  const out = Array.from({ length: rows }, (_, i) => {
+    const c = saved[i];
+    return typeof c === "string" && c.length > 0 ? c : null;
+  });
+  for (const [row, value] of edits) {
+    if (row < out.length && isRgbTuple(value)) out[row] = rgbToCss(value);
+  }
+  return out.some((c) => c !== null) ? out : null;
+};
+
+/** Row script picks laid over the saved actions. A cleared row drops its
+ *  script but keeps an object-form action — the picker can't represent
+ *  one, so clearing it isn't a delete. Trailing empties are trimmed. */
+const mergeActionEdits = (
+  saved: ReadonlyArray<string | ActionConfig | null>,
+  rows: number,
+  edits: ReadonlyArray<RowEdit>,
+): Array<string | ActionConfig | null> => {
+  const out: Array<string | ActionConfig | null> = [...saved];
+  while (out.length < rows) out.push(null);
+  for (const [row, value] of edits) {
+    if (row >= rows) continue;
+    if (typeof value === "string" && value.length > 0) out[row] = value;
+    else if (typeof out[row] !== "object") out[row] = null;
+  }
+  while (out.length > 0 && out[out.length - 1] === null) out.pop();
+  return out;
+};
+
+/** Labels-shrink cascade. When the chip selector emits a shorter labels
+ *  array than what was saved, trim every position-keyed secondary array
+ *  (weights / colors / label_colors / actions) to the new labels length.
+ *  The chip selector is the user's intent channel — deleting a chip
+ *  implies its row's weight, colour and action are gone too. Without
+ *  this, a stale weights[6] sticks around after labels drops to 4 and
+ *  trips setConfig validation (labels.length is fine vs segments=4, but
+ *  weights.length=6 isn't). */
+const followLabelShrink = (next: EditorData, savedLabels: unknown): void => {
+  const was = Array.isArray(savedLabels) ? savedLabels.length : 0;
+  const now = Array.isArray(next.labels) ? next.labels.length : 0;
+  if (now === 0 || now >= was) return;
+  for (const key of ["weights", "colors", "label_colors", "actions"]) {
+    const list = next[key];
+    if (Array.isArray(list) && list.length > now) {
+      next[key] = list.slice(0, now);
+    }
+  }
+};
+
 export class SpinningWheelCardEditor
   extends LitElement
   implements LovelaceCardEditor
@@ -146,10 +310,8 @@ export class SpinningWheelCardEditor
   public setConfig(config: SpinningWheelCardConfig): void {
     this._config = { ...config };
     this._weightsText = (config.weights ?? []).join(", ");
-    this._colorsText = (config.colors ?? []).map((c) => c ?? "").join(", ");
-    this._labelColorsText = (config.label_colors ?? [])
-      .map((c) => c ?? "")
-      .join(", ");
+    this._colorsText = colourCsv(config.colors);
+    this._labelColorsText = colourCsv(config.label_colors);
   }
 
   private _lang(): string {
@@ -679,13 +841,7 @@ export class SpinningWheelCardEditor
    *  to detect which surface (bindings panel / Advanced CSV / Advanced
    *  multi-picker) produced the change, so a stale projection on one
    *  surface can't overwrite a fresh edit on another. */
-  private _lastProjection: {
-    bindings: Record<string, unknown>;
-    actionsStrings: ReadonlyArray<string>;
-    colorsCsv: string;
-    labelColorsCsv: string;
-    weightsCsv: string;
-  } | null = null;
+  private _lastProjection: FormProjection | null = null;
 
   private _onFormChanged = (
     ev: CustomEvent<{ value: EditorData }>,
@@ -693,261 +849,137 @@ export class SpinningWheelCardEditor
     const next: EditorData = { ...ev.detail.value };
     const proj = this._lastProjection;
 
-    // 1. CSV synthetics (Advanced section).
-    const weightsCsv = (next.weights_csv as string | undefined) ?? "";
-    const colorsCsvNext = (next.colors_csv as string | undefined) ?? "";
-    const labelColorsCsvNext =
-      (next.label_colors_csv as string | undefined) ?? "";
-    delete next.weights_csv;
-    delete next.colors_csv;
-    delete next.label_colors_csv;
+    // 1. The synthetic fields come out first: the Advanced CSV texts
+    // and the per-label rows. Of both, only what differs from the last
+    // projection — the user's edits — is kept.
+    const csv = takeCsvEdits(next, proj);
+    const rows = takeRowEdits(next, proj?.bindings);
+    const edited = (field: string): ReadonlyArray<RowEdit> =>
+      rows.get(field) ?? [];
 
-    // 2. Bindings synthetics — strip from `next`, capture only the
-    // values that differ from the last projection (= user edits).
-    const bindingDeltas: Record<string, unknown> = {};
-    for (const key of Object.keys(next)) {
-      if (key.startsWith("binding_") || key === "bindings") {
-        if (proj && next[key] !== proj.bindings[key]) {
-          bindingDeltas[key] = next[key];
-        }
-        delete next[key];
-      }
-    }
-
-    // 3. Labels — chip selector emits string[] directly. Trim each chip
-    // and drop empties (paste of a trailing comma can leave one), clamp
-    // to the wheel's segment count.
-    // No editor-side truncation against `segments`. Labels and every
-    // secondary array (weights / colors / label_colors / actions)
-    // stay at their full user-entered length. When `segments` drops
-    // below an array length, setConfig validation throws a clear
+    // 2. Labels — the chip selector emits string[] directly; only the
+    // cleaning runs here. There is no truncation against `segments`:
+    // labels and every secondary array (weights / colors / label_colors
+    // / actions) stay at their full user-entered length. When `segments`
+    // drops below an array length, setConfig validation throws a clear
     // "labels length (N) must not exceed segments (M)" error in the
     // dashboard's red banner — fail-loud beats silent data loss, and
     // the user can either raise segments back or trim the offending
-    // array themselves. Only label cleaning (trim + drop empties from
-    // a paste) runs here.
-    const rawLabels = next.labels;
-    if (Array.isArray(rawLabels)) {
-      const cleaned = rawLabels
-        .filter((l): l is string => typeof l === "string")
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-      if (cleaned.length === 0) delete next.labels;
-      else next.labels = cleaned;
-    } else {
-      delete next.labels;
-    }
+    // array themselves.
+    put(next, "labels", cleanLabels(next.labels));
 
-    // 3b. Weights: CSV edit > bindings edit > unchanged.
-    const weightsCsvChanged =
-      proj !== null && weightsCsv !== proj.weightsCsv;
-    if (weightsCsvChanged) {
-      const parsed = parseWeights(weightsCsv);
-      if (parsed.length === 0) delete next.weights;
-      else next.weights = parsed;
-    } else {
-      const wDeltas = Object.entries(bindingDeltas).filter(([k]) =>
-        /^binding_\d+_weight$/.test(k),
+    // 3. Weights and colours: CSV edit > row edit > unchanged.
+    this._mergeWeights(next, csv.weights, edited("weight"));
+    this._mergeColours(next, "colors", csv.colors, edited("color"));
+    this._mergeColours(
+      next,
+      "label_colors",
+      csv.labelColors,
+      edited("label_color"),
+    );
+
+    // 4. Actions: multi-picker > row edit > unchanged.
+    this._mergeActions(next, proj?.actionsStrings ?? [], edited("action"));
+
+    // 5. A deleted label chip takes its row's values with it.
+    followLabelShrink(next, this._config.labels);
+
+    // 6. The special cases, then the defaults: tidyConfig drops every
+    // value equal to DEFAULTS and every cleared field (config.ts).
+    this._settleSpecialFields(next);
+    const saved = tidyConfig(next);
+
+    // 7. Cache CSV verbatim; regenerate when the binding side authored
+    // the change so the next render's CSV view stays in sync.
+    this._weightsText = csv.weights ?? (next.weights ?? []).join(", ");
+    this._colorsText = csv.colors ?? colourCsv(next.colors);
+    this._labelColorsText = csv.labelColors ?? colourCsv(next.label_colors);
+
+    this._config = saved;
+    fireEvent(this, "config-changed", { config: saved });
+  };
+
+  private _mergeWeights(
+    next: EditorData,
+    typedCsv: string | null,
+    edits: ReadonlyArray<RowEdit>,
+  ): void {
+    if (typedCsv !== null) {
+      put(next, "weights", nonEmpty(parseWeights(typedCsv)));
+    } else if (edits.length > 0) {
+      put(next, "weights", mergeWeightEdits(this._resolvedWeights(), edits));
+    }
+  }
+
+  /** One colour list. An Advanced CSV edit (`typedCsv`) wins over the
+   *  per-row picks; with neither, the list stays as saved. Sparse model
+   *  — unedited positions stay `null` so a `theme:` change still pulls
+   *  them from the new palette. Only positions the user actually picked
+   *  (or typed in CSV) become explicit strings. */
+  private _mergeColours(
+    next: EditorData,
+    key: "colors" | "label_colors",
+    typedCsv: string | null,
+    edits: ReadonlyArray<RowEdit>,
+  ): void {
+    if (typedCsv !== null) {
+      const parsed = parseColorList(typedCsv);
+      put(next, key, parsed.some((c) => c !== null) ? parsed : null);
+    } else if (edits.length > 0) {
+      put(
+        next,
+        key,
+        mergeColourEdits(
+          this._config[key] ?? [],
+          this._uniqueLabels().length,
+          edits,
+        ),
       );
-      if (wDeltas.length > 0) {
-        const resolved = this._resolvedWeights();
-        const out: number[] = resolved.slice();
-        for (const [k, v] of wDeltas) {
-          const m = /^binding_(\d+)_weight$/.exec(k);
-          if (!m) continue;
-          const i = parseInt(m[1] ?? "0", 10);
-          if (i < 0 || i >= out.length) continue;
-          if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-            out[i] = v;
-          }
-        }
-        // All-1 → drop entirely (default-equal cycling).
-        if (out.every((w) => w === 1)) delete next.weights;
-        else next.weights = out;
-      }
     }
+  }
 
-    // 4. Colours: CSV edit > bindings edit > unchanged. Sparse model —
-    // unedited positions stay `null` so a `theme:` change still pulls
-    // them from the new palette. Only positions the user actually
-    // picked (or typed in CSV) become explicit strings.
-    const colorsCsvChanged =
-      proj !== null && colorsCsvNext !== proj.colorsCsv;
-    if (colorsCsvChanged) {
-      const parsed = parseColorList(colorsCsvNext);
-      if (parsed.length === 0 || parsed.every((c) => c === null)) {
-        delete next.colors;
-      } else {
-        next.colors = parsed;
-      }
-    } else {
-      const colorDeltas = Object.entries(bindingDeltas).filter(
-        ([k]) => /^binding_\d+_color$/.test(k),
-      );
-      if (colorDeltas.length > 0) {
-        const uniqueCount = this._uniqueLabels().length;
-        const existing = this._config.colors ?? [];
-        // Start from existing entries (preserving null where set);
-        // pad to unique-label length with null so theme-derived
-        // positions stay theme-derived after this edit.
-        const out: (string | null)[] = [];
-        for (let i = 0; i < uniqueCount; i++) {
-          const e = existing[i];
-          out.push(typeof e === "string" && e.length > 0 ? e : null);
-        }
-        for (const [k, v] of colorDeltas) {
-          const m = /^binding_(\d+)_color$/.exec(k);
-          if (!m) continue;
-          const i = parseInt(m[1] ?? "0", 10);
-          if (i < 0 || i >= out.length) continue;
-          if (isRgbTuple(v)) out[i] = rgbToCss(v);
-        }
-        if (out.every((c) => c === null)) delete next.colors;
-        else next.colors = out;
-      }
-    }
-
-    // 5. Label colours: same sparse strategy as colours.
-    const labelColorsCsvChanged =
-      proj !== null && labelColorsCsvNext !== proj.labelColorsCsv;
-    if (labelColorsCsvChanged) {
-      const parsed = parseColorList(labelColorsCsvNext);
-      if (parsed.length === 0 || parsed.every((c) => c === null)) {
-        delete next.label_colors;
-      } else {
-        next.label_colors = parsed;
-      }
-    } else {
-      const lcDeltas = Object.entries(bindingDeltas).filter(([k]) =>
-        /^binding_\d+_label_color$/.test(k),
-      );
-      if (lcDeltas.length > 0) {
-        const uniqueCount = this._uniqueLabels().length;
-        const existing = this._config.label_colors ?? [];
-        const out: (string | null)[] = [];
-        for (let i = 0; i < uniqueCount; i++) {
-          const e = existing[i];
-          out.push(typeof e === "string" && e.length > 0 ? e : null);
-        }
-        for (const [k, v] of lcDeltas) {
-          const m = /^binding_(\d+)_label_color$/.exec(k);
-          if (!m) continue;
-          const i = parseInt(m[1] ?? "0", 10);
-          if (i < 0 || i >= out.length) continue;
-          if (isRgbTuple(v)) out[i] = rgbToCss(v);
-        }
-        if (out.every((c) => c === null)) delete next.label_colors;
-        else next.label_colors = out;
-      }
-    }
-
-    // 6. Actions: multi-picker > bindings > unchanged. Object-form
-    // ActionConfig entries are appended after the picker's strings so
-    // they survive a multi-picker save.
-    const pickerNext = Array.isArray(next.actions)
+  private _mergeActions(
+    next: EditorData,
+    shown: ReadonlyArray<string>,
+    edits: ReadonlyArray<RowEdit>,
+  ): void {
+    const saved = this._config.actions ?? [];
+    const picked = Array.isArray(next.actions)
       ? (next.actions as ReadonlyArray<unknown>).filter(
           (a): a is string => typeof a === "string",
         )
       : null;
-    const projActions = proj?.actionsStrings ?? [];
     const pickerChanged =
-      pickerNext !== null &&
-      (pickerNext.length !== projActions.length ||
-        pickerNext.some((v, i) => v !== projActions[i]));
-    const oldActions = this._config.actions ?? [];
-    const oldObjects = oldActions.filter(
-      (a): a is Exclude<(typeof oldActions)[number], string | null> =>
-        a !== null && typeof a !== "string",
-    );
-    if (pickerChanged && pickerNext) {
-      const merged: Array<string | ActionConfig> = [
-        ...pickerNext,
-        ...oldObjects,
-      ];
-      if (merged.length === 0) delete next.actions;
-      else next.actions = merged;
-    } else {
-      const actionDeltas = Object.entries(bindingDeltas).filter(([k]) =>
-        /^binding_\d+_action$/.test(k),
+      picked !== null &&
+      (picked.length !== shown.length || picked.some((v, i) => v !== shown[i]));
+    if (picked !== null && pickerChanged) {
+      // Object-form ActionConfig entries are appended after the picker's
+      // strings so they survive a multi-picker save.
+      const objects = saved.filter((a) => a !== null && typeof a !== "string");
+      put(next, "actions", nonEmpty([...picked, ...objects]));
+    } else if (edits.length > 0) {
+      put(
+        next,
+        "actions",
+        nonEmpty(mergeActionEdits(saved, this._uniqueLabels().length, edits)),
       );
-      if (actionDeltas.length > 0) {
-        // Pad with nulls then splice deltas; object entries at
-        // non-edited indices survive via the spread.
-        const uniqueCount = this._uniqueLabels().length;
-        const out: Array<string | ActionConfig | null> = [...oldActions];
-        while (out.length < uniqueCount) out.push(null);
-        for (const [k, v] of actionDeltas) {
-          const m = /^binding_(\d+)_action$/.exec(k);
-          if (!m) continue;
-          const i = parseInt(m[1] ?? "0", 10);
-          if (i < 0 || i >= uniqueCount) continue;
-          if (typeof v === "string" && v.length > 0) {
-            out[i] = v;
-          } else if (
-            // Cleared, but the slot held an object — keep the object
-            // (the picker can't represent it; clearing isn't a delete).
-            i < oldActions.length &&
-            typeof oldActions[i] === "object" &&
-            oldActions[i] !== null
-          ) {
-            // No-op: out[i] still references the object via spread.
-          } else {
-            out[i] = null;
-          }
-        }
-        while (out.length > 0 && out[out.length - 1] === null) out.pop();
-        if (out.length === 0) delete next.actions;
-        else next.actions = out;
-      } else {
-        // Neither the picker nor a binding row touched actions: keep them
-        // exactly as saved. The picker's projection holds strings only, so
-        // writing it back dropped object-form actions and the null
-        // placeholders that keep each action at its own segment — toggling
-        // an unrelated option moved scripts onto the wrong segment — and
-        // turned "no actions" into `actions: []`.
-        if (oldActions.length > 0) next.actions = [...oldActions];
-        else delete next.actions;
-      }
+    } else {
+      // Neither the picker nor a binding row touched actions: keep them
+      // exactly as saved. The picker's projection holds strings only, so
+      // writing it back dropped object-form actions and the null
+      // placeholders that keep each action at its own segment — toggling
+      // an unrelated option moved scripts onto the wrong segment — and
+      // turned "no actions" into `actions: []`.
+      put(next, "actions", nonEmpty([...saved]));
     }
+  }
 
-    // 6.5 Labels-shrink cascade. When the chip selector emits a shorter
-    // labels array than what was saved, trim every position-keyed
-    // secondary array (weights / colors / label_colors / actions) to
-    // the new labels length. The chip selector is the user's intent
-    // channel — deleting a chip implies its row's weight, colour and
-    // action are gone too. Without this, a stale weights[6] sticks
-    // around after labels drops to 4 and trips setConfig validation
-    // (labels.length is fine vs segments=4, but weights.length=6
-    // isn't).
-    const oldLabelsLen = Array.isArray(this._config.labels)
-      ? this._config.labels.length
-      : 0;
-    const newLabelsLen = Array.isArray(next.labels) ? next.labels.length : 0;
-    if (newLabelsLen > 0 && newLabelsLen < oldLabelsLen) {
-      if (Array.isArray(next.weights) && next.weights.length > newLabelsLen) {
-        next.weights = next.weights.slice(0, newLabelsLen);
-      }
-      if (Array.isArray(next.colors) && next.colors.length > newLabelsLen) {
-        next.colors = next.colors.slice(0, newLabelsLen);
-      }
-      if (
-        Array.isArray(next.label_colors) &&
-        next.label_colors.length > newLabelsLen
-      ) {
-        next.label_colors = next.label_colors.slice(0, newLabelsLen);
-      }
-      if (Array.isArray(next.actions) && next.actions.length > newLabelsLen) {
-        next.actions = next.actions.slice(0, newLabelsLen);
-      }
-    }
-
-    // 7. hub_text, the special cases, then the defaults. tidyConfig drops
-    // every value equal to DEFAULTS and every cleared field (config.ts);
-    // what stays here are the fields whose "unset" it can't know about.
-    const hadHubText = typeof this._config.hub_text === "string";
-    const formClearedHubText =
-      next.hub_text === undefined || next.hub_text === null;
-    if (hadHubText && formClearedHubText) {
+  /** The fields whose "unset" tidyConfig can't know about. */
+  private _settleSpecialFields(next: EditorData): void {
+    // A hub text that was set and comes back cleared is saved as "" —
+    // "no hub label" — where dropping the key would bring the localised
+    // default back.
+    if (typeof this._config.hub_text === "string" && next.hub_text == null) {
       next.hub_text = "";
     }
     // text_orientation's default is dynamic, so it isn't in DEFAULTS.
@@ -957,48 +989,17 @@ export class SpinningWheelCardEditor
     }
     if (next.language === "auto") delete next.language;
     // Empty entity list = feature off.
-    if (
-      !Array.isArray(next.light_sync_entities) ||
-      next.light_sync_entities.length === 0
-    ) {
-      delete next.light_sync_entities;
-    }
-    if (
-      !Array.isArray(next.tts_announce_entities) ||
-      next.tts_announce_entities.length === 0
-    ) {
-      delete next.tts_announce_entities;
+    for (const key of ["light_sync_entities", "tts_announce_entities"]) {
+      const list = next[key];
+      if (!Array.isArray(list) || list.length === 0) delete next[key];
     }
     // Density is meaningless when pegs are off — strip it so it doesn't
     // leak into saved YAML after a toggle-on / toggle-off.
     if (next.pegs !== true) delete next.peg_density;
     // result_entity is owned by the standalone widget — preserve from
     // _config; whatever ha-form emits here is stale.
-    if (this._config.result_entity) {
-      next.result_entity = this._config.result_entity;
-    } else {
-      delete next.result_entity;
-    }
-    const saved = tidyConfig(next);
-
-    // 8. Cache CSV verbatim; regenerate when the binding side authored
-    // the change so the next render's CSV view stays in sync.
-    this._weightsText = weightsCsvChanged
-      ? weightsCsv
-      : (next.weights ?? []).join(", ");
-    // null entries (= "use theme palette here") render as an empty
-    // slot between commas so the CSV round-trips faithfully. The
-    // parser turns those empties back into null.
-    this._colorsText = colorsCsvChanged
-      ? colorsCsvNext
-      : (next.colors ?? []).map((c) => c ?? "").join(", ");
-    this._labelColorsText = labelColorsCsvChanged
-      ? labelColorsCsvNext
-      : (next.label_colors ?? []).map((c) => c ?? "").join(", ");
-
-    this._config = saved;
-    fireEvent(this, "config-changed", { config: saved });
-  };
+    put(next, "result_entity", this._config.result_entity || null);
+  }
 
   protected override render(): TemplateResult {
     const lang = this._lang();
