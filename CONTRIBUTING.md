@@ -48,6 +48,24 @@ CI fails the build on the same check.
 CI runs the same five plus `npm audit --omit=dev --audit-level=high`,
 HACS plugin validation, and CodeQL JS/TS analysis.
 
+## Tests
+
+The suites live in `tests/` (vitest, no config file). Those that need a
+DOM opt into one with an `@vitest-environment happy-dom` docblock; the
+rest run in plain node.
+
+- `validate.test.ts`, `wheel-math.test.ts`, `friction.test.ts`,
+  `editor-helpers.test.ts`, `editor-defaults.test.ts` — pure functions.
+- `card.test.ts`, `card-draw.test.ts` — the card itself, mounted, spun
+  and painted. happy-dom has no canvas, no Web Audio and no animation
+  frames, so `tests/fakes.ts` stands in for them: its canvas records
+  every call, and its clock only moves when a test runs frames.
+- `editor-save.test.ts` — the editor, driven through `ha-form` events.
+
+A change to what the card does should come with a test that fails
+without it. `npm run test:coverage` prints a coverage summary and writes
+`coverage/coverage-final.json` (gitignored).
+
 ## Branching
 
 - All work happens on `dev`. PRs target `dev`.
@@ -77,7 +95,7 @@ useful PR.
 
 ## Card build
 
-The bundle is built by **Rolldown** (`rolldown.config.mjs`). Rolldown does transpilation, minification, module resolution and JSON natively, so the whole `devDependencies` list is `rolldown` + `typescript` + `vitest` + `happy-dom` — the `@rollup/plugin-*` stack (`swc`, `terser`, `node-resolve`, `json`) and `@swc/core` were **deleted** in the 2026-09 migration, not replaced.
+The bundle is built by **Rolldown** (`rolldown.config.mjs`). Rolldown does transpilation, minification, module resolution and JSON natively, so the build needs only `rolldown` + `typescript` — the `@rollup/plugin-*` stack (`swc`, `terser`, `node-resolve`, `json`) and `@swc/core` were **deleted** in the 2026-09 migration, not replaced. The other `devDependencies` (`vitest`, `@vitest/coverage-v8`, `happy-dom`) are the test stack.
 
 Three things in that config fail silently if you change them:
 
