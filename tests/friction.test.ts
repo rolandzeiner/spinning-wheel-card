@@ -6,7 +6,7 @@
  * old YAML keeps working. Also pins the v1.2.4+ Coulomb deceleration
  * curve introduced for finite-time stop.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   coulombDecel,

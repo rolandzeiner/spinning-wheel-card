@@ -1,25 +1,34 @@
 {
   "name": "spinning-wheel-card",
-  "private": true,
   "version": "1.4.2",
+  "private": true,
   "description": "Standalone Lovelace custom card — a click-to-spin / drag-to-flick wheel with momentum-based physics.",
   "type": "module",
   "scripts": {
-    "build": "rolldown -c",
-    "dev": "rolldown -c -w",
+    "build": "vp build",
+    "dev": "vp build --watch --mode development",
     "build:push": "./scripts/dev-push.sh --quiet",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.include=src/** --coverage.reporter=json --coverage.reporter=text-summary"
-  },
-  "devDependencies": {
-    "@vitest/coverage-v8": "5.0.2",
-    "happy-dom": "20.14.5",
-    "rolldown": "1.2.11",
-    "typescript": "7.0.2",
-    "vitest": "5.0.2"
+    "test": "vp test run",
+    "check": "vp check"
   },
   "dependencies": {
     "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "happy-dom": "20.14.5",
+    "vite-plus": "1.2.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.0.0"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "^24.11.0 || >=26.0.0"
+    }
   }
 }

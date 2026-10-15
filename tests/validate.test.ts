@@ -5,7 +5,7 @@
  * message in the card's place — so the message is UI, and which mistake is
  * reported first is part of the contract. Pure node — no DOM.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import en from "../src/localize/languages/en.json";
 import type { SpinningWheelCardConfig } from "../src/types";

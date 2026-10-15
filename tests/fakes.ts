@@ -7,7 +7,7 @@
  * Importing this file installs them. Everything is module state — call
  * `reset()` in `beforeEach`.
  */
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 
 import "../src/spinning-wheel-card";
 

@@ -10,7 +10,7 @@
  * saved value is how an unrelated toggle used to move scripts onto the
  * wrong segment and delete object-form actions.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import "../src/editor";
 import en from "../src/localize/languages/en.json";

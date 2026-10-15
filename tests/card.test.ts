@@ -8,7 +8,7 @@
  * The browser pieces happy-dom lacks are faked in ./fakes. `Math.random`
  * is pinned to 0.5 there, so a click always adds 12 rad/s, clockwise.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import de from "../src/localize/languages/de.json";
 import en from "../src/localize/languages/en.json";

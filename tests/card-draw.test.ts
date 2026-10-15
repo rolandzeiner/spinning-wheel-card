@@ -8,7 +8,7 @@
  * path closed and filled, a label is one or more `fillText` calls. Text
  * there is half its font size wide per character.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { THEME_PALETTES } from "../src/palettes";
 import {

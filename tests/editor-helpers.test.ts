@@ -7,7 +7,7 @@
  * pure with no DOM / Lit dependency, so a regression in any of them is a
  * silent bug between editor preview and saved YAML.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   cssToRgb,

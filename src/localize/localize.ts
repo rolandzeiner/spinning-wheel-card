@@ -1,12 +1,12 @@
-import * as en from "./languages/en.json";
-import * as de from "./languages/de.json";
-import * as fr from "./languages/fr.json";
-import * as it from "./languages/it.json";
-import * as es from "./languages/es.json";
-import * as pt from "./languages/pt.json";
-import * as nl from "./languages/nl.json";
-import * as zh from "./languages/zh.json";
-import * as ja from "./languages/ja.json";
+import en from "./languages/en.json";
+import de from "./languages/de.json";
+import fr from "./languages/fr.json";
+import it from "./languages/it.json";
+import es from "./languages/es.json";
+import pt from "./languages/pt.json";
+import nl from "./languages/nl.json";
+import zh from "./languages/zh.json";
+import ja from "./languages/ja.json";
 
 /** Single source of truth for bundled languages — ISO-639-1 code,
  *  native-language name (used as the editor dropdown label, never

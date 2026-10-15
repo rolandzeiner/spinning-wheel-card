@@ -10,7 +10,7 @@
  *
  * Pure node — no DOM. Needs vitest and a "test": "vitest run" script.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   DEFAULTS,

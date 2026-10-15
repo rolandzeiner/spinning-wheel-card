@@ -86,7 +86,10 @@ Desktop.ini
 # ───────────────────────────────────────────────────────────────────
 # IDE / editor state
 # ───────────────────────────────────────────────────────────────────
-.vscode/
+.vscode/*
+# Shared on purpose: the Vite+ (Oxc) formatter and lint fixes on save.
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.iml
 .cursor/
@@ -154,3 +157,4 @@ CLAUDE.local.md
 *.local.md
 local_*.py
 private_*.py
+.vitest/

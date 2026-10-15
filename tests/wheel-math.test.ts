@@ -11,7 +11,7 @@
  * either silently corrupts EVERY spin (wrong segment chosen, wrong
  * `wheel_color_rgb` injected into action data).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   cssRgbForLuminance,
