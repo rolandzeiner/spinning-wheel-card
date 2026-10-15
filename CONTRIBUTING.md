@@ -23,12 +23,15 @@ For live testing in a Home Assistant install:
 
 1. Install the card via HACS as a custom repository (HACS auto-registers
    the Lovelace resource at `/hacsfiles/spinning-wheel-card/spinning-wheel-card.js`).
-2. After each rebuild, copy `dist/spinning-wheel-card.js` to
-   `<config>/hacsfiles/spinning-wheel-card/spinning-wheel-card.js` on the HA
-   host — that's where HACS serves it from. Hard-refresh the browser
-   (⌘⇧R / Ctrl⇧R) to pick up the new bytes; HACS caches per version
-   tag, so dev iterations on the same tag rely on the browser cache
-   being bypassed.
+2. After each rebuild, copy `dist/spinning-wheel-card.js` into
+   `<config>/www/community/spinning-wheel-card/` on the HA host (HACS
+   serves that folder at `/hacsfiles/`), and delete the
+   `spinning-wheel-card.js.gz` beside it. HACS writes that gzipped copy
+   on install and Home Assistant serves it in preference, so without the
+   delete the browser keeps getting the old card.
+3. Hard-refresh the browser (⌘⇧R / Ctrl⇧R) to pick up the new bytes.
+   The resource URL carries the release tag, so iterations on the same
+   tag rely on the browser cache being bypassed.
 
 ## Verification gate (must pass before PR)
 
