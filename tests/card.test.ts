@@ -683,6 +683,32 @@ describe("what a result sets off", () => {
     ]);
   });
 
+  it("turns the lights a named colour, through the canvas", async () => {
+    await winning(
+      { colors: ["#f4a261", "red"], light_sync_entities: ["light.colour"] },
+      {
+        states: { "light.colour": { state: "on", attributes: { supported_color_modes: ["xy"] } } },
+      },
+    );
+    expect(serviceCalls()).toEqual([
+      ["light", "turn_on", { entity_id: "light.colour", rgb_color: [255, 0, 0] }],
+    ]);
+  });
+
+  it("resolves a named colour that matches the hub's own fill", async () => {
+    // The pointer is the canvas's last fill, so with a black hub the
+    // canvas already holds #000000 when "black" is looked up.
+    await winning(
+      { hub_color: "black", colors: ["#f4a261", "black"], light_sync_entities: ["light.colour"] },
+      {
+        states: { "light.colour": { state: "on", attributes: { supported_color_modes: ["xy"] } } },
+      },
+    );
+    expect(serviceCalls()).toEqual([
+      ["light", "turn_on", { entity_id: "light.colour", rgb_color: [0, 0, 0] }],
+    ]);
+  });
+
   it("leaves the lights alone for a colour with no RGB value", async () => {
     await winning({
       colors: [null, "var(--accent-color)"],

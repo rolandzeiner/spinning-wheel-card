@@ -34,6 +34,24 @@ const textWidth = (text: unknown, font: unknown): number => {
   return Array.from(String(text)).length * px * 0.5;
 };
 
+/** Named colours the tests use, in the form a canvas reports them back. */
+const NAMED_COLOURS: Record<string, string> = {
+  black: "#000000",
+  white: "#ffffff",
+  red: "#ff0000",
+};
+
+/** What a real canvas keeps when `fillStyle` is assigned: the canonical
+ *  form of a colour it can parse, its previous value for anything else
+ *  (`var(--…)`, a typo). Gradients and patterns are kept as given. */
+const canvasFill = (value: unknown, previous: unknown): unknown => {
+  if (typeof value !== "string") return value;
+  const colour = value.trim().toLowerCase();
+  if (colour in NAMED_COLOURS) return NAMED_COLOURS[colour];
+  if (/^#[0-9a-f]{3,8}$/.test(colour) || /^rgba?\(/.test(colour)) return colour;
+  return previous;
+};
+
 const fakeContext = (): unknown => {
   const props: Record<string, unknown> = { fillStyle: "#000000", font: "" };
   const method =
@@ -49,7 +67,7 @@ const fakeContext = (): unknown => {
   return new Proxy(props, {
     get: (_, name: string) => (name in props ? props[name] : method(name)),
     set: (_, name: string, value) => {
-      props[name] = value;
+      props[name] = name === "fillStyle" ? canvasFill(value, props[name]) : value;
       ops.push(["set", name, value]);
       return true;
     },

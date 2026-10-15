@@ -1777,15 +1777,22 @@ export class SpinningWheelCard extends LitElement {
     const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     const ctx = c?.getContext("2d");
     if (!ctx) return null;
+    // Canvas ignores a colour string it can't parse and keeps its current
+    // fillStyle. So probe from two different fills: a valid colour lands on
+    // the same canonical value both times, an invalid one leaves each probe
+    // where it started. One probe can't tell a rejected colour from one
+    // that equals the current fill (a "black" segment under a black hub).
     const prev = ctx.fillStyle;
-    ctx.fillStyle = color;
-    const canon = String(ctx.fillStyle);
+    const probe = (start: string): typeof prev => {
+      ctx.fillStyle = start;
+      ctx.fillStyle = color;
+      return ctx.fillStyle;
+    };
+    const fromBlack = probe("#000000");
+    const fromWhite = probe("#ffffff");
     ctx.fillStyle = prev;
-    // Canvas rejects unknown colour strings by leaving fillStyle
-    // unchanged — if canon matches the previous canonicalised value,
-    // the input wasn't a valid CSS colour.
-    if (canon === prev) return null;
-    return cssToRgbTriple(canon);
+    if (fromBlack !== fromWhite || typeof fromBlack !== "string") return null;
+    return cssToRgbTriple(fromBlack);
   }
 
   /** Set every entity in `light_sync_entities` to the winning segment's
