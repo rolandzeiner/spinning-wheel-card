@@ -98,7 +98,7 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-export type LovelaceCard = HTMLElement;
+type LovelaceCard = HTMLElement;
 
 /** `bubbles: true` + `composed: true` are required so the event crosses
  *  the editor's shadow boundary and reaches the dashboard's
