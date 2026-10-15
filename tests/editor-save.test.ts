@@ -59,13 +59,13 @@ beforeEach(() => {
 /** An open editor: its form, and the events it has fired so far. */
 interface Session {
   editor: Editor;
-  form(): Form;
+  form: () => Form;
   /** Every `config-changed` payload, oldest first. */
   saved: Config[];
   /** Every toast message. */
   toasts: string[];
   /** Change fields the way ha-form does; returns what gets saved. */
-  change(patch: Config): Promise<Config>;
+  change: (patch: Config) => Promise<Config>;
 }
 
 async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
@@ -88,7 +88,7 @@ async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
   editor.addEventListener("hass-notification", (event) =>
     toasts.push((event as CustomEvent<{ message: string }>).detail.message),
   );
-  const form = (): Form => editor.shadowRoot!.querySelector("ha-form") as Form;
+  const form = (): Form => editor.shadowRoot!.querySelector<Form>("ha-form")!;
   const change = async (patch: Config): Promise<Config> => {
     form().dispatchEvent(
       new CustomEvent("value-changed", {

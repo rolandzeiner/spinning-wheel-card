@@ -60,7 +60,7 @@ function resolveTranslation(path: string, dictionary: Record<string, unknown>): 
  *  as `lang`. Optional `vars` does `{name}` substitution. */
 export function localize(
   key: string,
-  lang: string | undefined = undefined,
+  lang?: string,
   vars?: Record<string, string | number>,
 ): string {
   // Strip BCP-47 region — dicts are ISO-639-1 lowercase.

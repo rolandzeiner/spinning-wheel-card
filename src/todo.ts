@@ -27,10 +27,10 @@ export const fetchOpenTodoItems = async (
   entity: string,
 ): Promise<TodoItem[] | null> => {
   if (!hass.callWS) return null;
-  const reply = (await hass.callWS({
+  const reply = await hass.callWS<{ items?: ReadonlyArray<TodoItem> } | undefined>({
     type: "todo/item/list",
     entity_id: entity,
-  })) as { items?: ReadonlyArray<TodoItem> } | undefined;
+  });
   const all = reply?.items ?? [];
   const open = all.filter((i) => (i.status ?? "needs_action") === "needs_action");
   return uniqueTodoItems(open);

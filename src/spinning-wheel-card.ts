@@ -87,7 +87,7 @@ export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI
  *  Consumers that need the literal user-typed RGB triple (e.g. the
  *  `wheel_color_rgb` action payload) want this function as-is so the
  *  payload mirrors what was in YAML.
- *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
+ *  Exported for tests. */
 export const cssToRgbTriple = (value: string): readonly [number, number, number] | null => {
   const s = value.trim();
   if (s.startsWith("#")) {
@@ -921,12 +921,6 @@ export class SpinningWheelCard extends LitElement {
     return this.config.wheel_context;
   }
 
-  /** Class shim around the module-level `cssToRgbTriple` — kept so any
-   *  existing `this._cssToRgbTriple(...)` call sites stay valid. */
-  private _cssToRgbTriple(css: string): readonly [number, number, number] | null {
-    return cssToRgbTriple(css);
-  }
-
   /** Build the auto-injected payload merged into action `data` when
    *  `wheel_context: true`. Lets a single generic script branch on
    *  `wheel_label` / `wheel_color` instead of one script per segment. */
@@ -943,9 +937,9 @@ export class SpinningWheelCard extends LitElement {
       wheel_color: color,
       wheel_label_color: labelColor,
     };
-    const colorRgb = this._cssToRgbTriple(color);
+    const colorRgb = cssToRgbTriple(color);
     if (colorRgb !== null) ctx.wheel_color_rgb = colorRgb;
-    const labelColorRgb = this._cssToRgbTriple(labelColor);
+    const labelColorRgb = cssToRgbTriple(labelColor);
     if (labelColorRgb !== null) ctx.wheel_label_color_rgb = labelColorRgb;
     return ctx;
   }
@@ -1537,10 +1531,9 @@ export class SpinningWheelCard extends LitElement {
             /* ignore */
           }
         }
-        const svgIcon = probe.shadowRoot?.querySelector("ha-svg-icon") as
-          | (HTMLElement & { path?: string })
-          | null
-          | undefined;
+        const svgIcon = probe.shadowRoot?.querySelector<HTMLElement & { path?: string }>(
+          "ha-svg-icon",
+        );
         // Modern ha-svg-icon.path → its shadow <path> → ha-icon's own
         // <path> (legacy iron-icon flow).
         path =
@@ -1791,7 +1784,7 @@ export class SpinningWheelCard extends LitElement {
     // Canvas rejects unknown colour strings by leaving fillStyle
     // unchanged — if canon matches the previous canonicalised value,
     // the input wasn't a valid CSS colour.
-    if (canon === String(prev)) return null;
+    if (canon === prev) return null;
     return cssToRgbTriple(canon);
   }
 

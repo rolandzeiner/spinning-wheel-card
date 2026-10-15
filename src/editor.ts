@@ -1099,7 +1099,7 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
    *  work. _config mutation MUST happen before config-changed — the
    *  dashboard persists storage but does NOT re-invoke setConfig on
    *  the live editor (ha-lovelace-card SKILL § _config lifecycle). */
-  private async _createResultHelper(): Promise<void> {
+  private _createResultHelper = async (): Promise<void> => {
     if (!this.hass?.callWS) return;
     const lang = this._lang();
     try {
@@ -1131,7 +1131,7 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
         message: localize("editor.result_entity_create_failed", lang),
       });
     }
-  }
+  };
 
   static override styles: CSSResultGroup = editorStyles;
 }
