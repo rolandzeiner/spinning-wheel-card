@@ -13,7 +13,9 @@ import ja from "./languages/ja.json";
  *  translated), and the imported JSON dict. Display order is what
  *  the editor renders, so keep English first (canonical fallback)
  *  with the rest in a stable order. To add a language, drop in the
- *  JSON file, import it above, and append an entry here. */
+ *  JSON file, default-import it above (vite.config.ts turns JSON named
+ *  exports off, so `import * as` would leave it empty), and append an
+ *  entry here. */
 const LANGUAGE_REGISTRY: ReadonlyArray<{
   code: string;
   nativeName: string;

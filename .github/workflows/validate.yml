@@ -25,17 +25,19 @@ jobs:
           category: plugin
 
   build:
-    # No separate guard for a stray backtick inside a Lit css/html template:
-    # it ends the template early, and `vp check`'s type-check reports every
-    # shape of that (unknown property, syntax error), which the old regex
-    # guard could not, since it ended each template at the stray backtick.
+    # A stray backtick inside a Lit css/html template is caught by `vp check`
+    # below: its type-check reports the syntax error or unknown property that
+    # follows. Don't copy in the Perl backtick guard from the sibling repos;
+    # it ends each template at the first unescaped backtick, which is the
+    # stray one, so it can never fire.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: voidzero-dev/setup-vp@v1.21.2
-        # Installs the global vp CLI, Node and npm (from devEngines), and
-        # caches npm's store. Install runs as its own step below so the
+        # Installs the vp CLI, Node 24 (pinned below; drop node-version to
+        # follow devEngines.runtime) and the npm devEngines asks for, and
+        # caches npm's cache. Install runs as its own step below so the
         # lockfile is enforced explicitly.
         with:
           node-version: "24"

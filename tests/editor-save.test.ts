@@ -64,7 +64,7 @@ interface Session {
   saved: Config[];
   /** Every toast message. */
   toasts: string[];
-  /** Change fields the way ha-form does; returns what gets saved. */
+  /** Change fields the way ha-form does; returns the latest saved config. */
   change: (patch: Config) => Promise<Config>;
 }
 

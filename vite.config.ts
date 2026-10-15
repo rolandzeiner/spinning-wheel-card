@@ -1,6 +1,6 @@
 // One config for the whole card toolchain under Vite+ (`vp`): build (Vite 8
 // library mode on Rolldown), test (Vitest), lint + type-check (Oxlint with
-// tsgolint) and format (Oxfmt). Replaces rolldown.config.mjs.
+// tsgolint) and format (Oxfmt).
 //
 // Decorators are deliberately not configured here. Rolldown reads
 // tsconfig.json itself and turns on Lit's legacy (experimental) decorators
@@ -13,15 +13,16 @@ import { defineConfig } from "vite-plus";
 const banner =
   "/*! Spinning Wheel Card — bundled by Rolldown. Edit sources in src/, then `npm run build`. */";
 
-// Dev vs prod comes from Vite's mode, not from a watch env var: `npm run dev`
-// passes `--mode development`, a plain `vp build` is production.
+// Dev vs prod comes from Vite's mode: `npm run dev` passes `--mode
+// development`. `vp build --watch` alone still builds production.
 export default defineConfig(({ mode }) => {
   const dev = mode === "development";
   return {
     // The language packs are default-imported whole (src/localize), so they
     // need neither a named export per key nor Vite's JSON.parse('…') form,
     // which the "auto" default applies to any value over 10 kB and which
-    // quotes every key. Both on: the bundle grows by about 1 kB gzipped.
+    // quotes every key. With Vite's defaults (namedExports: true,
+    // stringify: "auto") the bundle grows by about 1 kB gzipped.
     json: { namedExports: false, stringify: false },
     build: {
       // Library mode: one ES module, no index.html, no hashed file name.
@@ -30,9 +31,9 @@ export default defineConfig(({ mode }) => {
         formats: ["es"],
         fileName: () => "spinning-wheel-card.js",
       },
-      // dist/ holds nothing but this build's output, so Vite may empty it
-      // first (the default). That also drops the .map a dev build left
-      // behind, which dev-push would otherwise ship to the box.
+      // dist/ holds nothing but this build's output, so Vite empties it
+      // before each build (the default), and no stale dev .map is left
+      // next to a production bundle.
       outDir: "dist",
       copyPublicDir: false,
       target: "es2022",
@@ -40,15 +41,15 @@ export default defineConfig(({ mode }) => {
       rolldownOptions: {
         output: {
           banner,
-          // HACS users get a single .js file, not a chunked dist/. The
-          // editor's dynamic import (getConfigElement) is inlined.
+          // HACS installs one file, so never split chunks: a dynamic
+          // import() would otherwise emit a second file next to the bundle.
           codeSplitting: false,
           comments: { legal: true },
           // Set on the Rolldown output, not `build.minify`: Vite's library
           // mode skips whitespace minification for ES output. Keep console.*
-          // (dropConsole: false): the card's console calls are its only
-          // client-side failure signal, and the console.info banner shows
-          // which bundle loaded. Rolldown's dropConsole is all-or-nothing.
+          // (dropConsole: false): the card's console.warn calls, all in catch
+          // blocks, are its only client-side failure signal, and Rolldown's
+          // dropConsole is all-or-nothing.
           minify: dev ? false : { compress: { dropConsole: false }, mangle: true, codegen: true },
         },
       },
@@ -57,8 +58,8 @@ export default defineConfig(({ mode }) => {
       // Leave Lit html/css templates alone. Formatting them rewrites the
       // whitespace inside rendered elements, which changes the DOM.
       embeddedLanguageFormatting: "off",
-      // Format the card source only. The bundle is build output; Markdown
-      // and YAML keep their hand formatting.
+      // Format everything but the bundle (build output), the Markdown and
+      // the workflow YAML, which keep their hand formatting.
       ignorePatterns: ["dist/**", "**/*.md", ".github/**"],
     },
     lint: {
@@ -72,8 +73,10 @@ export default defineConfig(({ mode }) => {
         "eslint/no-shadow": "error",
         "unicorn/no-array-sort": "error",
       },
-      // typeCheck makes `vp check` report tsc's errors (strict tsconfig
-      // included), so it can stand in for `tsc --noEmit`.
+      // typeCheck: `vp check` also reports TypeScript's own diagnostics,
+      // which makes it the pipeline's only type-check. src/ gets the full
+      // flag set in tsconfig.json; tests/ sit outside its `include` and get
+      // only the compiler defaults with `strict`.
       // denyWarnings: a warning fails `vp check` (and CI) instead of
       // scrolling past with exit 0.
       options: { typeAware: true, typeCheck: true, denyWarnings: true },

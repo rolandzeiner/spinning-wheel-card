@@ -8,7 +8,7 @@
  * straight to ha-form. These tests pin the fix in config.ts: the display
  * side fills every default in, the save side takes them back out.
  *
- * Pure node — no DOM. Needs vitest and a "test": "vitest run" script.
+ * Pure node — no DOM.
  */
 import { describe, expect, it } from "vite-plus/test";
 
