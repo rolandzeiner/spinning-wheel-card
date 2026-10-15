@@ -32,8 +32,7 @@ type Editor = HTMLElement & {
   updateComplete: Promise<boolean>;
 };
 
-const flush = (): Promise<void> =>
-  new Promise((resolve) => setImmediate(resolve));
+const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 /** What the editor asked of hass, and what `callWS` answers. */
 const ws = { calls: [] as unknown[], todoItems: [] as unknown[], fail: false };
@@ -97,7 +96,7 @@ async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
       }),
     );
     await settle();
-    return saved[saved.length - 1]!;
+    return saved[saved.length - 1];
   };
   return { editor, form, saved, toasts, change };
 }
@@ -124,10 +123,7 @@ describe("editor save", () => {
 
   it("keeps object-form actions through an unrelated edit", async () => {
     const action = { action: "perform-action", perform_action: "light.toggle" };
-    const saved = await saveAfterChange(
-      { labels: ["a"], actions: [action] },
-      { sound: false },
-    );
+    const saved = await saveAfterChange({ labels: ["a"], actions: [action] }, { sound: false });
     expect(saved.actions).toEqual([action]);
   });
 
@@ -138,10 +134,7 @@ describe("editor save", () => {
   });
 
   it("drops a field set back to its default", async () => {
-    const saved = await saveAfterChange(
-      { segments: 6, sound: false },
-      { segments: 8 },
-    );
+    const saved = await saveAfterChange({ segments: 6, sound: false }, { segments: 8 });
     expect(saved).toEqual({ type: TYPE, sound: false });
   });
 });
@@ -171,10 +164,7 @@ describe("the rows per label", () => {
   });
 
   it("save a picked colour and leave the other labels to the theme", async () => {
-    const saved = await saveAfterChange(
-      { labels },
-      { binding_1_color: [1, 2, 3] },
-    );
+    const saved = await saveAfterChange({ labels }, { binding_1_color: [1, 2, 3] });
     expect(saved.colors).toEqual([null, "rgb(1, 2, 3)", null]);
     expect(saved.label_colors).toBeUndefined();
   });
@@ -188,10 +178,7 @@ describe("the rows per label", () => {
   });
 
   it("save a picked text colour", async () => {
-    const saved = await saveAfterChange(
-      { labels },
-      { binding_2_label_color: [9, 9, 9] },
-    );
+    const saved = await saveAfterChange({ labels }, { binding_2_label_color: [9, 9, 9] });
     expect(saved.label_colors).toEqual([null, null, "rgb(9, 9, 9)"]);
     expect(saved.colors).toBeUndefined();
   });
@@ -199,9 +186,7 @@ describe("the rows per label", () => {
   it("ignore a colour that isn't one, or a row that doesn't exist", async () => {
     const { change } = await open({ labels });
     expect((await change({ binding_0_color: "red" })).colors).toBeUndefined();
-    expect(
-      (await change({ binding_7_color: [1, 2, 3] })).colors,
-    ).toBeUndefined();
+    expect((await change({ binding_7_color: [1, 2, 3] })).colors).toBeUndefined();
   });
 
   it("save a weight, and nothing once every weight is 1 again", async () => {
@@ -213,10 +198,7 @@ describe("the rows per label", () => {
 
   it("save a script, and drop it again when the row is cleared", async () => {
     const { change } = await open({ labels });
-    expect((await change({ binding_1_action: "script.b" })).actions).toEqual([
-      null,
-      "script.b",
-    ]);
+    expect((await change({ binding_1_action: "script.b" })).actions).toEqual([null, "script.b"]);
     expect((await change({ binding_1_action: "" })).actions).toBeUndefined();
   });
 
@@ -244,23 +226,15 @@ describe("the rows per label", () => {
 describe("the advanced lists", () => {
   it("read colours with a gap as `leave this one to the theme`", async () => {
     const { change } = await open();
-    expect((await change({ colors_csv: "#a,,#c" })).colors).toEqual([
-      "#a",
-      null,
-      "#c",
-    ]);
+    expect((await change({ colors_csv: "#a,,#c" })).colors).toEqual(["#a", null, "#c"]);
     expect((await change({ colors_csv: ",," })).colors).toBeUndefined();
-    expect((await change({ label_colors_csv: "white" })).label_colors).toEqual([
-      "white",
-    ]);
+    expect((await change({ label_colors_csv: "white" })).label_colors).toEqual(["white"]);
     expect((await change({ label_colors_csv: "" })).label_colors).toBeUndefined();
   });
 
   it("read weights, skipping what isn't a positive number", async () => {
     const { change } = await open();
-    expect((await change({ weights_csv: "1, 2, x, -3, 4" })).weights).toEqual([
-      1, 2, 4,
-    ]);
+    expect((await change({ weights_csv: "1, 2, x, -3, 4" })).weights).toEqual([1, 2, 4]);
     expect((await change({ weights_csv: "none" })).weights).toBeUndefined();
   });
 
@@ -331,10 +305,7 @@ describe("the actions picker", () => {
 describe("labels", () => {
   it("are trimmed, and empty chips dropped", async () => {
     const { change } = await open();
-    expect((await change({ labels: [" a ", "", "b ", 5] })).labels).toEqual([
-      "a",
-      "b",
-    ]);
+    expect((await change({ labels: [" a ", "", "b ", 5] })).labels).toEqual(["a", "b"]);
     expect((await change({ labels: [" "] })).labels).toBeUndefined();
     expect((await change({ labels: "a, b" })).labels).toBeUndefined();
   });
@@ -380,12 +351,8 @@ describe("fields with a say of their own", () => {
   it("saves the text orientation only when it isn't the default", async () => {
     const { change, form } = await open();
     expect(form().data.text_orientation).toBe("tangent");
-    expect((await change({ text_orientation: "radial" })).text_orientation).toBe(
-      "radial",
-    );
-    expect(
-      "text_orientation" in (await change({ text_orientation: "tangent" })),
-    ).toBe(false);
+    expect((await change({ text_orientation: "radial" })).text_orientation).toBe("radial");
+    expect("text_orientation" in (await change({ text_orientation: "tangent" }))).toBe(false);
   });
 
   it("shows `auto` for the language and saves it as no language", async () => {
@@ -457,12 +424,8 @@ describe("labels and hints", () => {
     const { form } = await open({ language: "de" });
     const german = form().computeLabel({ name: "name" });
     expect(german).not.toBe(en.editor.name);
-    expect((await open()).form().computeLabel({ name: "name" })).toBe(
-      en.editor.name,
-    );
-    expect(german).toBe(
-      (await open({}, { language: "de" })).form().computeLabel({ name: "name" }),
-    );
+    expect((await open()).form().computeLabel({ name: "name" })).toBe(en.editor.name);
+    expect(german).toBe((await open({}, { language: "de" })).form().computeLabel({ name: "name" }));
   });
 });
 
@@ -471,9 +434,7 @@ describe("with a todo list", () => {
     states: { "todo.chores": { state, attributes: {} } },
   });
   const rows = (form: Form): unknown[] =>
-    (form.schema.find((field) => field.name === "bindings")?.schema ?? []).map(
-      (row) => row.title,
-    );
+    (form.schema.find((field) => field.name === "bindings")?.schema ?? []).map((row) => row.title);
 
   it("has one row per open item, and hides what the list overrides", async () => {
     ws.todoItems = [
@@ -482,13 +443,8 @@ describe("with a todo list", () => {
       { summary: "Bins" },
       { summary: "Dishes" },
     ];
-    const { form } = await open(
-      { todo_entity: "todo.chores", labels: ["ignored"] },
-      list("2"),
-    );
-    expect(ws.calls).toEqual([
-      { type: "todo/item/list", entity_id: "todo.chores" },
-    ]);
+    const { form } = await open({ todo_entity: "todo.chores", labels: ["ignored"] }, list("2"));
+    expect(ws.calls).toEqual([{ type: "todo/item/list", entity_id: "todo.chores" }]);
     expect(rows(form())).toEqual(["Dishes", "Bins"]);
     const names = fieldNames(form().schema);
     expect(names).not.toContain("segments");
@@ -507,9 +463,7 @@ describe("with a todo list", () => {
   it("warns when the list has nothing open", async () => {
     const { form } = await open({ todo_entity: "todo.chores" }, list("0"));
     expect(rows(form())).toEqual([]);
-    expect(form().computeHelper({ name: "todo_entity" })).toBe(
-      en.editor.todo_entity_empty_warning,
-    );
+    expect(form().computeHelper({ name: "todo_entity" })).toBe(en.editor.todo_entity_empty_warning);
   });
 
   it("fetches again when the list changes or another is chosen", async () => {
@@ -575,9 +529,7 @@ describe("the result helper", () => {
     expect(saved.result_entity).toBe("input_text.result");
 
     const none = await open();
-    expect(
-      "result_entity" in (await none.change({ result_entity: "input_text.x" })),
-    ).toBe(false);
+    expect("result_entity" in (await none.change({ result_entity: "input_text.x" }))).toBe(false);
   });
 
   it("can be created for an admin with one click", async () => {
@@ -593,20 +545,14 @@ describe("the result helper", () => {
         icon: "mdi:dharmachakra",
       },
     ]);
-    expect(session.saved).toEqual([
-      { type: TYPE, result_entity: "input_text.wheel_result" },
-    ]);
-    expect(session.toasts).toEqual([
-      "Result helper created: input_text.wheel_result",
-    ]);
+    expect(session.saved).toEqual([{ type: TYPE, result_entity: "input_text.wheel_result" }]);
+    expect(session.toasts).toEqual(["Result helper created: input_text.wheel_result"]);
     expect(createButton(session)).toBeNull();
   });
 
   it("offers no button to others, or when a helper is already set", async () => {
     expect(createButton(await open({}, { user: { is_admin: false } }))).toBeNull();
-    expect(
-      createButton(await open({ result_entity: "input_text.result" })),
-    ).toBeNull();
+    expect(createButton(await open({ result_entity: "input_text.result" }))).toBeNull();
   });
 
   it("says so when creating it fails", async () => {

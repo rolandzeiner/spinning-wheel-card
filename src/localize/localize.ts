@@ -45,16 +45,9 @@ export const AVAILABLE_LANGUAGES: ReadonlyArray<{
   nativeName: string;
 }> = LANGUAGE_REGISTRY.map(({ code, nativeName }) => ({ code, nativeName }));
 
-function resolveTranslation(
-  path: string,
-  dictionary: Record<string, unknown>,
-): string | undefined {
+function resolveTranslation(path: string, dictionary: Record<string, unknown>): string | undefined {
   const value = path.split(".").reduce<unknown>((acc, key) => {
-    if (
-      acc &&
-      typeof acc === "object" &&
-      key in (acc as Record<string, unknown>)
-    ) {
+    if (acc && typeof acc === "object" && key in (acc as Record<string, unknown>)) {
       return (acc as Record<string, unknown>)[key];
     }
     return undefined;
@@ -86,10 +79,7 @@ export function localize(
       // like "Pay $50 to $&" must render literally, not as the matched
       // `{value}` placeholder.
       const replacement = String(v);
-      translated = translated.replace(
-        new RegExp(`\\{${k}\\}`, "g"),
-        () => replacement,
-      );
+      translated = translated.replace(new RegExp(`\\{${k}\\}`, "g"), () => replacement);
     }
   }
   return translated;
@@ -98,10 +88,7 @@ export function localize(
 /** Resolve UI language: `hass.locale.language` → `hass.language` →
  *  `navigator.language` → `"en"`. */
 export function resolveLang(
-  hass:
-    | { locale?: { language?: string }; language?: string }
-    | undefined
-    | null,
+  hass: { locale?: { language?: string }; language?: string } | undefined | null,
 ): string {
   return (
     hass?.locale?.language ??

@@ -39,18 +39,15 @@ import {
 
 beforeEach(reset);
 
-const resting = (card: Card): boolean =>
-  wheel(card).classList.contains("wheel-resting");
+const resting = (card: Card): boolean => wheel(card).classList.contains("wheel-resting");
 
 describe("setting up", () => {
   it("refuses a bad config in the config's own language", () => {
     const card = document.createElement("spinning-wheel-card") as Card;
-    expect(() => card.setConfig({ type: TYPE, segments: 99 })).toThrow(
-      en.errors.segments_range,
+    expect(() => card.setConfig({ type: TYPE, segments: 99 })).toThrow(en.errors.segments_range);
+    expect(() => card.setConfig({ type: TYPE, language: "de", segments: 99 })).toThrow(
+      de.errors.segments_range,
     );
-    expect(() =>
-      card.setConfig({ type: TYPE, language: "de", segments: 99 }),
-    ).toThrow(de.errors.segments_range);
   });
 
   it("offers its editor and an empty stub config", () => {
@@ -59,9 +56,7 @@ describe("setting up", () => {
       getConfigElement(): HTMLElement;
     };
     expect(element.getStubConfig()).toEqual({});
-    expect(element.getConfigElement().localName).toBe(
-      "spinning-wheel-card-editor",
-    );
+    expect(element.getConfigElement().localName).toBe("spinning-wheel-card-editor");
   });
 
   it("asks the dashboard for less room as a half circle", async () => {
@@ -75,9 +70,9 @@ describe("setting up", () => {
 
   it("shows a header only when the card has a name", async () => {
     const header = async (name?: string): Promise<unknown> =>
-      (await mount({ name })).shadowRoot!.querySelector<
-        HTMLElement & { header?: string }
-      >("ha-card")!.header;
+      (await mount({ name })).shadowRoot!.querySelector<HTMLElement & { header?: string }>(
+        "ha-card",
+      )!.header;
     expect(await header("Chores")).toBe("Chores");
     expect(await header("  ")).toBeUndefined();
     expect(await header()).toBeUndefined();
@@ -387,9 +382,7 @@ describe("selector mode", () => {
   it("steps one segment per arrow key and announces it", async () => {
     const card = await selector();
     expect(statusText(card)).toBe(en.status.idle_selector);
-    expect(wheel(card).getAttribute("aria-keyshortcuts")).toContain(
-      "ArrowLeft",
-    );
+    expect(wheel(card).getAttribute("aria-keyshortcuts")).toContain("ArrowLeft");
 
     press(card, "ArrowRight");
     await rendered(card);
@@ -431,10 +424,7 @@ describe("selector mode", () => {
 
 describe("actions", () => {
   /** A wheel whose second segment carries `action`, stepped onto it. */
-  const fire = async (
-    action: unknown,
-    extra: Record<string, unknown> = {},
-  ): Promise<Card> => {
+  const fire = async (action: unknown, extra: Record<string, unknown> = {}): Promise<Card> => {
     const card = await mount({
       selector_mode: true,
       segments: 4,
@@ -541,9 +531,7 @@ describe("actions", () => {
 
   it("opens a URL in a new tab that can't reach back", async () => {
     await fire({ action: "url", url_path: "https://example.com" });
-    expect(calls).toEqual([
-      ["open", "https://example.com", "_blank", "noopener,noreferrer"],
-    ]);
+    expect(calls).toEqual([["open", "https://example.com", "_blank", "noopener,noreferrer"]]);
   });
 
   it("opens more-info, toggles, starts Assist and fires a DOM event", async () => {
@@ -556,9 +544,7 @@ describe("actions", () => {
       ["hass-assist-show", { pipeline_id: "home", start_listening: false }],
       ["ll-custom", { browser_mod: { popup: 1 } }],
     ]);
-    expect(serviceCalls()).toEqual([
-      ["homeassistant", "toggle", {}, { entity_id: "switch.a" }],
-    ]);
+    expect(serviceCalls()).toEqual([["homeassistant", "toggle", {}, { entity_id: "switch.a" }]]);
   });
 
   it.each([
@@ -597,8 +583,7 @@ describe("actions", () => {
   });
 
   describe("confirmation", () => {
-    const asked = (): unknown[] =>
-      calls.filter((op) => op[0] === "confirm").map((op) => op[1]);
+    const asked = (): unknown[] => calls.filter((op) => op[0] === "confirm").map((op) => op[1]);
 
     it("asks first, naming the action and the result", async () => {
       await fire("script.party", { disable_confirm_actions: false });
@@ -655,10 +640,7 @@ describe("what a result sets off", () => {
     config: Record<string, unknown>,
     hass: Record<string, unknown> = {},
   ): Promise<Card> => {
-    const card = await mount(
-      { selector_mode: true, segments: 4, ...config },
-      hass,
-    );
+    const card = await mount({ selector_mode: true, segments: 4, ...config }, hass);
     press(card, "ArrowRight");
     await flush();
     await flush();
@@ -671,11 +653,7 @@ describe("what a result sets off", () => {
       result_entity: "input_text.result",
     });
     expect(serviceCalls()).toEqual([
-      [
-        "input_text",
-        "set_value",
-        { entity_id: "input_text.result", value: "x".repeat(255) },
-      ],
+      ["input_text", "set_value", { entity_id: "input_text.result", value: "x".repeat(255) }],
     ]);
   });
 
@@ -683,11 +661,7 @@ describe("what a result sets off", () => {
     await winning(
       {
         colors: ["#000000", "#f4a261"],
-        light_sync_entities: [
-          "light.colour",
-          "light.white_only",
-          "light.unknown",
-        ],
+        light_sync_entities: ["light.colour", "light.white_only", "light.unknown"],
       },
       {
         states: {
@@ -765,8 +739,7 @@ describe("todo list", () => {
   const list = (state: string): Record<string, unknown> => ({
     states: { "todo.chores": { state, attributes: {} } },
   });
-  const fetches = (): number =>
-    calls.filter((op) => op[0] === "callWS").length;
+  const fetches = (): number => calls.filter((op) => op[0] === "callWS").length;
 
   it("fills the wheel with the list's open items", async () => {
     env.todoItems = [
@@ -782,9 +755,7 @@ describe("todo list", () => {
       { todo_entity: "todo.chores", labels: ["ignored"], selector_mode: true },
       list("5"),
     );
-    expect(calls).toEqual([
-      ["callWS", { type: "todo/item/list", entity_id: "todo.chores" }],
-    ]);
+    expect(calls).toEqual([["callWS", { type: "todo/item/list", entity_id: "todo.chores" }]]);
     // Done items and the repeated one are left out; five are left.
     const seen: string[] = [];
     for (let i = 0; i < 5; i++) {
@@ -803,10 +774,7 @@ describe("todo list", () => {
 
   it("repeats the items round the wheel when there are fewer than four", async () => {
     env.todoItems = [{ summary: "Dishes" }, { summary: "Bins" }];
-    const card = await mount(
-      { todo_entity: "todo.chores", selector_mode: true },
-      list("2"),
-    );
+    const card = await mount({ todo_entity: "todo.chores", selector_mode: true }, list("2"));
     press(card, "ArrowLeft");
     await rendered(card);
     expect(statusText(card)).toBe("Result: Bins");

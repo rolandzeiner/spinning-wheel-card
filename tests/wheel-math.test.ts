@@ -124,8 +124,10 @@ describe("pickFontPx", () => {
   // canvas measureText — exact glyph widths vary by font/glyph, but the
   // monotonic "smaller font → narrower text" relationship is what the
   // shrink loop relies on).
-  const linear = (textWidthAt1Px: number) => (px: number): number =>
-    textWidthAt1Px * px;
+  const linear =
+    (textWidthAt1Px: number) =>
+    (px: number): number =>
+      textWidthAt1Px * px;
 
   it("returns startPx when text already fits", () => {
     // 4 px-wide text, budget 100, start at 14 → fits immediately.
@@ -196,9 +198,7 @@ describe("toSpokenLabel", () => {
     // name itself is hyphen-only per MDI, but underscores are handled
     // defensively all the same.
     expect(toSpokenLabel("mdi:home")).toBe("home");
-    expect(toSpokenLabel("mdi:food-croissant-thing")).toBe(
-      "food croissant thing",
-    );
+    expect(toSpokenLabel("mdi:food-croissant-thing")).toBe("food croissant thing");
   });
 
   it("collapses runs of separators to a single space", () => {
@@ -269,13 +269,7 @@ describe("mapByUniqueLabel", () => {
       picks.push([slot, index]);
       return `colour-${slot}`;
     });
-    expect(out).toEqual([
-      "colour-0",
-      "colour-1",
-      "colour-0",
-      "colour-2",
-      "colour-1",
-    ]);
+    expect(out).toEqual(["colour-0", "colour-1", "colour-0", "colour-2", "colour-1"]);
     // Slot numbers count unique labels; the index is the first segment
     // carrying each one.
     expect(picks).toEqual([

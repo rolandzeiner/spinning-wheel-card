@@ -18,11 +18,7 @@ import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction"
 import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
-import {
-  type NormalisedConfig,
-  normaliseConfig,
-  textOrientationDefault,
-} from "./config";
+import { type NormalisedConfig, normaliseConfig, textOrientationDefault } from "./config";
 import { validateConfig } from "./validate";
 
 import "./editor";
@@ -37,8 +33,7 @@ interface WindowWithCustomCards extends Window {
   }>;
 }
 // hass not available at module init — use navigator.language for the picker.
-const initialLang =
-  typeof navigator !== "undefined" ? navigator.language : "en";
+const initialLang = typeof navigator !== "undefined" ? navigator.language : "en";
 
 // Idempotent — bundle may re-import (HACS + manual /local both
 // registered, dev-push iteration). Without the guard the picker grows
@@ -70,13 +65,12 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
  *  "dial nub" + HALF_BOTTOM_PAD_FRAC breathing room. */
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
-
 /** Safety-net stop threshold. Coulomb friction usually reaches ω = 0
  *  in finite time before this threshold is consulted; the guard
  *  catches pathological float drift. */
 const STOP_THRESHOLD_RAD_PER_S = 0.01;
-const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
-const CLICK_IMPULSE_MAX = 16;  // rad/s ≈ 2.5 rev/s
+const CLICK_IMPULSE_MIN = 8; // rad/s ≈ 1.3 rev/s
+const CLICK_IMPULSE_MAX = 16; // rad/s ≈ 2.5 rev/s
 const VELOCITY_SAMPLE_WINDOW_MS = 100;
 const MAX_VELOCITY_RAD_PER_S = 40;
 
@@ -94,9 +88,7 @@ export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI
  *  `wheel_color_rgb` action payload) want this function as-is so the
  *  payload mirrors what was in YAML.
  *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
-export const cssToRgbTriple = (
-  value: string,
-): readonly [number, number, number] | null => {
+export const cssToRgbTriple = (value: string): readonly [number, number, number] | null => {
   const s = value.trim();
   if (s.startsWith("#")) {
     if (s.length === 7) {
@@ -131,22 +123,18 @@ export const cssToRgbTriple = (
  *  (i.e. mid-grey, not black). Without this, auto-contrast misjudges
  *  translucent fills and picks the wrong text colour (WCAG 1.4.3).
  *  Returns null for inputs `cssToRgbTriple` doesn't accept. */
-export const cssRgbForLuminance = (
-  value: string,
-): readonly [number, number, number] | null => {
+export const cssRgbForLuminance = (value: string): readonly [number, number, number] | null => {
   const s = value.trim();
   // Hex values are opaque by definition — fall through to the
   // existing parser.
   if (s.startsWith("#")) return cssToRgbTriple(s);
-  const m = s.match(
-    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)/i,
-  );
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)/i);
   if (!m) return null;
   const r = parseInt(m[1]!, 10);
   const g = parseInt(m[2]!, 10);
   const b = parseInt(m[3]!, 10);
   if (m[4] === undefined) return [r, g, b];
-  const a = Math.max(0, Math.min(1, parseFloat(m[4]!)));
+  const a = Math.max(0, Math.min(1, parseFloat(m[4])));
   if (!Number.isFinite(a) || a >= 1) return [r, g, b];
   const blend = (c: number): number => Math.round(c * a + 255 * (1 - a));
   return [blend(r), blend(g), blend(b)];
@@ -277,7 +265,7 @@ const PEG_BACKROLL_MAX_PROB = 0.5;
 const DRAG_COMMIT_RAD = 0.04;
 
 interface VelocitySample {
-  t: number;        // performance.now()
+  t: number; // performance.now()
   angleDelta: number;
 }
 
@@ -286,13 +274,7 @@ interface VelocitySample {
  *  can't honour `rgb_color` (color_temp-only / brightness-only / on-off
  *  / white-only). HA's `light.turn_on` would silently no-op those
  *  upstream, but bailing here makes the misconfiguration deliberate. */
-const RGB_CAPABLE_COLOR_MODES: ReadonlySet<string> = new Set([
-  "rgb",
-  "rgbw",
-  "rgbww",
-  "hs",
-  "xy",
-]);
+const RGB_CAPABLE_COLOR_MODES: ReadonlySet<string> = new Set(["rgb", "rgbw", "rgbww", "hs", "xy"]);
 
 /** Cross-instance, cross-mount icon path cache. Keys are bare icon
  *  names (`mdi:home`); values are the resolved SVG `d` string, or
@@ -390,9 +372,7 @@ interface DrawCache {
 
 export class SpinningWheelCard extends LitElement {
   public static getConfigElement(): LovelaceCardEditor {
-    return document.createElement(
-      "spinning-wheel-card-editor",
-    ) as LovelaceCardEditor;
+    return document.createElement("spinning-wheel-card-editor");
   }
 
   public static getStubConfig(): Record<string, unknown> {
@@ -447,10 +427,7 @@ export class SpinningWheelCard extends LitElement {
   public setConfig(config: SpinningWheelCardConfig): void {
     // Prefer incoming language so an edit that flips language AND adds
     // an error reports the error in the new language.
-    const lang =
-      (config?.language as string | undefined) ??
-      this.config?.language ??
-      resolveLang(this.hass);
+    const lang = config?.language ?? this.config?.language ?? resolveLang(this.hass);
     // Validation reads the raw config, so a mistyped value still throws;
     // everything after it reads the normalised one. Defaults come from
     // the one table the editor also reads — see config.ts.
@@ -469,10 +446,7 @@ export class SpinningWheelCard extends LitElement {
     // baseline so the next crossing detection re-seeds in the new
     // scale instead of comparing across scales (would fire a spurious
     // click on the next frame).
-    if (
-      this.config.pegs !== next.pegs ||
-      this.config.peg_density !== next.peg_density
-    ) {
+    if (this.config.pegs !== next.pegs || this.config.peg_density !== next.peg_density) {
       this._lastTickSeg = -1;
     }
     this.config = next;
@@ -493,10 +467,7 @@ export class SpinningWheelCard extends LitElement {
     return this.config.sound;
   }
   private _textOrientation(): TextOrientation {
-    return (
-      this.config.text_orientation ??
-      textOrientationDefault(this._isTodoMode())
-    );
+    return this.config.text_orientation ?? textOrientationDefault(this._isTodoMode());
   }
 
   /** Todo mode = entity wired AND ≥1 open items being rendered. */
@@ -650,10 +621,7 @@ export class SpinningWheelCard extends LitElement {
   private _segmentLabelColors(): ReadonlyArray<string> {
     const custom = this.config.label_colors;
     const hasAnyCustom =
-      Array.isArray(custom) &&
-      custom.some(
-        (c) => typeof c === "string" && c.length > 0,
-      );
+      Array.isArray(custom) && custom.some((c) => typeof c === "string" && c.length > 0);
     const fills = this._segmentColors();
     const autoFallback = fills.map((fill) => {
       // Use the alpha-aware variant so translucent fills
@@ -683,8 +651,7 @@ export class SpinningWheelCard extends LitElement {
     custom: ReadonlyArray<string | null> | undefined,
     defaults: ReadonlyArray<string>,
   ): ReadonlyArray<string> {
-    const palette: ReadonlyArray<string | null> =
-      custom && custom.length > 0 ? custom : defaults;
+    const palette: ReadonlyArray<string | null> = custom && custom.length > 0 ? custom : defaults;
     return mapByUniqueLabel(this._expandedLabels(), (slot) => {
       const candidate = palette[slot % palette.length];
       return typeof candidate === "string" && candidate.length > 0
@@ -699,16 +666,12 @@ export class SpinningWheelCard extends LitElement {
     const labels = this._expandedLabels();
     const src = this.config.actions;
     if (!src || src.length === 0) return labels.map(() => null);
-    return mapByUniqueLabel(labels, (slot) =>
-      this._normalizeAction(src[slot % src.length]),
-    );
+    return mapByUniqueLabel(labels, (slot) => this._normalizeAction(src[slot % src.length]));
   }
 
   /** `script.<name>` shorthand → `perform-action`; any other string
    *  or null → null. Object entries pass through (setConfig validated). */
-  private _normalizeAction(
-    raw: string | ActionConfig | null | undefined,
-  ): ActionConfig | null {
+  private _normalizeAction(raw: string | ActionConfig | null | undefined): ActionConfig | null {
     if (raw == null) return null;
     if (typeof raw === "string") {
       if (!/^script\.[a-z0-9_]+$/.test(raw)) return null;
@@ -747,9 +710,7 @@ export class SpinningWheelCard extends LitElement {
   private async _confirmAction(cfg: ActionConfig): Promise<boolean> {
     if (this.config.disable_confirm_actions) return true;
     const cfgConfirm: ConfirmationConfig | undefined =
-      "confirmation" in cfg
-        ? (cfg.confirmation as ConfirmationConfig | undefined)
-        : undefined;
+      "confirmation" in cfg ? (cfg.confirmation as ConfirmationConfig | undefined) : undefined;
     if (cfgConfirm === false) return true;
     const text =
       typeof cfgConfirm === "object" && cfgConfirm?.text
@@ -795,12 +756,7 @@ export class SpinningWheelCard extends LitElement {
         return;
       case "toggle":
         if (!cfg.entity) return;
-        await this.hass.callService?.(
-          "homeassistant",
-          "toggle",
-          {},
-          { entity_id: cfg.entity },
-        );
+        await this.hass.callService?.("homeassistant", "toggle", {}, { entity_id: cfg.entity });
         return;
       case "assist":
         // Same CustomEvent HA's own action handler dispatches.
@@ -813,9 +769,7 @@ export class SpinningWheelCard extends LitElement {
         fireEvent(
           this,
           "ll-custom",
-          Object.fromEntries(
-            Object.entries(cfg).filter(([k]) => k !== "action"),
-          ),
+          Object.fromEntries(Object.entries(cfg).filter(([k]) => k !== "action")),
         );
         return;
     }
@@ -825,23 +779,14 @@ export class SpinningWheelCard extends LitElement {
     cfg: Extract<ActionConfig, { action: "perform-action" | "call-service" }>,
     context?: Record<string, unknown>,
   ): Promise<void> {
-    const svc =
-      cfg.action === "perform-action" ? cfg.perform_action : cfg.service;
+    const svc = cfg.action === "perform-action" ? cfg.perform_action : cfg.service;
     if (typeof svc !== "string") return;
     const dot = svc.indexOf(".");
     if (dot <= 0 || dot === svc.length - 1) return;
     const userData =
-      cfg.action === "call-service"
-        ? (cfg.data ?? cfg.service_data ?? {})
-        : (cfg.data ?? {});
-    const data =
-      context !== undefined ? { ...context, ...userData } : userData;
-    await this.hass.callService?.(
-      svc.slice(0, dot),
-      svc.slice(dot + 1),
-      data,
-      cfg.target,
-    );
+      cfg.action === "call-service" ? (cfg.data ?? cfg.service_data ?? {}) : (cfg.data ?? {});
+    const data = context !== undefined ? { ...context, ...userData } : userData;
+    await this.hass.callService?.(svc.slice(0, dot), svc.slice(dot + 1), data, cfg.target);
   }
 
   private _navigate(path: string, replace: boolean): void {
@@ -905,12 +850,8 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _attachResizeObserver(): void {
-    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
-      | HTMLElement
-      | null;
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as HTMLElement | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     if (!wrap || !c) return;
     // Seed from layout if resolved; observer's first delivery fixes
     // it within a frame either way.
@@ -920,9 +861,7 @@ export class SpinningWheelCard extends LitElement {
       // not unqueue them — bail when detached.
       if (!this.isConnected) return;
       for (const e of entries) {
-        const next = this._clampSize(
-          this._fitDim(e.contentRect.width, e.contentRect.height),
-        );
+        const next = this._clampSize(this._fitDim(e.contentRect.width, e.contentRect.height));
         // Tolerance avoids redraws on sub-pixel jitter.
         if (Math.abs(next - this._size) >= 1) {
           this._size = next;
@@ -984,9 +923,7 @@ export class SpinningWheelCard extends LitElement {
 
   /** Class shim around the module-level `cssToRgbTriple` — kept so any
    *  existing `this._cssToRgbTriple(...)` call sites stay valid. */
-  private _cssToRgbTriple(
-    css: string,
-  ): readonly [number, number, number] | null {
+  private _cssToRgbTriple(css: string): readonly [number, number, number] | null {
     return cssToRgbTriple(css);
   }
 
@@ -1037,10 +974,7 @@ export class SpinningWheelCard extends LitElement {
     const target = wrapAngle(-angle + a0 / 2);
     const totalPegs = this._pegsPerSegment() * n;
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
-    const pegPx = Math.max(
-      2,
-      (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
-    );
+    const pegPx = Math.max(2, (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE);
     // 1.0 × angular half-width — only treat the indicator as "on the
     // peg" when its centre overlaps the painted pixel footprint. A
     // wider buffer catches cases where the indicator is clearly past
@@ -1101,11 +1035,8 @@ export class SpinningWheelCard extends LitElement {
     // — i.e. `naturalSign === -lastDir`. Match against that to
     // suppress the back-roll for cleanly-crossed pegs.
     const lastDir = this._lastSpinDirection;
-    const wheelCrossedPeg =
-      lastDir !== 0 && plan.naturalSign === -lastDir;
-    const backRollProb = wheelCrossedPeg
-      ? 0
-      : plan.proximity * PEG_BACKROLL_MAX_PROB;
+    const wheelCrossedPeg = lastDir !== 0 && plan.naturalSign === -lastDir;
+    const backRollProb = wheelCrossedPeg ? 0 : plan.proximity * PEG_BACKROLL_MAX_PROB;
     const flip = Math.random() < backRollProb;
     const sign = (flip ? -plan.naturalSign : plan.naturalSign) as 1 | -1;
     const newTarget = wrapAngle(plan.pegAngle + sign * plan.deadzone);
@@ -1190,17 +1121,13 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _canvasCssHeight(): number {
-    return this._isHalfMode()
-      ? Math.round(this._size * HALF_ASPECT)
-      : this._size;
+    return this._isHalfMode() ? Math.round(this._size * HALF_ASPECT) : this._size;
   }
 
   /** Inline width/height keeps the next ResizeObserver delivery stable
    *  (CSS-driven sizing re-fires spuriously). */
   private _applyCanvasSize(): void {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     if (!c) return;
     c.style.width = `${this._size}px`;
     c.style.height = `${this._canvasCssHeight()}px`;
@@ -1275,9 +1202,7 @@ export class SpinningWheelCard extends LitElement {
     );
 
     const pegsEnabled = this._pegsEnabled();
-    const pegSize = pegsEnabled
-      ? Math.max(2, (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE)
-      : 0;
+    const pegSize = pegsEnabled ? Math.max(2, (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE) : 0;
     const pegRadius = pegsEnabled ? radius * PEG_RADIUS_FRAC : 0;
     const totalPegs = pegsEnabled ? this._pegsPerSegment() * n : 0;
     const pegStep = pegsEnabled && totalPegs > 0 ? TWO_PI / totalPegs : 0;
@@ -1323,14 +1248,9 @@ export class SpinningWheelCard extends LitElement {
     const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
     const offsetFrac = this.config.label_radius_offset / 100;
     const safeRadius = Math.max(1, radius);
-    const minFrac = Math.min(
-      0.95,
-      (hubRadius + labelFontPx * 0.6) / safeRadius,
-    );
+    const minFrac = Math.min(0.95, (hubRadius + labelFontPx * 0.6) / safeRadius);
     const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
-    const labelRadius =
-      radius *
-      Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
+    const labelRadius = radius * Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
 
     const radialInnerLimit = hubRadius + labelFontPx * 0.4;
     const radialOuterLimit = radius - labelFontPx * 0.3;
@@ -1380,9 +1300,7 @@ export class SpinningWheelCard extends LitElement {
     // Width budget: radial = full hub→rim channel; tangent = arc
     // span at labelRadius.
     const widthBudget =
-      g.orientation === "radial"
-        ? g.radialChannel * 0.95
-        : arc * g.labelRadius * 0.85;
+      g.orientation === "radial" ? g.radialChannel * 0.95 : arc * g.labelRadius * 0.85;
 
     // Auto-fit shrinks; fixed keeps labelFontPx.
     const measureAt = (px: number): number => {
@@ -1409,9 +1327,7 @@ export class SpinningWheelCard extends LitElement {
     // Tangent: per-glyph angular subtensions at labelRadius, so
     // `_drawArchedText` never measures during a spin.
     const chars = Array.from(display);
-    const glyphAngularWidths = chars.map(
-      (c) => measure(c) / Math.max(1, g.labelRadius),
-    );
+    const glyphAngularWidths = chars.map((c) => measure(c) / Math.max(1, g.labelRadius));
     return {
       ...plan,
       chars,
@@ -1422,11 +1338,7 @@ export class SpinningWheelCard extends LitElement {
 
   /** Largest hub font, from the base size down to 55 % of it, at which
    *  `text` fits inside the hub. */
-  private _hubFontPx(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    hubRadius: number,
-  ): number {
+  private _hubFontPx(ctx: CanvasRenderingContext2D, text: string, hubRadius: number): number {
     const basePx = Math.max(7, Math.round(this._size * 0.038));
     const minPx = Math.max(6, Math.round(basePx * 0.55));
     const measureAt = (px: number): number => {
@@ -1439,9 +1351,7 @@ export class SpinningWheelCard extends LitElement {
   private _resolveTheme(ctx: CanvasRenderingContext2D): WheelTheme {
     if (this._resolvedThemeCache !== null) return this._resolvedThemeCache;
     const cs = getComputedStyle(this);
-    const dividerColor =
-      cs.getPropertyValue("--divider-color").trim() ||
-      "rgba(0,0,0,0.45)";
+    const dividerColor = cs.getPropertyValue("--divider-color").trim() || "rgba(0,0,0,0.45)";
 
     const choice: HubColor = this.config.hub_color;
 
@@ -1471,8 +1381,7 @@ export class SpinningWheelCard extends LitElement {
 
     // Theme accent — indicator + hub use --primary-color; hub label
     // auto-picks black/white via WCAG luminance.
-    const primary =
-      cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
+    const primary = cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
     const rgb = this._cssColorToRgb(primary, ctx);
     this._resolvedThemeCache = {
       indicatorFill: primary,
@@ -1485,10 +1394,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** CSS colour → [r, g, b] via the canvas fillStyle round-trip. */
-  private _cssColorToRgb(
-    color: string,
-    ctx: CanvasRenderingContext2D,
-  ): [number, number, number] {
+  private _cssColorToRgb(color: string, ctx: CanvasRenderingContext2D): [number, number, number] {
     const prev = ctx.fillStyle;
     ctx.fillStyle = color;
     const canon = String(ctx.fillStyle);
@@ -1515,14 +1421,9 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** Tint toward white (positive delta) or black (negative). */
-  private _adjustLightness(
-    [r, g, b]: [number, number, number],
-    delta: number,
-  ): string {
+  private _adjustLightness([r, g, b]: [number, number, number], delta: number): string {
     const apply = (c: number): number =>
-      delta >= 0
-        ? Math.round(c + (255 - c) * delta)
-        : Math.round(c * (1 + delta));
+      delta >= 0 ? Math.round(c + (255 - c) * delta) : Math.round(c * (1 + delta));
     return `rgb(${apply(r)}, ${apply(g)}, ${apply(b)})`;
   }
 
@@ -1568,9 +1469,9 @@ export class SpinningWheelCard extends LitElement {
       const aw = angularWidths[i] ?? 0;
       const charAngle = angle + aw / 2;
       ctx.save();
-      ctx.rotate(charAngle);              // +X now points at this glyph's spoke
-      ctx.translate(radius, 0);           // … out along that spoke
-      ctx.rotate(Math.PI / 2);            // … then turn so +X is tangent (CW)
+      ctx.rotate(charAngle); // +X now points at this glyph's spoke
+      ctx.translate(radius, 0); // … out along that spoke
+      ctx.rotate(Math.PI / 2); // … then turn so +X is tangent (CW)
       ctx.fillText(chars[i] ?? "", 0, 0);
       ctx.restore();
       angle += aw;
@@ -1848,9 +1749,7 @@ export class SpinningWheelCard extends LitElement {
     const actions = this._segmentActions();
     const action = actions[idx];
     if (action) {
-      const context = this._wheelContextEnabled()
-        ? this._buildWheelContext(idx)
-        : undefined;
+      const context = this._wheelContextEnabled() ? this._buildWheelContext(idx) : undefined;
       void this._dispatchAction(action, context);
     }
   }
@@ -1858,9 +1757,7 @@ export class SpinningWheelCard extends LitElement {
   /** Write the winning label to `result_entity`. Truncates to 255
    *  chars (HA's MAX_LENGTH_STATE_STATE — longer todo summaries would
    *  otherwise be rejected by the input_text guard). */
-  private async _writeResultToEntity(
-    result: string | null,
-  ): Promise<void> {
+  private async _writeResultToEntity(result: string | null): Promise<void> {
     if (!result) return;
     const entity = this.config.result_entity;
     if (!entity) return;
@@ -1872,10 +1769,7 @@ export class SpinningWheelCard extends LitElement {
         value,
       });
     } catch (err) {
-      console.warn(
-        "[spinning-wheel-card] input_text.set_value failed:",
-        err,
-      );
+      console.warn("[spinning-wheel-card] input_text.set_value failed:", err);
     }
   }
 
@@ -1884,14 +1778,10 @@ export class SpinningWheelCard extends LitElement {
    *  (hex / rgb() / rgba()); for named colours and the like, falls
    *  back to a canvas `fillStyle` round-trip. `var(--…)` cannot be
    *  resolved this way and returns null — caller should skip silently. */
-  private _resolveSegmentRgb(
-    color: string,
-  ): readonly [number, number, number] | null {
+  private _resolveSegmentRgb(color: string): readonly [number, number, number] | null {
     const direct = cssToRgbTriple(color);
     if (direct !== null) return direct;
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     const ctx = c?.getContext("2d");
     if (!ctx) return null;
     const prev = ctx.fillStyle;
@@ -1909,9 +1799,7 @@ export class SpinningWheelCard extends LitElement {
    *  fill colour. Fire-and-forget — failures are logged and the spin
    *  result / configured actions still fire. Skips lights silently
    *  when the colour can't be resolved to RGB. */
-  private async _syncLights(
-    rgb: readonly [number, number, number],
-  ): Promise<void> {
+  private async _syncLights(rgb: readonly [number, number, number]): Promise<void> {
     const entities = this.config.light_sync_entities;
     if (!Array.isArray(entities) || entities.length === 0) return;
     if (!this.hass?.callService) return;
@@ -1926,12 +1814,8 @@ export class SpinningWheelCard extends LitElement {
       // color_temp / brightness / on-off would silently no-op
       // upstream; we skip earlier so it's a deliberate drop, not
       // a service-call ghost.
-      const modes = this.hass.states?.[entity]?.attributes
-        ?.supported_color_modes;
-      if (
-        Array.isArray(modes) &&
-        !modes.some((m) => RGB_CAPABLE_COLOR_MODES.has(m as string))
-      ) {
+      const modes = this.hass.states?.[entity]?.attributes?.supported_color_modes;
+      if (Array.isArray(modes) && !modes.some((m) => RGB_CAPABLE_COLOR_MODES.has(m as string))) {
         continue;
       }
       try {
@@ -1940,10 +1824,7 @@ export class SpinningWheelCard extends LitElement {
           rgb_color: [rgb[0], rgb[1], rgb[2]],
         });
       } catch (err) {
-        console.warn(
-          `[spinning-wheel-card] light.turn_on failed for ${entity}:`,
-          err,
-        );
+        console.warn(`[spinning-wheel-card] light.turn_on failed for ${entity}:`, err);
       }
     }
   }
@@ -2047,9 +1928,7 @@ export class SpinningWheelCard extends LitElement {
   /** The click boundary interval under the indicator, in that same index
    *  space. */
   private _tickIndex(): number {
-    return this._pegsEnabled()
-      ? this._pegIntervalIndex()
-      : this._segmentIndexUnderPointer();
+    return this._pegsEnabled() ? this._pegIntervalIndex() : this._segmentIndexUnderPointer();
   }
 
   /** Peg-click sound — a single focused filtered-noise burst: the dry
@@ -2172,11 +2051,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** One click per boundary crossed, staggered across the frame. */
-  private _playCrossingClicks(
-    crossed: number,
-    speed: number,
-    frameDtSec: number,
-  ): void {
+  private _playCrossingClicks(crossed: number, speed: number, frameDtSec: number): void {
     const ctx = this._ensureAudio();
     if (!ctx) return;
     if (ctx.state === "suspended") {
@@ -2204,9 +2079,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _wheelRect(): DOMRect | null {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     return c?.getBoundingClientRect() ?? null;
   }
 
@@ -2284,15 +2157,10 @@ export class SpinningWheelCard extends LitElement {
     const t = ev.timeStamp || performance.now();
     // Elapsed since the previous pointer move — the drag's frame `dt`.
     const prevSample = this._velocitySamples[this._velocitySamples.length - 1];
-    const dtSec = prevSample
-      ? Math.max(0.001, (t - prevSample.t) / 1000)
-      : 0.016;
+    const dtSec = prevSample ? Math.max(0.001, (t - prevSample.t) / 1000) : 0.016;
     this._velocitySamples.push({ t, angleDelta: delta });
     const cutoff = t - VELOCITY_SAMPLE_WINDOW_MS;
-    while (
-      this._velocitySamples.length > 0 &&
-      this._velocitySamples[0]!.t < cutoff
-    ) {
+    while (this._velocitySamples.length > 0 && this._velocitySamples[0]!.t < cutoff) {
       this._velocitySamples.shift();
     }
 
@@ -2351,18 +2219,13 @@ export class SpinningWheelCard extends LitElement {
   private _applyClickImpulse(): boolean {
     const wasSpinning = Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
     if (wasSpinning && this.config.disable_boost) return false;
-    const mag =
-      CLICK_IMPULSE_MIN +
-      Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
+    const mag = CLICK_IMPULSE_MIN + Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
     if (wasSpinning) {
       // Cap at MAX_VELOCITY so repeated clicks don't compound past the
       // upper bound.
       const sign = this._omega >= 0 ? 1 : -1;
       const next = this._omega + sign * mag;
-      this._omega = Math.max(
-        -MAX_VELOCITY_RAD_PER_S,
-        Math.min(MAX_VELOCITY_RAD_PER_S, next),
-      );
+      this._omega = Math.max(-MAX_VELOCITY_RAD_PER_S, Math.min(MAX_VELOCITY_RAD_PER_S, next));
     } else {
       // Cancel any in-progress settle tween so the new spin can claim
       // the RAF slot.
@@ -2384,10 +2247,7 @@ export class SpinningWheelCard extends LitElement {
     const span = (samples[samples.length - 1]!.t - samples[0]!.t) / 1000;
     if (span <= 0) return null;
     const totalDelta = samples.reduce((s, x) => s + x.angleDelta, 0);
-    return Math.max(
-      -MAX_VELOCITY_RAD_PER_S,
-      Math.min(MAX_VELOCITY_RAD_PER_S, totalDelta / span),
-    );
+    return Math.max(-MAX_VELOCITY_RAD_PER_S, Math.min(MAX_VELOCITY_RAD_PER_S, totalDelta / span));
   }
 
   /** Selector mode: centre segment `idx` under the indicator and fire it. */
@@ -2410,8 +2270,7 @@ export class SpinningWheelCard extends LitElement {
     const isSelector = this._isSelectorMode();
     // Selector mode adds ArrowLeft/ArrowRight for keyboard ±1-segment
     // navigation (mouse uses drag; this closes the parity gap).
-    const isArrow =
-      isSelector && (ev.key === "ArrowRight" || ev.key === "ArrowLeft");
+    const isArrow = isSelector && (ev.key === "ArrowRight" || ev.key === "ArrowLeft");
     if (ev.key !== " " && ev.key !== "Enter" && !isArrow) return;
     ev.preventDefault();
     this._warmAudio();
@@ -2420,10 +2279,7 @@ export class SpinningWheelCard extends LitElement {
       return;
     }
     if (!this._applyClickImpulse()) return;
-    if (
-      Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S &&
-      this._rafId === null
-    ) {
+    if (Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S && this._rafId === null) {
       this._spinning = true;
       this._startAnim();
     }
@@ -2445,9 +2301,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _draw(): void {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
 
@@ -2505,10 +2359,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** The slices and their labels, in the wheel's rotated frame. */
-  private _paintSegments(
-    ctx: CanvasRenderingContext2D,
-    cache: DrawCache,
-  ): void {
+  private _paintSegments(ctx: CanvasRenderingContext2D, cache: DrawCache): void {
     const { arcs, radius } = cache;
     // Borderless mode bleeds the canvas-clear colour through the
     // sub-pixel antialiasing along each diagonal seam between two
@@ -2617,11 +2468,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** The outer ring and, when enabled, the pegs on it. */
-  private _paintRim(
-    ctx: CanvasRenderingContext2D,
-    cache: DrawCache,
-    pegFill: string,
-  ): void {
+  private _paintRim(ctx: CanvasRenderingContext2D, cache: DrawCache, pegFill: string): void {
     // Soft outer ring — CSS drop-shadow carries the depth.
     ctx.beginPath();
     ctx.arc(0, 0, cache.radius, 0, Math.PI * 2);
@@ -2665,8 +2512,12 @@ export class SpinningWheelCard extends LitElement {
     ctx.beginPath();
     ctx.arc(center, center, hubRadius, 0, Math.PI * 2);
     const grad = ctx.createRadialGradient(
-      center - hubRadius * 0.22, center - hubRadius * 0.22, 2,
-      center, center, hubRadius,
+      center - hubRadius * 0.22,
+      center - hubRadius * 0.22,
+      2,
+      center,
+      center,
+      hubRadius,
     );
     grad.addColorStop(0, theme.hubLight);
     grad.addColorStop(1, theme.hubDark);
@@ -2739,14 +2590,9 @@ export class SpinningWheelCard extends LitElement {
   }
 
   protected override updated(changed: PropertyValues): void {
-    let needsDraw =
-      changed.has("config") ||
-      changed.has("_result") ||
-      changed.has("_todoItems");
+    let needsDraw = changed.has("config") || changed.has("_result") || changed.has("_todoItems");
     if (changed.has("config")) {
-      this._resizeOnHalfCircleFlip(
-        changed.get("config") as SpinningWheelCardConfig | undefined,
-      );
+      this._resizeOnHalfCircleFlip(changed.get("config") as SpinningWheelCardConfig | undefined);
     }
     if (changed.has("hass") && this.hass && this._themeFlipped(this.hass)) {
       this._invalidateThemeCache();
@@ -2762,18 +2608,11 @@ export class SpinningWheelCard extends LitElement {
    *  config object on every keystroke, and re-running
    *  getBoundingClientRect() + resize for each one is a forced layout
    *  per keystroke. Idempotent when diameter is unchanged. */
-  private _resizeOnHalfCircleFlip(
-    prevConfig: SpinningWheelCardConfig | undefined,
-  ): void {
-    if (
-      prevConfig !== undefined &&
-      prevConfig.half_circle === this.config.half_circle
-    ) {
+  private _resizeOnHalfCircleFlip(prevConfig: SpinningWheelCardConfig | undefined): void {
+    if (prevConfig !== undefined && prevConfig.half_circle === this.config.half_circle) {
       return;
     }
-    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
-      | HTMLElement
-      | null;
+    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as HTMLElement | null;
     if (wrap) this._sizeFromWrap(wrap);
     this._applyCanvasSize();
   }
@@ -2813,13 +2652,9 @@ export class SpinningWheelCard extends LitElement {
     // todo wired but empty / not yet fetched — say so instead of
     // rendering placeholder 1..N labels silently.
     const todoEmpty =
-      !!this.config.todo_entity &&
-      (this._todoItems === null || this._todoItems.length === 0);
+      !!this.config.todo_entity && (this._todoItems === null || this._todoItems.length === 0);
     if (todoEmpty) return localize("status.todo_empty", lang);
-    return localize(
-      this._isSelectorMode() ? "status.idle_selector" : "status.idle",
-      lang,
-    );
+    return localize(this._isSelectorMode() ? "status.idle_selector" : "status.idle", lang);
   }
 
   protected override render(): TemplateResult {
@@ -2835,9 +2670,7 @@ export class SpinningWheelCard extends LitElement {
         : statusText;
     // Empty / whitespace `name` hides ha-card's header — fresh installs
     // show a clean wheel until the user opts in.
-    const header = this.config.name?.trim()
-      ? this.config.name
-      : undefined;
+    const header = this.config.name?.trim() ? this.config.name : undefined;
     const halfMode = this._isHalfMode();
 
     return html`
@@ -2853,9 +2686,9 @@ export class SpinningWheelCard extends LitElement {
               tabindex="0"
               aria-roledescription=${localize("a11y.wheel_role", lang)}
               aria-label=${localize("a11y.wheel_label", lang)}
-              aria-keyshortcuts=${this._isSelectorMode()
-                ? "Space Enter ArrowLeft ArrowRight"
-                : "Space Enter"}
+              aria-keyshortcuts=${
+                this._isSelectorMode() ? "Space Enter ArrowLeft ArrowRight" : "Space Enter"
+              }
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -2870,9 +2703,7 @@ export class SpinningWheelCard extends LitElement {
                but kept in the DOM as a polite live region — disabling
                the indicator is a layout choice, not an a11y choice. -->
           <div
-            class=${!this.config.show_status
-              ? "status status-sr-only"
-              : "status"}
+            class=${!this.config.show_status ? "status status-sr-only" : "status"}
             aria-live="polite"
             aria-atomic="true"
             aria-busy=${this._spinning ? "true" : "false"}

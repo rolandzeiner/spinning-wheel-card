@@ -57,15 +57,12 @@ const fakeContext = (): unknown => {
 };
 
 /** The canvas calls of the most recent paint. */
-export const lastPaint = (): Op[] =>
-  ops.slice(ops.map((op) => op[0]).lastIndexOf("setTransform"));
+export const lastPaint = (): Op[] => ops.slice(ops.map((op) => op[0]).lastIndexOf("setTransform"));
 
 /** Fill colour of each wedge of the most recent paint, in order. */
 export const wedgeColours = (): unknown[] => {
   const paint = lastPaint();
-  return paint.flatMap((op, i) =>
-    op[0] === "moveTo" && op[1] === 0 ? [paint[i + 3]?.[2]] : [],
-  );
+  return paint.flatMap((op, i) => (op[0] === "moveTo" && op[1] === 0 ? [paint[i + 3]?.[2]] : []));
 };
 
 /** Every string drawn by the most recent paint. */
@@ -110,8 +107,7 @@ let now = 1000;
 const frameQueue = new Map<number, (time: number) => void>();
 let frameId = 0;
 
-export const flush = (): Promise<void> =>
-  new Promise((resolve) => setImmediate(resolve));
+export const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 /** Run `count` animation frames, 1/60 s apart. */
 export const frames = async (count = 1): Promise<void> => {
@@ -197,8 +193,7 @@ class FakeAudioContext {
 }
 
 /** Clicks the card has scheduled so far. */
-export const clicksPlayed = (): number =>
-  audio.filter((op) => op[0] === "start").length;
+export const clicksPlayed = (): number => audio.filter((op) => op[0] === "start").length;
 
 // ------------------------------------------------------------------ hass
 
@@ -380,14 +375,11 @@ export const wheel = (card: Card): HTMLCanvasElement =>
 
 /** The status line's text. */
 export const statusText = (card: Card): string =>
-  card.shadowRoot!.querySelector(".status")!.textContent!.trim();
+  card.shadowRoot!.querySelector(".status")!.textContent.trim();
 
 /** A point 100 px from the wheel's centre, `degrees` clockwise from 3
  *  o'clock. */
-const at = (
-  card: Card,
-  degrees: number,
-): { clientX: number; clientY: number } => {
+const at = (card: Card, degrees: number): { clientX: number; clientY: number } => {
   const centre = parseFloat(wheel(card).style.width) / 2;
   const radians = (degrees * Math.PI) / 180;
   return {
@@ -397,13 +389,7 @@ const at = (
 };
 
 /** A pointer event on the wheel at `degrees`, `afterMs` after the last. */
-export const pointer = (
-  card: Card,
-  type: string,
-  degrees = 0,
-  afterMs = 8,
-  button = 0,
-): void => {
+export const pointer = (card: Card, type: string, degrees = 0, afterMs = 8, button = 0): void => {
   now += afterMs;
   const event = new PointerEvent(type, {
     ...at(card, degrees),
@@ -431,6 +417,4 @@ export const drag = (card: Card, from: number, to: number): void => {
 };
 
 export const press = (card: Card, key: string): boolean =>
-  wheel(card).dispatchEvent(
-    new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-  );
+  wheel(card).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));

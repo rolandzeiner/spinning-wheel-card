@@ -4,9 +4,7 @@ import type { HomeAssistant, TodoItem } from "./types";
  *  order. The same-label-same-colour rule would otherwise collapse two
  *  identically-named items into one visual segment, so equal summaries
  *  are folded to a single slot here. */
-export const uniqueTodoItems = (
-  items: ReadonlyArray<TodoItem>,
-): TodoItem[] => {
+export const uniqueTodoItems = (items: ReadonlyArray<TodoItem>): TodoItem[] => {
   const seen = new Set<string>();
   const out: TodoItem[] = [];
   for (const item of items) {
@@ -34,8 +32,6 @@ export const fetchOpenTodoItems = async (
     entity_id: entity,
   })) as { items?: ReadonlyArray<TodoItem> } | undefined;
   const all = reply?.items ?? [];
-  const open = all.filter(
-    (i) => (i.status ?? "needs_action") === "needs_action",
-  );
+  const open = all.filter((i) => (i.status ?? "needs_action") === "needs_action");
   return uniqueTodoItems(open);
 };

@@ -8,11 +8,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  coulombDecel,
-  frictionMultiplier,
-  normalizeFriction,
-} from "../src/friction";
+import { coulombDecel, frictionMultiplier, normalizeFriction } from "../src/friction";
 
 describe("normalizeFriction", () => {
   it("passes valid integer levels through", () => {

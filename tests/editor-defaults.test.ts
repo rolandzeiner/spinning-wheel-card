@@ -12,12 +12,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  DEFAULTS,
-  normaliseConfig,
-  textOrientationDefault,
-  tidyConfig,
-} from "../src/config";
+import { DEFAULTS, normaliseConfig, textOrientationDefault, tidyConfig } from "../src/config";
 
 const TYPE = "custom:spinning-wheel-card";
 

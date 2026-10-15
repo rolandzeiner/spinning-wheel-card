@@ -33,8 +33,7 @@ import {
 beforeEach(reset);
 
 /** The calls named `name` in the most recent paint. */
-const painted = (name: string): Op[] =>
-  lastPaint().filter((op) => op[0] === name);
+const painted = (name: string): Op[] => lastPaint().filter((op) => op[0] === name);
 
 /** Angle each wedge spans, in the most recent paint. */
 const wedgeSpans = (): number[] => {
@@ -50,9 +49,7 @@ const wedgeSpans = (): number[] => {
 /** Text colour of each label (and of the hub text, last). */
 const textColours = (): unknown[] => {
   const paint = lastPaint();
-  return paint.flatMap((op, i) =>
-    op[1] === "textAlign" ? [paint[i - 1]?.[2]] : [],
-  );
+  return paint.flatMap((op, i) => (op[1] === "textAlign" ? [paint[i - 1]?.[2]] : []));
 };
 
 const four = (extra: Record<string, unknown> = {}): Promise<Card> =>
@@ -152,7 +149,7 @@ describe("labels", () => {
     await four({ labels: [long], text_orientation: "radial" });
     const [drawn] = texts();
     expect(drawn).toMatch(/^A label.*…$/);
-    expect(drawn!.length).toBeLessThan(long.length);
+    expect(drawn.length).toBeLessThan(long.length);
     expect(fontSizes()).toEqual([14, 14, 14, 14]);
   });
 
@@ -213,17 +210,12 @@ describe("labels", () => {
 
 describe("icon labels", () => {
   const iconFills = (): unknown[] =>
-    painted("fill").flatMap((op) =>
-      op[1] ? [(op[1] as { d: string }).d] : [],
-    );
+    painted("fill").flatMap((op) => (op[1] ? [(op[1] as { d: string }).d] : []));
 
   it("paints the icon once Home Assistant has resolved it", async () => {
     const card = await four({ labels: ["mdi:resolves", "b"] });
     await rendered(card);
-    expect(iconFills()).toEqual([
-      "path-of-mdi:resolves",
-      "path-of-mdi:resolves",
-    ]);
+    expect(iconFills()).toEqual(["path-of-mdi:resolves", "path-of-mdi:resolves"]);
     expect(texts()).toEqual(["b", "b"]);
   });
 
@@ -310,10 +302,7 @@ describe("rim, hub and pointer", () => {
 });
 
 describe("size", () => {
-  const size = (card: Card): string[] => [
-    wheel(card).style.width,
-    wheel(card).style.height,
-  ];
+  const size = (card: Card): string[] => [wheel(card).style.width, wheel(card).style.height];
 
   it("starts at 280 px until it knows its room", async () => {
     expect(size(await mount())).toEqual(["280px", "280px"]);

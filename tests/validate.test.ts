@@ -16,7 +16,7 @@ const TYPE = "custom:spinning-wheel-card";
 /** The message `config` is rejected with, or null when it is accepted. */
 const problem = (config: Record<string, unknown>, lang = "en"): string | null => {
   try {
-    validateConfig({ type: TYPE, ...config } as SpinningWheelCardConfig, lang);
+    validateConfig({ type: TYPE, ...config }, lang);
     return null;
   } catch (err) {
     return (err as Error).message;
@@ -60,9 +60,9 @@ describe("validateConfig", () => {
 
   it("rejects something that isn't a config object", () => {
     for (const config of [null, undefined, 5, "wheel"]) {
-      expect(() =>
-        validateConfig(config as unknown as SpinningWheelCardConfig, "en"),
-      ).toThrow(en.errors.invalid_config);
+      expect(() => validateConfig(config as unknown as SpinningWheelCardConfig, "en")).toThrow(
+        en.errors.invalid_config,
+      );
     }
   });
 
@@ -100,16 +100,12 @@ describe("validateConfig", () => {
       expect(problem({ friction: value }), String(value)).toBeNull();
     }
     for (const value of [0, 11, 2.5, "heavy", true]) {
-      expect(problem({ friction: value }), String(value)).toBe(
-        en.errors.friction_range,
-      );
+      expect(problem({ friction: value }), String(value)).toBe(en.errors.friction_range);
     }
   });
 
   it("measures every list against the segment count", () => {
-    expect(problem({ labels: nine("x") })).toBe(
-      "labels length (9) must not exceed segments (8)",
-    );
+    expect(problem({ labels: nine("x") })).toBe("labels length (9) must not exceed segments (8)");
     expect(problem({ segments: 9, labels: nine("x") })).toBeNull();
     expect(problem({ segments: 4, weights: [1, 1, 1, 1, 1] })).toBe(
       "weights length (5) must not exceed segments (4)",
@@ -135,28 +131,18 @@ describe("validateConfig", () => {
     expect(problem({ label_colors: [] })).toBe(en.errors.label_colors_empty);
   });
 
-  it("takes an entity of the right domain, or a cleared picker's \"\"", () => {
+  it('takes an entity of the right domain, or a cleared picker\'s ""', () => {
     expect(problem({ todo_entity: "" })).toBeNull();
     expect(problem({ todo_entity: 5 })).toBe(en.errors.todo_entity_type);
-    expect(problem({ todo_entity: "light.x" })).toBe(
-      en.errors.todo_entity_invalid,
-    );
-    expect(problem({ todo_entity: "todo.Shopping" })).toBe(
-      en.errors.todo_entity_invalid,
-    );
-    expect(problem({ result_entity: "sensor.x" })).toBe(
-      en.errors.result_entity_invalid,
-    );
-    expect(problem({ tts_engine: "media_player.x" })).toBe(
-      en.errors.tts_engine_invalid,
-    );
+    expect(problem({ todo_entity: "light.x" })).toBe(en.errors.todo_entity_invalid);
+    expect(problem({ todo_entity: "todo.Shopping" })).toBe(en.errors.todo_entity_invalid);
+    expect(problem({ result_entity: "sensor.x" })).toBe(en.errors.result_entity_invalid);
+    expect(problem({ tts_engine: "media_player.x" })).toBe(en.errors.tts_engine_invalid);
     expect(problem({ tts_engine: 5 })).toBe(en.errors.tts_engine_type);
   });
 
   it("names the entry that is wrong in an entity list", () => {
-    expect(problem({ light_sync_entities: "light.a" })).toBe(
-      en.errors.light_sync_entities_type,
-    );
+    expect(problem({ light_sync_entities: "light.a" })).toBe(en.errors.light_sync_entities_type);
     expect(problem({ light_sync_entities: ["light.a", "switch.b"] })).toBe(
       "light_sync_entities entry must be a light.* entity_id (got: switch.b)",
     );
@@ -170,15 +156,11 @@ describe("validateConfig", () => {
       "actions string entries must be a script.* entity_id (got: light.toggle)",
     );
     expect(problem({ actions: [5] })).toBe(en.errors.actions_type);
-    expect(problem({ actions: [{ service: "x" }] })).toBe(
-      en.errors.actions_type,
-    );
+    expect(problem({ actions: [{ service: "x" }] })).toBe(en.errors.actions_type);
   });
 
   it("reports the first mistake, in the order the options are checked", () => {
-    expect(problem({ pegs: "x", segments: 99, name: 5 })).toBe(
-      en.errors.name_type,
-    );
+    expect(problem({ pegs: "x", segments: 99, name: 5 })).toBe(en.errors.name_type);
     expect(problem({ pegs: "x", segments: 99 })).toBe(en.errors.segments_range);
   });
 

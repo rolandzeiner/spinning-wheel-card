@@ -11,10 +11,7 @@ import { localize } from "./localize/localize";
 import type { SpinningWheelCardConfig } from "./types";
 
 /** Why a value was rejected: the message suffix and its placeholders. */
-type Problem = readonly [
-  suffix: string,
-  vars?: Record<string, string | number>,
-];
+type Problem = readonly [suffix: string, vars?: Record<string, string | number>];
 type Rule = (value: unknown, segments: number) => Problem | null;
 
 const text: Rule = (v) => (typeof v === "string" ? null : ["type"]);
@@ -28,18 +25,13 @@ const oneOf =
 const integer =
   (min: number, max: number): Rule =>
   (v) =>
-    typeof v === "number" && Number.isInteger(v) && v >= min && v <= max
-      ? null
-      : ["range"];
+    typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? null : ["range"];
 
 /** 1–10, or one of the pre-v1.2 presets. */
 const friction: Rule = (v, segments) =>
-  ["low", "medium", "high"].includes(v as string)
-    ? null
-    : integer(1, 10)(v, segments);
+  ["low", "medium", "high"].includes(v as string) ? null : integer(1, 10)(v, segments);
 
-const entityId = (domain: string): RegExp =>
-  new RegExp(`^${domain}\\.[a-z0-9_]+$`);
+const entityId = (domain: string): RegExp => new RegExp(`^${domain}\\.[a-z0-9_]+$`);
 
 /** One entity of `domain`. "" is what a cleared picker saves: unset. */
 const entity = (domain: string): Rule => {
@@ -74,11 +66,9 @@ const list =
   };
 
 const isLabel = (e: unknown): boolean => typeof e === "string";
-const isWeight = (e: unknown): boolean =>
-  typeof e === "number" && Number.isFinite(e) && e > 0;
+const isWeight = (e: unknown): boolean => typeof e === "number" && Number.isFinite(e) && e > 0;
 /** `null` leaves that slot to the theme palette. */
-const isColour = (e: unknown): boolean =>
-  e === null || (typeof e === "string" && e.length > 0);
+const isColour = (e: unknown): boolean => e === null || (typeof e === "string" && e.length > 0);
 
 const SCRIPT_ID = entityId("script");
 
@@ -92,10 +82,7 @@ const actions: Rule = (v, segments) => {
       if (!SCRIPT_ID.test(a)) return ["string", { value: a }];
       continue;
     }
-    if (
-      typeof a !== "object" ||
-      typeof (a as { action?: unknown }).action !== "string"
-    ) {
+    if (typeof a !== "object" || typeof (a as { action?: unknown }).action !== "string") {
       return ["type"];
     }
   }
@@ -139,24 +126,18 @@ const RULES: ReadonlyArray<readonly [option: string, rule: Rule]> = [
 
 /** Throw a localised error for the first option that is set to something
  *  the card can't use. Unset options are fine — they take their default. */
-export function validateConfig(
-  config: SpinningWheelCardConfig,
-  lang: string,
-): void {
+export function validateConfig(config: SpinningWheelCardConfig, lang: string): void {
   if (!config || typeof config !== "object") {
     throw new Error(localize("errors.invalid_config", lang));
   }
   // Lists are measured against the segment count the card will draw.
-  const segments =
-    typeof config.segments === "number" ? config.segments : DEFAULTS.segments;
+  const segments = typeof config.segments === "number" ? config.segments : DEFAULTS.segments;
   for (const [option, rule] of RULES) {
     const value = config[option];
     if (value === undefined) continue;
     const problem = rule(value, segments);
     if (problem) {
-      throw new Error(
-        localize(`errors.${option}_${problem[0]}`, lang, problem[1]),
-      );
+      throw new Error(localize(`errors.${option}_${problem[0]}`, lang, problem[1]));
     }
   }
 }

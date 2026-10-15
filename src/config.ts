@@ -62,17 +62,13 @@ const EMPTY_IS_A_VALUE: ReadonlySet<string> = new Set(["hub_text"]);
 
 /** "" is what a cleared text field or dropdown hands back. */
 const isUnset = (key: string, value: unknown): boolean =>
-  value === undefined ||
-  value === null ||
-  (value === "" && !EMPTY_IS_A_VALUE.has(key));
+  value === undefined || value === null || (value === "" && !EMPTY_IS_A_VALUE.has(key));
 
 /** The config with every default filled in: what the card renders and what
  *  the editor shows. Unset values (undefined, null, "") fall back to the
  *  default instead of blanking it out. The user's keys keep their order and
  *  the defaults follow them, so a save doesn't reshuffle the YAML. */
-export function normaliseConfig(
-  config: SpinningWheelCardConfig,
-): NormalisedConfig {
+export function normaliseConfig(config: SpinningWheelCardConfig): NormalisedConfig {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
     if (!isUnset(key, value)) out[key] = value;
@@ -86,9 +82,7 @@ export function normaliseConfig(
 /** The config as the editor saves it: only what differs from DEFAULTS,
  *  cleared fields dropped, `type` first. A default saved into the config is
  *  pinned — a later change to DEFAULTS would never reach that card. */
-export function tidyConfig(
-  config: SpinningWheelCardConfig,
-): SpinningWheelCardConfig {
+export function tidyConfig(config: SpinningWheelCardConfig): SpinningWheelCardConfig {
   const defaults: Record<string, unknown> = DEFAULTS;
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {

@@ -12,11 +12,7 @@ import type {
 } from "./types";
 import { fireEvent } from "./types";
 import { editorStyles } from "./styles";
-import {
-  AVAILABLE_LANGUAGES,
-  localize,
-  resolveLang,
-} from "./localize/localize";
+import { AVAILABLE_LANGUAGES, localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
 import { normalizeFriction } from "./friction";
 import { normaliseConfig, textOrientationDefault, tidyConfig } from "./config";
@@ -65,9 +61,7 @@ export const parseWeights = (csv: string): ReadonlyArray<number> => {
  *  the editor itself emits. Returns null for everything else (named
  *  colours, `var(--…)`, hsl()); those keep working in YAML but the
  *  picker falls back to undefined. Exported for unit tests. */
-export const cssToRgb = (
-  s: string | undefined,
-): readonly [number, number, number] | null => {
+export const cssToRgb = (s: string | undefined): readonly [number, number, number] | null => {
   if (!s) return null;
   const t = s.trim();
   let m = /^#([0-9a-f]{6})$/i.exec(t);
@@ -85,11 +79,7 @@ export const cssToRgb = (
     const a = hex[0] ?? "0";
     const b = hex[1] ?? "0";
     const c = hex[2] ?? "0";
-    return [
-      parseInt(a + a, 16),
-      parseInt(b + b, 16),
-      parseInt(c + c, 16),
-    ] as const;
+    return [parseInt(a + a, 16), parseInt(b + b, 16), parseInt(c + c, 16)] as const;
   }
   m = /^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(t);
   if (m) {
@@ -192,10 +182,7 @@ const takeRowEdits = (
     const m = /^binding_(\d+)_(.+)$/.exec(key);
     if (m && shown && next[key] !== shown[key]) {
       const field = m[2] ?? "";
-      edits.set(field, [
-        ...(edits.get(field) ?? []),
-        [Number(m[1]), next[key]],
-      ]);
+      edits.set(field, [...(edits.get(field) ?? []), [Number(m[1]), next[key]]]);
     }
     delete next[key];
   }
@@ -210,12 +197,7 @@ const mergeWeightEdits = (
 ): number[] | null => {
   const out = resolved.slice();
   for (const [row, value] of edits) {
-    if (
-      row < out.length &&
-      typeof value === "number" &&
-      Number.isFinite(value) &&
-      value > 0
-    ) {
+    if (row < out.length && typeof value === "number" && Number.isFinite(value) && value > 0) {
       out[row] = value;
     }
   }
@@ -279,10 +261,7 @@ const followLabelShrink = (next: EditorData, savedLabels: unknown): void => {
   }
 };
 
-export class SpinningWheelCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
+export class SpinningWheelCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
   @state() private _config: SpinningWheelCardConfig = {
@@ -345,10 +324,7 @@ export class SpinningWheelCardEditor
     try {
       this._todoItems = (await fetchOpenTodoItems(this.hass, entity)) ?? [];
     } catch (err) {
-      console.warn(
-        "[spinning-wheel-card editor] todo/item/list failed:",
-        err,
-      );
+      console.warn("[spinning-wheel-card editor] todo/item/list failed:", err);
       this._todoItems = [];
     } finally {
       this._todoLoading = false;
@@ -389,9 +365,7 @@ export class SpinningWheelCardEditor
     const fallback = THEME_PALETTES[themeName] ?? THEME_PALETTES.default;
     const custom = this._config.colors;
     const src = custom && custom.length > 0 ? custom : fallback;
-    return uniques.map(
-      (_, i) => src[i % src.length] ?? fallback[i % fallback.length] ?? "#888888",
-    );
+    return uniques.map((_, i) => src[i % src.length] ?? fallback[i % fallback.length] ?? "#888888");
   }
 
   /** Per-unique-label text colour. Defaults to a single dark grey. */
@@ -757,47 +731,70 @@ export class SpinningWheelCardEditor
   /** Per-field i18n bindings keyed by schema name. Bindings-panel
    *  synthetics (`binding_<i>_<suffix>`) live in BINDING_SUFFIX_LABELS
    *  below — same label per suffix across rows. */
-  private static readonly FIELD_I18N: ReadonlyMap<
-    string,
-    { label: string; helper?: string }
-  > = new Map([
-    ["name", { label: "editor.name" }],
-    ["language", { label: "editor.language", helper: "editor.language_helper" }],
-    ["todo_entity", { label: "editor.todo_entity", helper: "editor.todo_entity_helper" }],
-    ["segments", { label: "editor.segments", helper: "editor.segments_helper" }],
-    ["friction", { label: "editor.friction", helper: "editor.friction_helper" }],
-    ["theme", { label: "editor.theme", helper: "editor.theme_helper" }],
-    ["labels", { label: "editor.labels", helper: "editor.labels_helper" }],
-    ["weights_csv", { label: "editor.weights", helper: "editor.weights_helper" }],
-    ["colors_csv", { label: "editor.colors", helper: "editor.colors_helper" }],
-    ["label_colors_csv", { label: "editor.label_colors", helper: "editor.label_colors_helper" }],
-    ["hub_text", { label: "editor.hub_text", helper: "editor.hub_text_helper" }],
-    ["hub_color", { label: "editor.hub_color", helper: "editor.hub_color_helper" }],
-    ["text_orientation", { label: "editor.text_orientation", helper: "editor.text_orientation_helper" }],
-    ["label_auto_fit", { label: "editor.label_auto_fit", helper: "editor.label_auto_fit_helper" }],
-    ["label_font_scale", { label: "editor.label_font_scale", helper: "editor.label_font_scale_helper" }],
-    ["label_radius_offset", { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" }],
-    ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
-    ["light_sync_entities", { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" }],
-    ["tts_engine", { label: "editor.tts_engine", helper: "editor.tts_engine_helper" }],
-    ["tts_announce_entities", { label: "editor.tts_announce_entities", helper: "editor.tts_announce_entities_helper" }],
-    ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
-    ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
-    ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
-    ["disable_confirm_actions", { label: "editor.disable_confirm_actions", helper: "editor.disable_confirm_actions_helper" }],
-    ["disable_boost", { label: "editor.disable_boost", helper: "editor.disable_boost_helper" }],
-    ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
-    ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
-    ["segment_borders", { label: "editor.segment_borders", helper: "editor.segment_borders_helper" }],
-    ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
-    ["peg_density", { label: "editor.peg_density", helper: "editor.peg_density_helper" }],
-    ["wheel_context", { label: "editor.wheel_context", helper: "editor.wheel_context_helper" }],
-    ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
-  ]);
+  private static readonly FIELD_I18N: ReadonlyMap<string, { label: string; helper?: string }> =
+    new Map([
+      ["name", { label: "editor.name" }],
+      ["language", { label: "editor.language", helper: "editor.language_helper" }],
+      ["todo_entity", { label: "editor.todo_entity", helper: "editor.todo_entity_helper" }],
+      ["segments", { label: "editor.segments", helper: "editor.segments_helper" }],
+      ["friction", { label: "editor.friction", helper: "editor.friction_helper" }],
+      ["theme", { label: "editor.theme", helper: "editor.theme_helper" }],
+      ["labels", { label: "editor.labels", helper: "editor.labels_helper" }],
+      ["weights_csv", { label: "editor.weights", helper: "editor.weights_helper" }],
+      ["colors_csv", { label: "editor.colors", helper: "editor.colors_helper" }],
+      ["label_colors_csv", { label: "editor.label_colors", helper: "editor.label_colors_helper" }],
+      ["hub_text", { label: "editor.hub_text", helper: "editor.hub_text_helper" }],
+      ["hub_color", { label: "editor.hub_color", helper: "editor.hub_color_helper" }],
+      [
+        "text_orientation",
+        { label: "editor.text_orientation", helper: "editor.text_orientation_helper" },
+      ],
+      [
+        "label_auto_fit",
+        { label: "editor.label_auto_fit", helper: "editor.label_auto_fit_helper" },
+      ],
+      [
+        "label_font_scale",
+        { label: "editor.label_font_scale", helper: "editor.label_font_scale_helper" },
+      ],
+      [
+        "label_radius_offset",
+        { label: "editor.label_radius_offset", helper: "editor.label_radius_offset_helper" },
+      ],
+      ["label_flip", { label: "editor.label_flip", helper: "editor.label_flip_helper" }],
+      [
+        "light_sync_entities",
+        { label: "editor.light_sync_entities", helper: "editor.light_sync_entities_helper" },
+      ],
+      ["tts_engine", { label: "editor.tts_engine", helper: "editor.tts_engine_helper" }],
+      [
+        "tts_announce_entities",
+        { label: "editor.tts_announce_entities", helper: "editor.tts_announce_entities_helper" },
+      ],
+      ["sound", { label: "editor.sound", helper: "editor.sound_helper" }],
+      ["show_status", { label: "editor.show_status", helper: "editor.show_status_helper" }],
+      ["actions", { label: "editor.actions", helper: "editor.actions_helper" }],
+      [
+        "disable_confirm_actions",
+        {
+          label: "editor.disable_confirm_actions",
+          helper: "editor.disable_confirm_actions_helper",
+        },
+      ],
+      ["disable_boost", { label: "editor.disable_boost", helper: "editor.disable_boost_helper" }],
+      ["half_circle", { label: "editor.half_circle", helper: "editor.half_circle_helper" }],
+      ["selector_mode", { label: "editor.selector_mode", helper: "editor.selector_mode_helper" }],
+      [
+        "segment_borders",
+        { label: "editor.segment_borders", helper: "editor.segment_borders_helper" },
+      ],
+      ["pegs", { label: "editor.pegs", helper: "editor.pegs_helper" }],
+      ["peg_density", { label: "editor.peg_density", helper: "editor.peg_density_helper" }],
+      ["wheel_context", { label: "editor.wheel_context", helper: "editor.wheel_context_helper" }],
+      ["raw_arrays", { label: "editor.advanced", helper: "editor.advanced_helper" }],
+    ]);
 
-  private static readonly BINDING_SUFFIX_LABELS: ReadonlyArray<
-    readonly [string, string]
-  > = [
+  private static readonly BINDING_SUFFIX_LABELS: ReadonlyArray<readonly [string, string]> = [
     ["_label_color", "editor.binding_label_color"],
     ["_color", "editor.binding_color"],
     ["_weight", "editor.binding_weight"],
@@ -825,11 +822,7 @@ export class SpinningWheelCardEditor
     if (field.name === "todo_entity") {
       const entity = this._config.todo_entity;
       const wired = typeof entity === "string" && entity.length > 0;
-      if (
-        wired &&
-        this._todoItems !== null &&
-        this._todoItems.length === 0
-      ) {
+      if (wired && this._todoItems !== null && this._todoItems.length === 0) {
         return localize("editor.todo_entity_empty_warning", this._lang());
       }
     }
@@ -843,9 +836,7 @@ export class SpinningWheelCardEditor
    *  surface can't overwrite a fresh edit on another. */
   private _lastProjection: FormProjection | null = null;
 
-  private _onFormChanged = (
-    ev: CustomEvent<{ value: EditorData }>,
-  ): void => {
+  private _onFormChanged = (ev: CustomEvent<{ value: EditorData }>): void => {
     const next: EditorData = { ...ev.detail.value };
     const proj = this._lastProjection;
 
@@ -854,8 +845,7 @@ export class SpinningWheelCardEditor
     // projection — the user's edits — is kept.
     const csv = takeCsvEdits(next, proj);
     const rows = takeRowEdits(next, proj?.bindings);
-    const edited = (field: string): ReadonlyArray<RowEdit> =>
-      rows.get(field) ?? [];
+    const edited = (field: string): ReadonlyArray<RowEdit> => rows.get(field) ?? [];
 
     // 2. Labels — the chip selector emits string[] directly; only the
     // cleaning runs here. There is no truncation against `segments`:
@@ -871,12 +861,7 @@ export class SpinningWheelCardEditor
     // 3. Weights and colours: CSV edit > row edit > unchanged.
     this._mergeWeights(next, csv.weights, edited("weight"));
     this._mergeColours(next, "colors", csv.colors, edited("color"));
-    this._mergeColours(
-      next,
-      "label_colors",
-      csv.labelColors,
-      edited("label_color"),
-    );
+    this._mergeColours(next, "label_colors", csv.labelColors, edited("label_color"));
 
     // 4. Actions: multi-picker > row edit > unchanged.
     this._mergeActions(next, proj?.actionsStrings ?? [], edited("action"));
@@ -926,15 +911,7 @@ export class SpinningWheelCardEditor
       const parsed = parseColorList(typedCsv);
       put(next, key, parsed.some((c) => c !== null) ? parsed : null);
     } else if (edits.length > 0) {
-      put(
-        next,
-        key,
-        mergeColourEdits(
-          this._config[key] ?? [],
-          this._uniqueLabels().length,
-          edits,
-        ),
-      );
+      put(next, key, mergeColourEdits(this._config[key] ?? [], this._uniqueLabels().length, edits));
     }
   }
 
@@ -945,24 +922,17 @@ export class SpinningWheelCardEditor
   ): void {
     const saved = this._config.actions ?? [];
     const picked = Array.isArray(next.actions)
-      ? (next.actions as ReadonlyArray<unknown>).filter(
-          (a): a is string => typeof a === "string",
-        )
+      ? (next.actions as ReadonlyArray<unknown>).filter((a): a is string => typeof a === "string")
       : null;
     const pickerChanged =
-      picked !== null &&
-      (picked.length !== shown.length || picked.some((v, i) => v !== shown[i]));
+      picked !== null && (picked.length !== shown.length || picked.some((v, i) => v !== shown[i]));
     if (picked !== null && pickerChanged) {
       // Object-form ActionConfig entries are appended after the picker's
       // strings so they survive a multi-picker save.
       const objects = saved.filter((a) => a !== null && typeof a !== "string");
       put(next, "actions", nonEmpty([...picked, ...objects]));
     } else if (edits.length > 0) {
-      put(
-        next,
-        "actions",
-        nonEmpty(mergeActionEdits(saved, this._uniqueLabels().length, edits)),
-      );
+      put(next, "actions", nonEmpty(mergeActionEdits(saved, this._uniqueLabels().length, edits)));
     } else {
       // Neither the picker nor a binding row touched actions: keep them
       // exactly as saved. The picker's projection holds strings only, so
@@ -1011,15 +981,12 @@ export class SpinningWheelCardEditor
       ...normaliseConfig(this._config),
       // Offered only outside todo mode (see _buildSchema), where the
       // dynamic default is always tangent.
-      text_orientation:
-        this._config.text_orientation ?? textOrientationDefault(false),
+      text_orientation: this._config.text_orientation ?? textOrientationDefault(false),
       // Map "no override" to the Auto sentinel so the dropdown isn't blank.
       language: this._config.language ?? "auto",
       // multi:true entity selector expects string[]; object-form
       // ActionConfigs stay in _config.actions and re-merge on save.
-      actions: (this._config.actions ?? []).filter(
-        (a): a is string => typeof a === "string",
-      ),
+      actions: (this._config.actions ?? []).filter((a): a is string => typeof a === "string"),
       // Migrate pre-v1.2 string presets to the new 1–10 slider on the
       // fly so the slider widget displays a value (the dropdown is gone).
       // Save path re-strips if the result equals the default.
@@ -1085,8 +1052,9 @@ export class SpinningWheelCardEditor
             @value-changed=${this._onResultEntityChanged}
           ></ha-selector>
         </div>
-        ${showCreateHelper
-          ? html`
+        ${
+          showCreateHelper
+            ? html`
               <div class="create-helper-row">
                 <p class="create-helper-hint">
                   ${localize("editor.result_entity_create_hint", lang)}
@@ -1100,7 +1068,8 @@ export class SpinningWheelCardEditor
                 </button>
               </div>
             `
-          : nothing}
+            : nothing
+        }
         <div class="editor-hint">${localize("editor.footer_hint", lang)}</div>
       </div>
     `;
@@ -1109,9 +1078,7 @@ export class SpinningWheelCardEditor
   /** Standalone result_entity handler — bypasses ha-form so the racy
    *  entity-selector-emits-empty-after-programmatic-set can't drop the
    *  value between Create and Save. */
-  private _onResultEntityChanged = (
-    ev: CustomEvent<{ value: string }>,
-  ): void => {
+  private _onResultEntityChanged = (ev: CustomEvent<{ value: string }>): void => {
     // Some HA frontend versions catch unhandled value-changed events
     // at the dialog level and try to merge them; scope to us only.
     ev.stopPropagation();
@@ -1159,10 +1126,7 @@ export class SpinningWheelCardEditor
         });
       }
     } catch (err) {
-      console.warn(
-        "[spinning-wheel-card editor] input_text/create failed:",
-        err,
-      );
+      console.warn("[spinning-wheel-card editor] input_text/create failed:", err);
       fireEvent(this, "hass-notification", {
         message: localize("editor.result_entity_create_failed", lang),
       });
@@ -1176,8 +1140,5 @@ export class SpinningWheelCardEditor
 // spinning-wheel-card.ts. Without the guard, a duplicate Lovelace
 // resource load aborts module init before the card class registers.
 if (!customElements.get("spinning-wheel-card-editor")) {
-  customElements.define(
-    "spinning-wheel-card-editor",
-    SpinningWheelCardEditor,
-  );
+  customElements.define("spinning-wheel-card-editor", SpinningWheelCardEditor);
 }

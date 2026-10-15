@@ -9,13 +9,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  cssToRgb,
-  isRgbTuple,
-  parseColorList,
-  parseWeights,
-  rgbToCss,
-} from "../src/editor";
+import { cssToRgb, isRgbTuple, parseColorList, parseWeights, rgbToCss } from "../src/editor";
 
 describe("parseColorList", () => {
   it("returns empty array for empty input", () => {
@@ -27,11 +21,7 @@ describe("parseColorList", () => {
   });
 
   it("splits on newlines too", () => {
-    expect(parseColorList("#aaa\n#bbb\n#ccc")).toEqual([
-      "#aaa",
-      "#bbb",
-      "#ccc",
-    ]);
+    expect(parseColorList("#aaa\n#bbb\n#ccc")).toEqual(["#aaa", "#bbb", "#ccc"]);
   });
 
   it("converts empty positions to null sentinels", () => {
