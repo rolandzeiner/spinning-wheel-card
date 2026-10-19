@@ -15,7 +15,7 @@ import { LitElement, html, nothing } from "lit";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 
-import { playSample } from "./click-sounds";
+import { CLICK_SOUNDS, playSample } from "./click-sounds";
 import { DEFAULTS, normaliseConfig, tidyConfig } from "./config";
 import {
   COUNT_FIELD,
@@ -47,6 +47,7 @@ import { editorStyles } from "./styles";
 import { fetchOpenTodoItems } from "./todo";
 import type {
   ActionConfig,
+  ClickSound,
   HASelector,
   HomeAssistant,
   LovelaceCardEditor,
@@ -56,6 +57,9 @@ import type {
 import { fireEvent } from "./types";
 
 type Data = Record<string, unknown>;
+
+const isClickSound = (value: unknown): value is ClickSound =>
+  CLICK_SOUNDS.includes(value as ClickSound);
 
 /** Parse a CSS colour into [r, g, b] for the swatch. Handles `#RRGGBB`,
  *  `#RGB` and `rgb(r, g, b)`; anything else (named colours, `var(--…)`,
@@ -174,31 +178,18 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
     this._audio = null;
   }
 
-  /** The Listen button's audio context: made on its first press, which is
-   *  the user gesture browsers want before they play anything. */
+  /** The audio context for the click-sound samples: made on the first
+   *  tile picked, which is the user gesture browsers want before they
+   *  play anything. */
   private _audio: AudioContext | null = null;
 
-  private _renderListen(ctx: FieldContext): TemplateResult | typeof nothing {
-    if (!ctx.shown.sound) return nothing;
-    const name = this._t(`editor.click_sound_${ctx.shown.click_sound}`);
-    return html`<div>
-      <ha-button
-        appearance="plain"
-        aria-label=${`${this._t("editor.listen")}: ${name}`}
-        @click=${() => this._listen(ctx)}
-      >
-        <ha-icon icon="mdi:play" slot="icon" aria-hidden="true"></ha-icon>
-        ${this._t("editor.listen")}
-      </ha-button>
-    </div>`;
-  }
-
-  /** A short rattle in the chosen sound, slowing to a stop. */
-  private _listen(ctx: FieldContext): void {
+  /** A short rattle in `sound`, slowing to a stop: picking a click-sound
+   *  tile plays it, so there is something to hear before saving. */
+  private _listen(sound: ClickSound): void {
     if (typeof window.AudioContext === "undefined") return;
     this._audio ??= new AudioContext();
     const audio = this._audio;
-    const play = (): void => playSample(ctx.shown.click_sound, audio);
+    const play = (): void => playSample(sound, audio);
     if (audio.state === "suspended") void audio.resume().then(play, () => {});
     else play();
   }
@@ -342,6 +333,8 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
       // Someone typing in the field has the switch on, even when the text
       // they just cleared saves as "no text".
       this._hubTextOn = true;
+    } else if (name === "click_sound" && isClickSound(value)) {
+      this._listen(value);
     }
   }
 
@@ -361,7 +354,6 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
       flush();
       if (item.kind === "divider") out.push(html`<hr class="ed-divider" />`);
       else if (item.kind === "result") out.push(this._renderResult(ctx));
-      else if (item.kind === "listen") out.push(this._renderListen(ctx));
       else {
         const text = item.text(ctx);
         if (text === null) continue;
@@ -674,8 +666,10 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
   /**
    * A colour swatch. Both @input and @change are wired: @input recolours
    * the preview while the picker is dragged, @change is what some
-   * platforms fire when it closes. The reset shows only once a colour is
-   * set, and resetting saves no colour for the slot at all.
+   * platforms fire when it closes. A set colour gets a small clear button
+   * on the swatch's corner, so both swatches keep the same height; clearing
+   * saves no colour for the slot at all. It sits beside the label, not in
+   * it, or a click on it would open the colour picker too.
    */
   private _renderSwatch(
     slot: number,
@@ -707,13 +701,15 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
       </label>
       ${
         custom
-          ? html`<ha-button
-            appearance="plain"
+          ? html`<button
+            type="button"
+            class="swatch-reset"
             aria-label=${`${this._t("editor.row.reset")}: ${name}`}
+            title=${this._t("editor.row.reset")}
             @click=${() => this._setColour(slot, slots, key, null, ctx)}
           >
-            ${this._t("editor.row.reset")}
-          </ha-button>`
+            <ha-icon icon="mdi:close-circle" aria-hidden="true"></ha-icon>
+          </button>`
           : nothing
       }
     </div>`;

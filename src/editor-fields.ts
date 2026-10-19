@@ -68,9 +68,7 @@ export type GroupItem =
   /** The result-helper picker. Drawn by the editor, outside ha-form, whose
    *  entity selector drops a helper created a moment ago. */
   | { kind: "result" }
-  | { kind: "note"; text: (ctx: FieldContext) => string | null; warning?: boolean }
-  /** Plays a short rattle in the chosen click sound. Drawn by the editor. */
-  | { kind: "listen" };
+  | { kind: "note"; text: (ctx: FieldContext) => string | null; warning?: boolean };
 
 export const isField = (item: GroupItem): item is EditorField => !("kind" in item);
 
@@ -443,6 +441,7 @@ export const GROUP_ITEMS: Record<GroupId, ReadonlyArray<GroupItem>> = {
   sound: [
     { name: "sound", selector: TOGGLE },
     {
+      // Picking a tile plays a sample of it (the editor's _listen).
       name: "click_sound",
       visible: (ctx) => ctx.shown.sound,
       selector: (ctx) =>
@@ -453,7 +452,6 @@ export const GROUP_ITEMS: Record<GroupId, ReadonlyArray<GroupItem>> = {
           2,
         ),
     },
-    { kind: "listen" },
   ],
   after: [
     {

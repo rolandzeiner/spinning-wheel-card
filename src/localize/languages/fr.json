@@ -147,7 +147,6 @@
     "click_sound_felt_desc": "Feutré et discret",
     "click_sound_ratchet": "Cliquet",
     "click_sound_ratchet_desc": "Net et sec",
-    "listen": "Écouter",
     "confirm": "Demander avant les actions",
     "confirm_helper": "Sinon, même une rotation anodine peut déclencher une action.",
     "result_entity": "Enregistrer le résultat dans",

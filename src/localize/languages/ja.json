@@ -147,7 +147,6 @@
     "click_sound_felt_desc": "こもった静かな音",
     "click_sound_ratchet": "ラチェット",
     "click_sound_ratchet_desc": "歯切れよく乾いた音",
-    "listen": "試聴",
     "confirm": "アクションの前に確認",
     "confirm_helper": "オフにすると、何気なく回しただけでアクションが実行されることがあります。",
     "result_entity": "結果の保存先",

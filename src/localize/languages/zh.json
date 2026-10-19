@@ -147,7 +147,6 @@
     "click_sound_felt_desc": "沉闷而安静",
     "click_sound_ratchet": "棘轮",
     "click_sound_ratchet_desc": "清脆干爽",
-    "listen": "试听",
     "confirm": "执行动作前询问",
     "confirm_helper": "否则随手一转也可能触发动作。",
     "result_entity": "将结果保存到",

@@ -147,7 +147,6 @@
     "click_sound_felt_desc": "Muted and quiet",
     "click_sound_ratchet": "Ratchet",
     "click_sound_ratchet_desc": "Crisp and dry",
-    "listen": "Listen",
     "confirm": "Ask before running actions",
     "confirm_helper": "Otherwise even a casual spin can trigger an action.",
     "result_entity": "Save the result to",

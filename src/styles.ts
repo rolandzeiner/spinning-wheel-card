@@ -190,10 +190,44 @@ export const editorStyles = css`
   }
 
   .ed-color {
+    position: relative;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
+  }
+
+  /* Clears a set colour. A badge on the swatch's top-right corner, so a
+     set swatch is as tall as an unset one. The 26 px button reaches 40 px
+     through its ::before, the house size for dense controls. */
+  .swatch-reset {
+    position: absolute;
+    top: -9px;
+    left: 27px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--card-background-color, var(--primary-background-color));
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    --mdc-icon-size: 20px;
+  }
+
+  .swatch-reset::before {
+    content: "";
+    position: absolute;
+    inset: -7px;
+  }
+
+  .swatch-reset:hover {
+    color: var(--primary-color);
+  }
+
+  .swatch-reset:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
   }
 
   .swatch {
@@ -244,6 +278,7 @@ export const editorStyles = css`
 
   @media (forced-colors: active) {
     .ed-row-main:focus-visible,
+    .swatch-reset:focus-visible,
     .swatch input[type="color"]:focus-visible {
       outline-color: CanvasText;
     }

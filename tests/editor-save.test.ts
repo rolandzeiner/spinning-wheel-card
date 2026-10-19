@@ -296,7 +296,7 @@ describe("the click sound", () => {
     expect(session.fields()).not.toContain("click_sound");
   });
 
-  it("can be heard before it is saved", async () => {
+  it("plays a sample of each sound as it is picked", async () => {
     const starts: number[] = [];
     const node = (): Record<string, unknown> => ({
       connect: <T>(next: T): T => next,
@@ -324,16 +324,17 @@ describe("the click sound", () => {
       close = async (): Promise<void> => {};
     }
     vi.stubGlobal("AudioContext", FakeAudio);
-    const session = await open({ click_sound: "wood" });
-    const listen = session.root.querySelector<HTMLElement>(
-      ".ed-groups ha-button[aria-label^='Listen']",
-    );
-    listen!.click();
+    const session = await open();
+    expect(await session.change("click_sound", "wood")).toEqual({
+      type: TYPE,
+      click_sound: "wood",
+    });
     // Eleven wood clicks: a noise tap and two body modes each.
     expect(starts).toHaveLength(33);
+    // An edit elsewhere plays nothing.
+    await session.change("show_status", false);
+    expect(starts).toHaveLength(33);
     vi.unstubAllGlobals();
-    const silent = await open({ sound: false });
-    expect(silent.root.querySelector(".ed-groups ha-button[aria-label^='Listen']")).toBeNull();
   });
 });
 
@@ -426,10 +427,13 @@ describe("the segment rows", () => {
     const session = await open({ labels });
     await session.toggleRow(1);
     expect((await pickColour(session, 0, "#123456")).colors).toEqual([null, "#123456", null]);
-    expect(session.root.querySelector(".ed-row-body ha-button")?.textContent).toContain(
-      en.editor.row.reset,
+    // Only the set colour gets a clear button, named for what it clears.
+    const resets = session.root.querySelectorAll<HTMLElement>(".ed-row-body .swatch-reset");
+    expect(resets).toHaveLength(1);
+    expect(resets[0].getAttribute("aria-label")).toBe(
+      `${en.editor.row.reset}: ${en.editor.row.fill}`,
     );
-    session.root.querySelector<HTMLElement>(".ed-row-body ha-button")!.click();
+    resets[0].click();
     await session.settle();
     expect(session.saved[session.saved.length - 1]).toEqual({ type: TYPE, labels });
   });

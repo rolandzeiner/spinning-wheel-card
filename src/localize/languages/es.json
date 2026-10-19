@@ -147,7 +147,6 @@
     "click_sound_felt_desc": "Apagado y suave",
     "click_sound_ratchet": "Trinquete",
     "click_sound_ratchet_desc": "Nítido y seco",
-    "listen": "Escuchar",
     "confirm": "Preguntar antes de las acciones",
     "confirm_helper": "Si no, hasta un giro casual puede lanzar una acción.",
     "result_entity": "Guardar el resultado en",
