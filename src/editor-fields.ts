@@ -553,8 +553,9 @@ export function fieldHelper(name: string, ctx: FieldContext): string | undefined
       });
     case "friction": {
       const level = normalizeFriction(ctx.config.friction);
+      const pegs = shown.pegs ? ctx.segmentCount * (shown.peg_density + 1) : 0;
       return t("editor.friction_helper", {
-        seconds: formatSeconds(stopSeconds(level, CLICK_LAUNCH), ctx.lang),
+        seconds: formatSeconds(stopSeconds(level, CLICK_LAUNCH, pegs), ctx.lang),
       });
     }
   }

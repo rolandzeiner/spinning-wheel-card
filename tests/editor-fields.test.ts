@@ -132,6 +132,15 @@ describe("helpers", () => {
     );
   });
 
+  it("quote a shorter stop time when pegs brake the wheel", () => {
+    expect(fieldHelper("friction", ctx())).toBe(
+      "The wheel stops after about 5 s. 1 spins long, 10 brakes hard.",
+    );
+    expect(fieldHelper("friction", ctx({ pegs: true }))).toBe(
+      "The wheel stops after about 4 s. 1 spins long, 10 brakes hard.",
+    );
+  });
+
   it("count the pegs around the whole rim", () => {
     expect(fieldHelper("peg_count", ctx({ pegs: true, peg_density: 2 }))).toBe(
       "24 pegs around the rim.",

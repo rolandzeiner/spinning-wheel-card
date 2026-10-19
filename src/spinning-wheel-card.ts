@@ -15,7 +15,7 @@ import type {
 } from "./types";
 import { fireEvent } from "./types";
 import { playClick } from "./click-sounds";
-import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction";
+import { coulombDecel, frictionMultiplier, normalizeFriction, pegDrag } from "./friction";
 import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
@@ -229,17 +229,6 @@ const TICK_MIN_INTENSITY = 0.4; // intensity floor at near-zero speed
 // could otherwise sweep dozens of pegs; you cannot hear more than a
 // few per ~16 ms anyway.
 const TICK_MAX_PER_FRAME = 8;
-
-/** Peg brake bump at slider level 5 (the new default). Applied once
- *  per `_onSegmentCrossing` call — once per animation frame while
- *  spinning, or once per pointer-move while dragging — regardless of
- *  how many pegs were swept that call; only the audio path clicks per
- *  peg. `_pegDrag()` scales linearly with the 1–10 friction slider so
- *  light setups (level 1) get ~0.016 rad/s per braked frame, heavy
- *  setups (level 10) get ~0.16. Capped at zero in the use-site so the
- *  brake can't reverse the spin direction. Composes with the
- *  continuous friction decay; one slider drives both. */
-const PEG_DRAG_RAD_PER_S = 0.08;
 
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
  *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
@@ -562,7 +551,7 @@ export class SpinningWheelCard extends LitElement {
    *  per-peg bump — 5 (default) reproduces the historical 0.08 value
    *  exactly, 1 gives a feather-touch, 10 a heavy ratchet. */
   private _pegDrag(): number {
-    return PEG_DRAG_RAD_PER_S * (this._frictionLevel() / 5);
+    return pegDrag(this._frictionLevel());
   }
   /** Labels expanded to length = segments; cycles short arrays;
    *  defaults to "1".."N". */

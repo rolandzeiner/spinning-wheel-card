@@ -8,7 +8,13 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 
-import { coulombDecel, frictionMultiplier, normalizeFriction, stopSeconds } from "../src/friction";
+import {
+  coulombDecel,
+  frictionMultiplier,
+  normalizeFriction,
+  pegDrag,
+  stopSeconds,
+} from "../src/friction";
 
 describe("normalizeFriction", () => {
   it("passes valid integer levels through", () => {
@@ -117,6 +123,14 @@ describe("coulombDecel", () => {
   });
 });
 
+describe("pegDrag", () => {
+  it("brakes 0.08 rad/s per peg at the default, scaled with the slider", () => {
+    expect(pegDrag(5)).toBeCloseTo(0.08, 6);
+    expect(pegDrag(1)).toBeCloseTo(0.016, 6);
+    expect(pegDrag(10)).toBeCloseTo(0.16, 6);
+  });
+});
+
 describe("stopSeconds", () => {
   // The editor quotes it under the friction slider, for a click launch
   // of 12 rad/s; the anchors pin what the slider says at each end.
@@ -130,6 +144,12 @@ describe("stopSeconds", () => {
     for (let level = 2; level <= 10; level++) {
       expect(stopSeconds(level, 12)).toBeLessThan(stopSeconds(level - 1, 12));
     }
+  });
+
+  it("is shorter with pegs, each crossing one braking the wheel", () => {
+    // 8 segments with two pegs each: about a fifth shorter at the default.
+    expect(stopSeconds(5, 12, 16)).toBeCloseTo(4.2, 0);
+    expect(stopSeconds(5, 12, 16)).toBeLessThan(stopSeconds(5, 12, 8));
   });
 
   it("is zero for a wheel already at rest", () => {
