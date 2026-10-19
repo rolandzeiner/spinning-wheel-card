@@ -21,12 +21,12 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **TTS announcement** — opt-in: pick a `tts.*` engine and one or more `media_player.*` speakers and the winning label is spoken aloud after every spin. MDI icon labels are read without the `mdi:` prefix (`mdi:food-croissant` → "food croissant"). No script required.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
-- **Label layout controls** (grouped in a collapsible section in the editor) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
+- **Label layout controls** (the editor's *Labels* group) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
 - **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
 - **Responsive canvas** — 140–1000 px, scales to the dashboard cell on both axes.
-- **Visual editor** with grouped sections (General / Label layout / Segment bindings / Advanced).
+- **Visual editor** — the segments as one list, each with its label, fill and text colour, weight and action, then collapsible groups that show their settings without opening: *Appearance*, *Labels*, *Hub & pointer*, *Lines & pegs*, *Spinning* and *After a spin*. The friction slider says how long a spin lasts; a to-do list can stand in for the segments.
 - **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
 - **WCAG 2.2 A+AA** — keyboard activation, focus-visible ring, `prefers-reduced-motion`, forced-colors fallback.
 
@@ -39,7 +39,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
   </tr>
   <tr>
     <td align="center"><em>Lovelace card</em></td>
-    <td align="center"><em>Visual editor — every option in one form</em></td>
+    <td align="center"><em>Visual editor</em></td>
   </tr>
 </table>
 
@@ -106,13 +106,13 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 
 `friction: 1–10` controls how fast the wheel decays each frame, and (when `pegs: true`) how hard each peg brakes — one slider drives both. Default `5` reproduces the historical `medium` feel.
 
-| Level | @ 60 fps | Stops after | Per-peg drag |
+| Level | @ 60 fps | Stops after a click | Per-peg drag |
 | --- | --- | --- | --- |
-| `1` | 0.998 | ~14 s | 0.016 rad/s |
-| `3` | 0.994 (≈ old `low`) | ~6 s | 0.048 rad/s |
-| `5` | 0.990 (= old `medium`) | ~4 s | 0.080 rad/s |
-| `7` | 0.982 (≈ old `high`) | ~2 s | 0.112 rad/s |
-| `10` | 0.970 | ~1.3 s | 0.160 rad/s |
+| `1` | 0.998 | ~27 s | 0.016 rad/s |
+| `3` | 0.994 (≈ old `low`) | ~9 s | 0.048 rad/s |
+| `5` | 0.990 (= old `medium`) | ~5 s | 0.080 rad/s |
+| `7` | 0.982 (≈ old `high`) | ~3 s | 0.112 rad/s |
+| `10` | 0.970 | ~2 s | 0.160 rad/s |
 
 Decay is frame-rate independent. Each tick applies viscous damping
 `ω *= friction^(60·dt)` followed by a Coulomb subtraction

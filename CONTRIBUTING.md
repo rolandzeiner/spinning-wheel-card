@@ -58,12 +58,17 @@ sets nothing for them). Those that need a DOM opt into one with an
 `@vitest-environment happy-dom` docblock; the rest run in plain node.
 
 - `validate.test.ts`, `wheel-math.test.ts`, `friction.test.ts`,
-  `editor-helpers.test.ts`, `editor-defaults.test.ts` — pure functions.
+  `editor-helpers.test.ts`, `editor-defaults.test.ts`,
+  `editor-fields.test.ts` — pure functions. `editor-fields.test.ts` also
+  fails when an option with a default has no field in the editor.
 - `card.test.ts`, `card-draw.test.ts` — the card itself, mounted, spun
   and painted. happy-dom has no canvas, no Web Audio and no animation
   frames, so `tests/fakes.ts` stands in for them: its canvas records
   every call, and its clock only moves when a test runs frames.
-- `editor-save.test.ts` — the editor, driven through `ha-form` events.
+- `editor-save.test.ts` — the editor, driven through `ha-form` events
+  and its segment rows. happy-dom has no `ha-expansion-panel`, so the
+  groups are drawn open there; `editor-panels.test.ts` covers the panels
+  with a stand-in element.
 - `toolchain.test.ts` — the `vite` override in `package.json` names the
   same version as `vite-plus` (see *Card build*).
 

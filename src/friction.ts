@@ -55,3 +55,21 @@ export const coulombDecel = (level: number): number => {
   const calibrated = 0.3; // rad/s² at slider 5
   return calibrated * (level / 5);
 };
+
+/** Seconds a wheel launched at `omega` rad/s takes to stop at this
+ *  friction level, stepped at 60 fps with the card's own two terms and
+ *  stop threshold. Pegs brake on top of this, so it is the upper bound.
+ *  The editor quotes it under the friction slider. */
+export const stopSeconds = (level: number, omega: number): number => {
+  const dt = 1 / 60;
+  const viscous = frictionMultiplier(level);
+  const coulomb = coulombDecel(level) * dt;
+  let speed = omega;
+  let t = 0;
+  while (speed >= 0.01 && t < 120) {
+    speed *= viscous;
+    speed = speed <= coulomb ? 0 : speed - coulomb;
+    t += dt;
+  }
+  return t;
+};

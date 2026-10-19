@@ -3,12 +3,13 @@
  *
  * What the editor shows and what it writes back.
  *
- * ha-form hands back everything it was shown, and the editor shows
- * projections of some fields rather than the fields themselves — `actions`
- * reaches the multi-picker as strings only, colours and weights appear a
- * second time as one row per label. Writing a projection back over the
- * saved value is how an unrelated toggle used to move scripts onto the
- * wrong segment and delete object-form actions.
+ * The editor is several ha-forms over one config, plus the segment rows
+ * and the result-helper picker. Each form reports only what the user
+ * changed in it, and every save goes through tidyConfig, so the saved
+ * YAML holds what differs from the defaults and nothing else.
+ *
+ * happy-dom has no ha-expansion-panel, so the groups are drawn open
+ * here (the editor's fallback); editor-panels.test.ts covers the panels.
  */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -19,7 +20,7 @@ import type { SpinningWheelCardConfig } from "../src/types";
 const TYPE = "custom:spinning-wheel-card";
 
 type Config = Record<string, unknown>;
-type Field = { name: string; schema?: Field[]; title?: string };
+type Field = { name: string; selector?: Record<string, Record<string, unknown>> };
 type Form = HTMLElement & {
   data: Config;
   schema: Field[];
@@ -56,16 +57,29 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-/** An open editor: its form, and the events it has fired so far. */
+/** An open editor, and the events it has fired so far. */
 interface Session {
   editor: Editor;
-  form: () => Form;
+  root: ShadowRoot;
   /** Every `config-changed` payload, oldest first. */
   saved: Config[];
-  /** Every toast message. */
   toasts: string[];
-  /** Change fields the way ha-form does; returns the latest saved config. */
-  change: (patch: Config) => Promise<Config>;
+  /** The form that draws `name`, or undefined when no form draws it. */
+  form: (name: string) => Form | undefined;
+  /** Every field name drawn by any form, rows excluded. */
+  fields: () => string[];
+  /** Change one field the way ha-form does; returns the latest save. */
+  change: (name: string, value: unknown) => Promise<Config>;
+  settle: () => Promise<void>;
+  /** The segment rows' names, in order. */
+  rows: () => string[];
+  /** Open (or close) row `index` by clicking its head. */
+  toggleRow: (index: number) => Promise<void>;
+  /** The open row's form for `name`. */
+  rowForm: (name: string) => Form | undefined;
+  changeRow: (name: string, value: unknown) => Promise<Config>;
+  /** Click the row's icon button: 0 up, 1 down, 2 remove. */
+  rowButton: (index: number, which: 0 | 1 | 2) => Promise<Config>;
 }
 
 async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
@@ -79,6 +93,7 @@ async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
     await editor.updateComplete;
   };
   await settle();
+  const root = editor.shadowRoot!;
 
   const saved: Config[] = [];
   const toasts: string[] = [];
@@ -88,344 +103,357 @@ async function open(config: Config = {}, hass: Config = {}): Promise<Session> {
   editor.addEventListener("hass-notification", (event) =>
     toasts.push((event as CustomEvent<{ message: string }>).detail.message),
   );
-  const form = (): Form => editor.shadowRoot!.querySelector<Form>("ha-form")!;
-  const change = async (patch: Config): Promise<Config> => {
-    form().dispatchEvent(
-      new CustomEvent("value-changed", {
-        detail: { value: { ...form().data, ...patch } },
-      }),
+  const forms = (scope: ParentNode): Form[] => [...scope.querySelectorAll<Form>("ha-form")];
+  const outside = (): Form[] =>
+    forms(root).filter((f) => !f.closest(".ed-row-body") && !f.hasAttribute("hidden"));
+  const form = (name: string): Form | undefined =>
+    outside().find((f) => f.schema.some((field) => field.name === name));
+  const emit = async (target: Form, name: string, value: unknown): Promise<Config> => {
+    target.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { ...target.data, [name]: value } } }),
     );
     await settle();
-    return saved[saved.length - 1];
+    return saved[saved.length - 1] ?? {};
   };
-  return { editor, form, saved, toasts, change };
+  const rowForm = (name: string): Form | undefined =>
+    forms(root.querySelector(".ed-row-body") ?? root).find(
+      (f) => f.closest(".ed-row-body") && f.schema.some((field) => field.name === name),
+    );
+  return {
+    editor,
+    root,
+    saved,
+    toasts,
+    form,
+    settle,
+    fields: () => outside().flatMap((f) => f.schema.map((field) => field.name)),
+    change: (name, value) => emit(form(name)!, name, value),
+    rows: () => [...root.querySelectorAll(".ed-row-name")].map((el) => el.textContent ?? ""),
+    toggleRow: async (index) => {
+      root.querySelectorAll<HTMLButtonElement>(".ed-row-main")[index].click();
+      await settle();
+    },
+    rowForm,
+    changeRow: (name, value) => emit(rowForm(name)!, name, value),
+    rowButton: async (index, which) => {
+      const head = root.querySelectorAll(".ed-row-head")[index];
+      head.querySelectorAll<HTMLElement>("ha-icon-button")[which].click();
+      await settle();
+      return saved[saved.length - 1] ?? {};
+    },
+  };
 }
 
-/** Open the editor on `config`, make one change, return what is saved. */
-const saveAfterChange = async (config: Config, patch: Config): Promise<Config> =>
-  (await open(config)).change(patch);
+/** A colour swatch's input in the open row: 0 fill, 1 text. */
+const swatch = (session: Session, which: 0 | 1): HTMLInputElement =>
+  session.root.querySelectorAll<HTMLInputElement>(".ed-row-body input[type=color]")[which];
 
-/** Every field name in the form, groups included. */
-const fieldNames = (schema: Field[]): string[] =>
-  schema.flatMap((field) => [
-    ...(field.name ? [field.name] : []),
-    ...fieldNames(field.schema ?? []),
-  ]);
+const pickColour = async (session: Session, which: 0 | 1, value: string): Promise<Config> => {
+  const input = swatch(session, which);
+  input.value = value;
+  input.dispatchEvent(new Event("change"));
+  await session.settle();
+  return session.saved[session.saved.length - 1] ?? {};
+};
 
 describe("editor save", () => {
-  it("keeps each action on its own segment through an unrelated edit", async () => {
-    const saved = await saveAfterChange(
-      { labels: ["a", "b"], actions: [null, "script.b"] },
-      { sound: false },
-    );
-    expect(saved.actions).toEqual([null, "script.b"]);
-  });
-
-  it("keeps object-form actions through an unrelated edit", async () => {
-    const action = { action: "perform-action", perform_action: "light.toggle" };
-    const saved = await saveAfterChange({ labels: ["a"], actions: [action] }, { sound: false });
-    expect(saved.actions).toEqual([action]);
-  });
-
   it("writes only the changed field, type first", async () => {
-    const saved = await saveAfterChange({}, { show_status: false });
+    const saved = await (await open()).change("show_status", false);
     expect(saved).toEqual({ type: TYPE, show_status: false });
     expect(Object.keys(saved)[0]).toBe("type");
   });
 
   it("drops a field set back to its default", async () => {
-    const saved = await saveAfterChange({ segments: 6, sound: false }, { segments: 8 });
+    const saved = await (await open({ segments: 6, sound: false })).change("segments", 8);
     expect(saved).toEqual({ type: TYPE, sound: false });
   });
-});
 
-describe("the rows per label", () => {
-  const labels = ["a", "b", "c"];
-
-  it("show each label's colour, weight and script", async () => {
-    const { form } = await open({
-      labels,
-      colors: ["#ff0000"],
-      weights: [2, 3],
-      actions: ["script.a", { action: "none" }],
-    });
-    expect(form().data).toMatchObject({
-      binding_0_color: [255, 0, 0],
-      binding_1_color: [255, 0, 0],
-      binding_0_label_color: [26, 26, 26],
-      binding_0_weight: 2,
-      binding_1_weight: 3,
-      binding_2_weight: 2,
-      binding_0_action: "script.a",
-      // An action object has no place in a script picker.
-      binding_1_action: "",
-      binding_2_action: "",
-    });
+  it("keeps each action on its own segment through an unrelated edit", async () => {
+    const session = await open({ labels: ["a", "b"], actions: [null, "script.b"] });
+    expect((await session.change("sound", false)).actions).toEqual([null, "script.b"]);
   });
 
-  it("save a picked colour and leave the other labels to the theme", async () => {
-    const saved = await saveAfterChange({ labels }, { binding_1_color: [1, 2, 3] });
-    expect(saved.colors).toEqual([null, "rgb(1, 2, 3)", null]);
-    expect(saved.label_colors).toBeUndefined();
-  });
-
-  it("keep the colours that were already set", async () => {
-    const saved = await saveAfterChange(
-      { labels, colors: ["#ff0000", null, "#0000ff"] },
-      { binding_1_color: [1, 2, 3], binding_2_color: [4, 5, 6] },
-    );
-    expect(saved.colors).toEqual(["#ff0000", "rgb(1, 2, 3)", "rgb(4, 5, 6)"]);
-  });
-
-  it("save a picked text colour", async () => {
-    const saved = await saveAfterChange({ labels }, { binding_2_label_color: [9, 9, 9] });
-    expect(saved.label_colors).toEqual([null, null, "rgb(9, 9, 9)"]);
-    expect(saved.colors).toBeUndefined();
-  });
-
-  it("ignore a colour that isn't one, or a row that doesn't exist", async () => {
-    const { change } = await open({ labels });
-    expect((await change({ binding_0_color: "red" })).colors).toBeUndefined();
-    expect((await change({ binding_7_color: [1, 2, 3] })).colors).toBeUndefined();
-  });
-
-  it("save a weight, and nothing once every weight is 1 again", async () => {
-    const { change } = await open({ labels });
-    expect((await change({ binding_1_weight: 3 })).weights).toEqual([1, 3, 1]);
-    expect((await change({ binding_1_weight: 0 })).weights).toEqual([1, 3, 1]);
-    expect((await change({ binding_1_weight: 1 })).weights).toBeUndefined();
-  });
-
-  it("save a script, and drop it again when the row is cleared", async () => {
-    const { change } = await open({ labels });
-    expect((await change({ binding_1_action: "script.b" })).actions).toEqual([null, "script.b"]);
-    expect((await change({ binding_1_action: "" })).actions).toBeUndefined();
-  });
-
-  it("keep an action object when its row is cleared", async () => {
-    const action = { action: "navigate", navigation_path: "/lovelace/0" };
-    const { change } = await open({ labels, actions: ["script.a", action] });
-    // The picker shows "" for the object; clearing it emits undefined.
-    const saved = await change({
-      binding_0_action: undefined,
-      binding_1_action: undefined,
-    });
-    expect(saved.actions).toEqual([null, action]);
-  });
-
-  it("name the rows after the unique labels, in order", async () => {
-    const { form } = await open({
-      segments: 6,
-      labels: ["a", "b", "a", "c"],
-    });
-    const group = form().schema.find((field) => field.name === "bindings")!;
-    expect(group.schema!.map((row) => row.title)).toEqual(["a", "b", "c"]);
-  });
-});
-
-describe("the advanced lists", () => {
-  it("read colours with a gap as `leave this one to the theme`", async () => {
-    const { change } = await open();
-    expect((await change({ colors_csv: "#a,,#c" })).colors).toEqual(["#a", null, "#c"]);
-    expect((await change({ colors_csv: ",," })).colors).toBeUndefined();
-    expect((await change({ label_colors_csv: "white" })).label_colors).toEqual(["white"]);
-    expect((await change({ label_colors_csv: "" })).label_colors).toBeUndefined();
-  });
-
-  it("read weights, skipping what isn't a positive number", async () => {
-    const { change } = await open();
-    expect((await change({ weights_csv: "1, 2, x, -3, 4" })).weights).toEqual([1, 2, 4]);
-    expect((await change({ weights_csv: "none" })).weights).toBeUndefined();
-  });
-
-  it("keep the text exactly as typed, so a trailing comma survives", async () => {
-    const { change, form } = await open();
-    await change({ colors_csv: "#abc, ", weights_csv: "2," });
-    expect(form().data).toMatchObject({
-      colors_csv: "#abc, ",
-      weights_csv: "2,",
-      colors: ["#abc"],
-      weights: [2],
-    });
-  });
-
-  it("win over a row edited in the same breath", async () => {
-    const saved = await saveAfterChange(
-      { labels: ["a", "b"] },
-      {
-        colors_csv: "#abc",
-        binding_0_color: [1, 2, 3],
-        weights_csv: "5",
-        binding_0_weight: 9,
-      },
-    );
-    expect(saved).toMatchObject({ colors: ["#abc"], weights: [5] });
-  });
-
-  it("follow a row edit", async () => {
-    const { change, form } = await open({ labels: ["a", "b"] });
-    await change({ binding_1_color: [1, 2, 3], binding_1_weight: 4 });
-    expect(form().data).toMatchObject({
-      colors_csv: ", rgb(1, 2, 3)",
-      weights_csv: "1, 4",
-    });
-  });
-});
-
-describe("the actions picker", () => {
-  const action = { action: "none" };
-
-  it("lists the scripts only", async () => {
-    const { form } = await open({ actions: ["script.a", null, action] });
-    expect(form().data.actions).toEqual(["script.a"]);
-  });
-
-  it("saves its scripts ahead of the action objects it can't show", async () => {
-    const saved = await saveAfterChange(
-      { actions: ["script.a", action] },
-      { actions: ["script.a", "script.z"] },
-    );
-    expect(saved.actions).toEqual(["script.a", "script.z", action]);
-  });
-
-  it("saves no actions once it is emptied", async () => {
-    const saved = await saveAfterChange({ actions: ["script.a"] }, { actions: [] });
-    expect(saved).toEqual({ type: TYPE });
-  });
-
-  it("wins over a row edited in the same breath", async () => {
-    const saved = await saveAfterChange(
-      { labels: ["a", "b"] },
-      { actions: ["script.z"], binding_1_action: "script.b" },
-    );
-    expect(saved.actions).toEqual(["script.z"]);
-  });
-});
-
-describe("labels", () => {
-  it("are trimmed, and empty chips dropped", async () => {
-    const { change } = await open();
-    expect((await change({ labels: [" a ", "", "b ", 5] })).labels).toEqual(["a", "b"]);
-    expect((await change({ labels: [" "] })).labels).toBeUndefined();
-    expect((await change({ labels: "a, b" })).labels).toBeUndefined();
-  });
-
-  it("take their weight, colours and action with them when deleted", async () => {
-    const saved = await saveAfterChange(
-      {
-        labels: ["a", "b", "c"],
-        weights: [1, 2, 3],
-        colors: ["#1", "#2", "#3"],
-        label_colors: ["#4", "#5", "#6"],
-        actions: ["script.a", "script.b", "script.c"],
-      },
-      { labels: ["a", "b"] },
-    );
-    expect(saved).toEqual({
-      type: TYPE,
-      labels: ["a", "b"],
-      weights: [1, 2],
-      colors: ["#1", "#2"],
-      label_colors: ["#4", "#5"],
-      actions: ["script.a", "script.b"],
-    });
-  });
-
-  it("leave the other lists alone when one is added", async () => {
-    const saved = await saveAfterChange(
-      { labels: ["a", "b"], weights: [1, 2] },
-      { labels: ["a", "b", "c"] },
-    );
-    expect(saved.weights).toEqual([1, 2]);
-  });
-});
-
-describe("fields with a say of their own", () => {
-  it("saves a cleared hub text as `no hub text`, not as the default", async () => {
-    const saved = await saveAfterChange({ hub_text: "Go" }, { hub_text: undefined });
-    expect(saved.hub_text).toBe("");
-    const never = await saveAfterChange({}, { sound: false });
-    expect("hub_text" in never).toBe(false);
-  });
-
-  it("saves the text orientation only when it isn't the default", async () => {
-    const { change, form } = await open();
-    expect(form().data.text_orientation).toBe("tangent");
-    expect((await change({ text_orientation: "radial" })).text_orientation).toBe("radial");
-    expect("text_orientation" in (await change({ text_orientation: "tangent" }))).toBe(false);
-  });
-
-  it("shows `auto` for the language and saves it as no language", async () => {
-    const { change, form } = await open({ language: "de" });
-    expect(form().data.language).toBe("de");
-    expect("language" in (await change({ language: "auto" }))).toBe(false);
-    expect(form().data.language).toBe("auto");
-  });
-
-  it("saves an emptied entity list as the feature being off", async () => {
-    const saved = await saveAfterChange(
-      {
-        light_sync_entities: ["light.a"],
-        tts_announce_entities: ["media_player.a"],
-      },
-      { light_sync_entities: [], tts_announce_entities: undefined },
-    );
-    expect(saved).toEqual({ type: TYPE });
-  });
-
-  it("offers the peg density only with pegs on, and saves it only then", async () => {
-    const { change, form } = await open({ pegs: true, peg_density: 3 });
-    expect(fieldNames(form().schema)).toContain("peg_density");
-    expect(await change({ pegs: false })).toEqual({ type: TYPE });
-    expect(fieldNames(form().schema)).not.toContain("peg_density");
+  it("keeps object-form actions through an unrelated edit", async () => {
+    const action = { action: "perform-action", perform_action: "light.toggle" };
+    const session = await open({ labels: ["a"], actions: [action] });
+    expect((await session.change("sound", false)).actions).toEqual([action]);
   });
 
   it("migrates a pre-v1.2 friction preset to its level", async () => {
-    const { change, form } = await open({ friction: "high" });
-    expect(form().data.friction).toBe(7);
-    expect((await change({ sound: false })).friction).toBe(7);
+    const session = await open({ friction: "high" });
+    expect(session.form("friction")!.data.friction).toBe(7);
+    expect((await session.change("sound", false)).friction).toBe(7);
   });
 });
 
-describe("labels and hints", () => {
-  it("gives every field a label in plain words", async () => {
-    const { form } = await open({ pegs: true, labels: ["a"] });
-    for (const name of fieldNames(form().schema)) {
-      const label = form().computeLabel({ name });
-      // Groups carry their title in the schema instead.
-      if (["general", "label_layout", "integrations", "bindings"].includes(name)) {
-        continue;
-      }
-      if (/^binding_\d+$/.test(name)) continue;
-      expect(label, name).not.toBe(name);
-      expect(label, name).not.toMatch(/^editor\./);
-    }
+describe("fields that show a projection", () => {
+  it("draw the two disable_ options as switches that are on by default", async () => {
+    const session = await open();
+    expect(session.form("boost")!.data.boost).toBe(true);
+    expect(session.form("confirm")!.data.confirm).toBe(true);
+    expect(await session.change("boost", false)).toEqual({ type: TYPE, disable_boost: true });
+    expect(await session.change("confirm", false)).toEqual({
+      type: TYPE,
+      disable_boost: true,
+      disable_confirm_actions: true,
+    });
+    expect(await session.change("boost", true)).toEqual({
+      type: TYPE,
+      disable_confirm_actions: true,
+    });
   });
 
-  it("labels the row fields the same on every row", async () => {
-    const { form } = await open({ labels: ["a", "b"] });
-    const label = (name: string): string => form().computeLabel({ name });
-    expect(label("binding_0_color")).toBe(en.editor.binding_color);
-    expect(label("binding_1_color")).toBe(en.editor.binding_color);
-    expect(label("binding_1_label_color")).toBe(en.editor.binding_label_color);
-    expect(label("binding_0_weight")).toBe(en.editor.binding_weight);
-    expect(label("binding_0_action")).toBe(en.editor.binding_action);
+  it("save the shape and the interaction as their booleans", async () => {
+    const session = await open();
+    expect(session.form("shape")!.data.shape).toBe("full");
+    expect(session.form("mode")!.data.mode).toBe("spin");
+    expect((await session.change("shape", "half")).half_circle).toBe(true);
+    expect((await session.change("mode", "pick")).selector_mode).toBe(true);
+    // Friction and momentum mean nothing without spinning.
+    expect(session.fields()).not.toContain("friction");
+    expect(session.fields()).not.toContain("boost");
+    expect(session.fields()).toContain("sound");
   });
 
-  it("adds a hint where there is one to give", async () => {
-    const { form } = await open({ labels: ["a"] });
-    const hint = (name: string): unknown => form().computeHelper({ name });
-    expect(hint("todo_entity")).toBe(en.editor.todo_entity_helper);
-    expect(hint("name")).toBeUndefined();
-    expect(hint("binding_0_color")).toBeUndefined();
+  it("count pegs per segment, boundary peg included, and only with pegs on", async () => {
+    const session = await open({ pegs: true, peg_density: 3 });
+    expect(session.form("peg_count")!.data.peg_count).toBe(4);
+    expect(await session.change("peg_count", 2)).toEqual({ type: TYPE, pegs: true });
+    expect(await session.change("pegs", false)).toEqual({ type: TYPE });
+    expect(session.fields()).not.toContain("peg_count");
   });
 
-  it("speaks the card's language", async () => {
-    const { form } = await open({ language: "de" });
-    const german = form().computeLabel({ name: "name" });
-    expect(german).not.toBe(en.editor.name);
-    expect((await open()).form().computeLabel({ name: "name" })).toBe(en.editor.name);
-    expect(german).toBe((await open({}, { language: "de" })).form().computeLabel({ name: "name" }));
+  it("save the text orientation only when it isn't the default", async () => {
+    const session = await open();
+    expect(session.form("text_orientation")!.data.text_orientation).toBe("tangent");
+    expect((await session.change("text_orientation", "radial")).text_orientation).toBe("radial");
+    expect("text_orientation" in (await session.change("text_orientation", "tangent"))).toBe(false);
+  });
+
+  it("show the language in effect and save following Home Assistant as no language", async () => {
+    const session = await open({ language: "de" });
+    const field = session.form("language")!;
+    expect(field.data.language).toBe("de");
+    const options = (field.schema.find((f) => f.name === "language")!.selector!.select.options ??
+      []) as Array<{ value: string; label: string }>;
+    expect(options[0]).toEqual({ value: "auto", label: "Same as Home Assistant (English)" });
+    expect("language" in (await session.change("language", "auto"))).toBe(false);
+    expect(session.form("language")!.data.language).toBe("auto");
+  });
+
+  it("switch the hub text off as an empty text, and keep the field while it is edited", async () => {
+    const session = await open();
+    expect(session.form("hub_text")!.data.hub_text).toBe("SPIN");
+    expect(await session.change("hub_text", "GO")).toEqual({ type: TYPE, hub_text: "GO" });
+    // Typed back to the default, the key goes again.
+    expect(await session.change("hub_text", "SPIN")).toEqual({ type: TYPE });
+    // Cleared, it saves "no text", and the field stays for the next letter.
+    expect(await session.change("hub_text", undefined)).toEqual({ type: TYPE, hub_text: "" });
+    expect(session.form("hub_text_on")?.data.hub_text_on).toBe(true);
+    expect(session.fields()).toContain("hub_text");
+    expect(await session.change("hub_text_on", false)).toEqual({ type: TYPE, hub_text: "" });
+    expect(session.fields()).not.toContain("hub_text");
+    // Back on, it shows the default again and saves nothing.
+    expect(await session.change("hub_text_on", true)).toEqual({ type: TYPE });
+    expect(session.form("hub_text")?.data.hub_text).toBe("SPIN");
+  });
+
+  it("open with the hub text switched off when it was saved off", async () => {
+    const session = await open({ hub_text: "" });
+    expect(session.form("hub_text_on")!.data.hub_text_on).toBe(false);
+    expect(session.fields()).not.toContain("hub_text");
+  });
+
+  it("save an emptied entity list as the feature being off, engine included", async () => {
+    const session = await open({
+      light_sync_entities: ["light.a"],
+      tts_announce_entities: ["media_player.a"],
+      tts_engine: "tts.a",
+    });
+    await session.change("light_sync_entities", []);
+    expect(await session.change("tts_announce_entities", [])).toEqual({ type: TYPE });
+    expect(session.fields()).not.toContain("tts_engine");
+  });
+
+  it("warn while speakers have no engine to speak with", async () => {
+    const session = await open({ tts_announce_entities: ["media_player.a"] });
+    expect(session.fields()).toContain("tts_engine");
+    expect(session.root.querySelector("ha-alert")?.textContent).toContain(
+      en.editor.tts_engine_missing,
+    );
+    await session.change("tts_engine", "tts.a");
+    expect(session.root.querySelector("ha-alert")).toBeNull();
+  });
+});
+
+describe("the segment rows", () => {
+  const labels = ["a", "b", "c"];
+
+  it("list the labels, each with its weight and action", async () => {
+    const session = await open({
+      labels,
+      weights: [2, 1, 1],
+      actions: ["script.a", { action: "none" }],
+    });
+    expect(session.rows()).toEqual(labels);
+    const summaries = [...session.root.querySelectorAll(".ed-row-summary")].map(
+      (el) => el.textContent,
+    );
+    expect(summaries).toEqual([
+      "Weight 2 · script.a",
+      en.editor.row.action_yaml,
+      // The card cycles a list shorter than the labels: c gets a's action.
+      "script.a",
+    ]);
+  });
+
+  it("open one row at a time, with its label, weight and action", async () => {
+    const session = await open({ labels });
+    await session.toggleRow(1);
+    expect(session.rowForm("label")!.data).toMatchObject({ label: "b", weight: 1, action: "" });
+    await session.toggleRow(2);
+    expect(session.root.querySelectorAll(".ed-row-body")).toHaveLength(1);
+    expect(session.rowForm("label")!.data.label).toBe("c");
+  });
+
+  it("keep a row's settings through a rename", async () => {
+    const session = await open({ labels: ["a", "b"], colors: ["#111111", "#222222"] });
+    await session.toggleRow(0);
+    expect(await session.changeRow("label", "z")).toEqual({
+      type: TYPE,
+      labels: ["z", "b"],
+      colors: ["#111111", "#222222"],
+    });
+  });
+
+  const full = {
+    labels,
+    weights: [1, 2, 3],
+    colors: ["#111111", "#222222", "#333333"],
+    label_colors: ["#444444", "#555555", "#666666"],
+    actions: ["script.a", "script.b", "script.c"],
+  };
+
+  it("move a row with all its settings", async () => {
+    const session = await open(full);
+    expect(await session.rowButton(2, 0)).toEqual({
+      type: TYPE,
+      labels: ["a", "c", "b"],
+      weights: [1, 3, 2],
+      colors: ["#111111", "#333333", "#222222"],
+      label_colors: ["#444444", "#666666", "#555555"],
+      actions: ["script.a", "script.c", "script.b"],
+    });
+  });
+
+  it("remove a row with all its settings", async () => {
+    const session = await open(full);
+    expect(await session.rowButton(1, 2)).toEqual({
+      type: TYPE,
+      labels: ["a", "c"],
+      weights: [1, 3],
+      colors: ["#111111", "#333333"],
+      label_colors: ["#444444", "#666666"],
+      actions: ["script.a", "script.c"],
+    });
+  });
+
+  it("add a row, open it, and make room for it on the wheel", async () => {
+    const eight = ["1", "2", "3", "4", "5", "6", "7", "8"];
+    const session = await open({ labels: eight, weights: [2] });
+    session.root.querySelector<HTMLElement>(".ed-add ha-button")!.click();
+    await session.settle();
+    const saved = session.saved[session.saved.length - 1];
+    expect(saved.labels).toEqual([...eight, "Segment 9"]);
+    expect(saved.segments).toBe(9);
+    // A cycled list is written out, so the new row doesn't shift it.
+    expect(saved.weights).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 1]);
+    expect(session.rowForm("label")!.data.label).toBe("Segment 9");
+  });
+
+  it("pick a fill colour for one label and leave the others to the palette", async () => {
+    const session = await open({ labels });
+    await session.toggleRow(1);
+    expect((await pickColour(session, 0, "#123456")).colors).toEqual([null, "#123456", null]);
+    expect(session.root.querySelector(".ed-row-body ha-button")?.textContent).toContain(
+      en.editor.row.reset,
+    );
+    session.root.querySelector<HTMLElement>(".ed-row-body ha-button")!.click();
+    await session.settle();
+    expect(session.saved[session.saved.length - 1]).toEqual({ type: TYPE, labels });
+  });
+
+  it("write a cycled colour list out before changing one entry", async () => {
+    const session = await open({ labels, colors: ["#ff0000"] });
+    await session.toggleRow(1);
+    expect(swatch(session, 0).value).toBe("#ff0000");
+    expect((await pickColour(session, 0, "#00ff00")).colors).toEqual([
+      "#ff0000",
+      "#00ff00",
+      "#ff0000",
+    ]);
+  });
+
+  it("pick a text colour", async () => {
+    const session = await open({ labels });
+    await session.toggleRow(2);
+    const saved = await pickColour(session, 1, "#090909");
+    expect(saved.label_colors).toEqual([null, null, "#090909"]);
+    expect(saved.colors).toBeUndefined();
+  });
+
+  it("save a weight, ignore one that isn't positive, and drop them all at 1", async () => {
+    const session = await open({ labels });
+    await session.toggleRow(1);
+    expect((await session.changeRow("weight", 3)).weights).toEqual([1, 3, 1]);
+    expect((await session.changeRow("weight", 0)).weights).toEqual([1, 3, 1]);
+    expect((await session.changeRow("weight", 1)).weights).toBeUndefined();
+  });
+
+  it("save a script, and drop it again when cleared", async () => {
+    const session = await open({ labels });
+    await session.toggleRow(1);
+    expect((await session.changeRow("action", "script.b")).actions).toEqual([
+      null,
+      "script.b",
+      null,
+    ]);
+    expect((await session.changeRow("action", undefined)).actions).toBeUndefined();
+  });
+
+  it("leave an action object alone and offer no script picker for it", async () => {
+    const action = { action: "navigate", navigation_path: "/lovelace/0" };
+    const session = await open({ labels: ["a", "b"], actions: ["script.a", action] });
+    await session.toggleRow(1);
+    expect(session.rowForm("action")).toBeUndefined();
+    expect(session.root.querySelector(".ed-row-body .ed-note")?.textContent).toBe(
+      en.editor.row.action_yaml_note,
+    );
+    expect((await session.changeRow("weight", 2)).actions).toEqual(["script.a", action]);
+  });
+
+  it("share one colour between rows with the same label, as the card does", async () => {
+    const session = await open({ labels: ["a", "b", "a"] });
+    await session.toggleRow(2);
+    expect((await pickColour(session, 0, "#abcdef")).colors).toEqual(["#abcdef", null]);
+  });
+
+  it("keep the segment count at or above the number of labels", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `L${i}`);
+    const session = await open({ labels: ten, segments: 12 });
+    const count = session.form("segments")!;
+    expect(count.schema[0].selector!.number.min).toBe(10);
+    expect(count.computeHelper({ name: "segments" })).toBe(
+      "Your 10 labels repeat across 12 segments.",
+    );
+  });
+
+  it("say what the wheel shows without labels", async () => {
+    const session = await open();
+    expect(session.root.querySelector(".ed-empty")?.textContent?.trim()).toBe(
+      "No labels yet. The wheel shows the numbers 1 to 8.",
+    );
+    expect(session.rows()).toEqual([]);
   });
 });
 
@@ -433,8 +461,6 @@ describe("with a todo list", () => {
   const list = (state: string): Config => ({
     states: { "todo.chores": { state, attributes: {} } },
   });
-  const rows = (form: Form): unknown[] =>
-    (form.schema.find((field) => field.name === "bindings")?.schema ?? []).map((row) => row.title);
 
   it("has one row per open item, and hides what the list overrides", async () => {
     ws.todoItems = [
@@ -443,70 +469,89 @@ describe("with a todo list", () => {
       { summary: "Bins" },
       { summary: "Dishes" },
     ];
-    const { form } = await open({ todo_entity: "todo.chores", labels: ["ignored"] }, list("2"));
+    const session = await open({ todo_entity: "todo.chores", labels: ["ignored"] }, list("2"));
     expect(ws.calls).toEqual([{ type: "todo/item/list", entity_id: "todo.chores" }]);
-    expect(rows(form())).toEqual(["Dishes", "Bins"]);
-    const names = fieldNames(form().schema);
+    expect(session.rows()).toEqual(["Dishes", "Bins"]);
+    // The items are the list's: no moving or removing them here.
+    expect(session.root.querySelectorAll(".ed-row-head ha-icon-button")).toHaveLength(0);
+    const names = session.fields();
     expect(names).not.toContain("segments");
-    expect(names).not.toContain("labels");
     expect(names).not.toContain("text_orientation");
+    expect(names).not.toContain("label_auto_fit");
     expect(names).toContain("friction");
   });
 
-  it("saves a row edit against the items, not the ignored labels", async () => {
-    ws.todoItems = [{ summary: "Dishes" }, { summary: "Bins" }];
-    const { change } = await open({ todo_entity: "todo.chores" }, list("2"));
-    const saved = await change({ binding_1_color: [1, 2, 3] });
-    expect(saved.colors).toEqual([null, "rgb(1, 2, 3)"]);
+  it("saves a row edit against the items, and makes room for a long list", async () => {
+    ws.todoItems = Array.from({ length: 9 }, (_, i) => ({ summary: `Item ${i}` }));
+    const session = await open({ todo_entity: "todo.chores" }, list("9"));
+    await session.toggleRow(8);
+    const saved = await pickColour(session, 0, "#010203");
+    expect(saved.colors).toEqual([null, null, null, null, null, null, null, null, "#010203"]);
+    // The card validates lists against `segments`, in to-do mode too.
+    expect(saved.segments).toBe(9);
   });
 
   it("warns when the list has nothing open", async () => {
-    const { form } = await open({ todo_entity: "todo.chores" }, list("0"));
-    expect(rows(form())).toEqual([]);
-    expect(form().computeHelper({ name: "todo_entity" })).toBe(en.editor.todo_entity_empty_warning);
+    const session = await open({ todo_entity: "todo.chores" }, list("0"));
+    expect(session.rows()).toEqual([]);
+    expect(session.root.querySelector(".ed-segments ha-alert")?.textContent).toContain(
+      en.editor.todo_empty,
+    );
   });
 
   it("fetches again when the list changes or another is chosen", async () => {
     ws.todoItems = [{ summary: "Dishes" }];
-    const { editor, change, form } = await open(
-      { todo_entity: "todo.chores" },
-      {
-        states: {
-          "todo.chores": { state: "1", attributes: {} },
-          "todo.garden": { state: "4", attributes: {} },
-        },
-      },
-    );
-    editor.hass = fakeHass(list("1"));
-    await editor.updateComplete;
+    const states = {
+      "todo.chores": { state: "1", attributes: {} },
+      "todo.garden": { state: "4", attributes: {} },
+    };
+    const session = await open({ todo_entity: "todo.chores" }, { states });
+    session.editor.hass = fakeHass({ states });
+    await session.settle();
     expect(ws.calls).toHaveLength(1);
 
     ws.todoItems = [{ summary: "Mow" }];
-    editor.hass = fakeHass({
-      states: {
-        "todo.chores": { state: "1", attributes: {} },
-        "todo.garden": { state: "4", attributes: {} },
-      },
-    });
-    await change({ todo_entity: "todo.garden" });
+    await session.change("todo_entity", "todo.garden");
     expect(ws.calls).toHaveLength(2);
-    expect(rows(form())).toEqual(["Mow"]);
+    expect(session.rows()).toEqual(["Mow"]);
   });
 
   it("shows no rows when the list can't be read", async () => {
     ws.fail = true;
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { form } = await open({ todo_entity: "todo.chores" }, list("3"));
+    const session = await open({ todo_entity: "todo.chores" }, list("3"));
     expect(warn).toHaveBeenCalledOnce();
-    expect(rows(form())).toEqual([]);
+    expect(session.rows()).toEqual([]);
+  });
+
+  it("can be picked as the source before a list is, saving nothing yet", async () => {
+    const session = await open({ labels: ["a"] });
+    expect(session.form("source")!.data.source).toBe("list");
+    session
+      .form("source")!
+      .dispatchEvent(new CustomEvent("value-changed", { detail: { value: { source: "todo" } } }));
+    await session.settle();
+    expect(session.saved).toEqual([]);
+    expect(session.fields()).toContain("todo_entity");
+    expect(session.fields()).not.toContain("segments");
+    expect(session.root.querySelector(".ed-segments .ed-note")?.textContent).toBe(
+      en.editor.todo_none,
+    );
+  });
+
+  it("is dropped when the source goes back to the own list", async () => {
+    const session = await open({ todo_entity: "todo.chores", labels: ["a"] }, list("1"));
+    expect(session.form("source")!.data.source).toBe("todo");
+    expect(await session.change("source", "list")).toEqual({ type: TYPE, labels: ["a"] });
+    expect(session.rows()).toEqual(["a"]);
   });
 });
 
 describe("the result helper", () => {
   const picker = (session: Session): HTMLElement =>
-    session.editor.shadowRoot!.querySelector("ha-selector")!;
-  const createButton = (session: Session): HTMLButtonElement | null =>
-    session.editor.shadowRoot!.querySelector(".create-helper-btn");
+    session.root.querySelector(".ed-result ha-selector")!;
+  const createButton = (session: Session): HTMLElement | null =>
+    session.root.querySelector(".ed-result ha-button");
   const pick = (session: Session, value: string): void => {
     picker(session).dispatchEvent(
       new CustomEvent("value-changed", { detail: { value }, bubbles: true }),
@@ -523,20 +568,16 @@ describe("the result helper", () => {
     ]);
   });
 
-  it("survives whatever the form says about it", async () => {
+  it("survives edits made in the forms", async () => {
     const session = await open({ result_entity: "input_text.result" });
-    const saved = await session.change({ result_entity: "", sound: false });
-    expect(saved.result_entity).toBe("input_text.result");
-
-    const none = await open();
-    expect("result_entity" in (await none.change({ result_entity: "input_text.x" }))).toBe(false);
+    expect((await session.change("sound", false)).result_entity).toBe("input_text.result");
   });
 
   it("can be created for an admin with one click", async () => {
     const session = await open();
     createButton(session)!.click();
     await flush();
-    await session.editor.updateComplete;
+    await session.settle();
     expect(ws.calls).toEqual([
       {
         type: "input_text/create",
@@ -546,7 +587,7 @@ describe("the result helper", () => {
       },
     ]);
     expect(session.saved).toEqual([{ type: TYPE, result_entity: "input_text.wheel_result" }]);
-    expect(session.toasts).toEqual(["Result helper created: input_text.wheel_result"]);
+    expect(session.toasts).toEqual(["Helper created: input_text.wheel_result"]);
     expect(createButton(session)).toBeNull();
   });
 
@@ -564,5 +605,49 @@ describe("the result helper", () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(session.saved).toEqual([]);
     expect(session.toasts).toEqual([en.editor.result_entity_create_failed]);
+  });
+});
+
+describe("labels and hints", () => {
+  it("gives every field a label in plain words", async () => {
+    const session = await open({
+      pegs: true,
+      labels: ["a"],
+      tts_announce_entities: ["media_player.a"],
+    });
+    await session.toggleRow(0);
+    const all = [...session.root.querySelectorAll<Form>("ha-form")].filter(
+      (f) => !f.hasAttribute("hidden"),
+    );
+    for (const form of all) {
+      for (const { name } of form.schema) {
+        const label = form.computeLabel({ name });
+        expect(label, name).not.toBe(name);
+        expect(label, name).not.toMatch(/^editor\./);
+      }
+    }
+  });
+
+  it("quotes the stop time under the friction, from the card's own physics", async () => {
+    const session = await open({ friction: 5 });
+    expect(session.form("friction")!.computeHelper({ name: "friction" })).toBe(
+      "The wheel stops after about 5 s. 1 spins long, 10 brakes hard.",
+    );
+  });
+
+  it("adds a hint only where there is one to give", async () => {
+    const session = await open();
+    const hint = (name: string): unknown => session.form(name)!.computeHelper({ name });
+    expect(hint("name")).toBe(en.editor.name_helper);
+    expect(hint("shape")).toBeUndefined();
+  });
+
+  it("speaks Home Assistant's language, whatever the card's", async () => {
+    const german = await open({}, { language: "de" });
+    expect(german.form("name")!.computeLabel({ name: "name" })).toBe("Titel");
+    const english = await open({ language: "de" });
+    expect(english.form("name")!.computeLabel({ name: "name" })).toBe(en.editor.name);
+    // The hub's default text follows the card's language.
+    expect(english.form("hub_text")!.data.hub_text).toBe("DREH");
   });
 });

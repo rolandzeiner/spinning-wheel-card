@@ -165,6 +165,14 @@ export interface EntitySelectorConfig {
   exclude_entities?: string[];
 }
 
+/** `description` and `image` are drawn by `mode: "box"` only. */
+export interface SelectOption {
+  value: string;
+  label: string;
+  description?: string;
+  image?: string | { src: string; src_dark?: string };
+}
+
 export type HASelector =
   | { entity: EntitySelectorConfig }
   | { area: { multiple?: boolean } }
@@ -182,10 +190,13 @@ export type HASelector =
     }
   | {
       select: {
-        mode?: "dropdown" | "list";
+        /** `box` (frontend 2025.3+) draws a tile per option with its
+         *  description and image; older frontends fall back to a dropdown. */
+        mode?: "dropdown" | "list" | "box";
+        box_max_columns?: number;
         multiple?: boolean;
         custom_value?: boolean;
-        options: ReadonlyArray<{ value: string; label: string }>;
+        options: ReadonlyArray<SelectOption>;
       };
     }
   | { color_rgb: Record<string, never> }
