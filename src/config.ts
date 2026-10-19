@@ -32,6 +32,7 @@ export const DEFAULTS = {
   label_radius_offset: 0,
   label_flip: false,
   sound: true,
+  click_sound: "classic",
   theme: "default",
   hub_color: "theme",
   show_status: true,

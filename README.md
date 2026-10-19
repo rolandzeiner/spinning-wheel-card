@@ -24,7 +24,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **Label layout controls** (the editor's *Labels* group) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
-- **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
+- **Six peg-click sounds**, synthesised with Web Audio (no audio files): classic, wood block, rubber flapper, metal pin, felt and plastic ratchet. Every one clicks harder and shorter the faster the wheel turns. The editor's *Listen* button plays a short sample; switch the sound off for silence.
 - **Responsive canvas** — 140–1000 px, scales to the dashboard cell on both axes.
 - **Visual editor** — the segments as one list, each with its label, fill and text colour, weight and action, then collapsible groups that show their settings without opening: *Appearance*, *Labels*, *Hub & pointer*, *Lines & pegs*, *Spinning* and *After a spin*. The friction slider says how long a spin lasts; a to-do list can stand in for the segments.
 - **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
@@ -100,6 +100,7 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `hub_text` | string | localised (`SPIN` / `DREH` / …) | Centre-hub label. Auto-shrinks. Empty hides. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub + indicator fill. `theme` uses HA's `--primary-color` with auto-contrast text. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
+| `click_sound` | `classic` / `wood` / `flapper` / `pin` / `felt` / `ratchet` | `classic` | How each click sounds. `classic` is a short, light click; `wood` a warm knock with a hint of pitch; `flapper` a rubber flap that springs back on slow crossings; `pin` a bright metal tink; `felt` a muted thud; `ratchet` a crisp, dry tick. |
 | `show_status` | boolean | `true` | Show the line beneath the wheel (`Spinning…` / `Result: X` / idle hint). |
 
 ### Friction slider

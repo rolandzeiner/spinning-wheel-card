@@ -168,7 +168,8 @@ describe("group summaries", () => {
     expect(groupSummary("labels", c)).toBe("Around the rim · 120 %");
     expect(groupSummary("hub", c)).toBe("“SPIN” · Primary colour");
     expect(groupSummary("lines", c)).toBe("Dividers · 2 pegs per segment");
-    expect(groupSummary("spin", c)).toBe("Spin · Friction 7 · Silent");
+    expect(groupSummary("spin", c)).toBe("Spin · Friction 7");
+    expect(groupSummary("sound", c)).toBe("Off");
     expect(groupSummary("after", c)).toBe("Asks first · Result helper · 2 lights");
   });
 
@@ -183,7 +184,9 @@ describe("group summaries", () => {
     expect(groupSummary("look", c)).toBe("Default · Full circle · No status line");
     expect(groupSummary("lines", c)).toBe("No dividers · No pegs");
     expect(groupSummary("hub", c)).toBe("No text · Primary colour");
-    expect(groupSummary("spin", c)).toBe("Pick · Click sound");
+    expect(groupSummary("spin", c)).toBe("Pick");
+    expect(groupSummary("sound", c)).toBe("Classic");
+    expect(groupSummary("sound", ctx({ click_sound: "wood" }))).toBe("Wood block");
     expect(groupSummary("after", c)).toBe("No confirmation");
   });
 

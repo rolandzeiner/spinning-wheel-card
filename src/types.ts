@@ -248,6 +248,10 @@ export type Friction = number | FrictionPreset;
 /** Built-in palette presets. Custom `colors` always wins over `theme`. */
 export type Theme = "default" | "pastel" | "pride" | "neon";
 
+/** How each peg / segment click sounds. All six are synthesised in
+ *  `click-sounds.ts`; `classic` is the card's original click. */
+export type ClickSound = "classic" | "wood" | "flapper" | "pin" | "felt" | "ratchet";
+
 /** Hub + indicator fill mode. `theme` uses HA's `--primary-color`;
  *  `black` / `white` are solid with auto-contrast hub text. */
 export type HubColor = "theme" | "black" | "white";
@@ -300,6 +304,7 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   hub_color?: HubColor;
   /** Play a peg-click sound on each segment crossing. Default true. */
   sound?: boolean;
+  click_sound?: ClickSound;
   /** Show the status line beneath the wheel. Default true. */
   show_status?: boolean;
   /** Label orientation. `tangent` wraps along the rim; `radial` reads

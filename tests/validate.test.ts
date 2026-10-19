@@ -40,6 +40,7 @@ describe("validateConfig", () => {
         label_colors: [null, "white"],
         hub_text: "",
         sound: false,
+        click_sound: "flapper",
         text_orientation: "radial",
         theme: "neon",
         hub_color: "white",
@@ -78,6 +79,7 @@ describe("validateConfig", () => {
     ["text_orientation", "diagonal", en.errors.text_orientation_value],
     ["theme", "dark", en.errors.theme_value],
     ["hub_color", "red", en.errors.hub_color_value],
+    ["click_sound", "bell", en.errors.click_sound_value],
   ])("rejects %s: %j", (option, value, message) => {
     expect(problem({ [option]: value })).toBe(message);
   });
@@ -191,6 +193,7 @@ describe("validateConfig", () => {
       { label_colors: nine("red") },
       { hub_text: 1 },
       { sound: 1 },
+      { click_sound: 1 },
       { text_orientation: 1 },
       { theme: 1 },
       { hub_color: 1 },

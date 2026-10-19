@@ -12,11 +12,12 @@
  * guard in editor-fields.test.ts fails when an option with a default has
  * no field here.
  */
+import { CLICK_SOUNDS } from "./click-sounds";
 import { DEFAULTS, type NormalisedConfig } from "./config";
 import { normalizeFriction, stopSeconds } from "./friction";
 import { AVAILABLE_LANGUAGES } from "./localize/localize";
 import { THEME_PALETTES } from "./palettes";
-import type { HASelector, SelectOption, SpinningWheelCardConfig, Theme } from "./types";
+import type { ClickSound, HASelector, SelectOption, SpinningWheelCardConfig, Theme } from "./types";
 
 export type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -67,11 +68,13 @@ export type GroupItem =
   /** The result-helper picker. Drawn by the editor, outside ha-form, whose
    *  entity selector drops a helper created a moment ago. */
   | { kind: "result" }
-  | { kind: "note"; text: (ctx: FieldContext) => string | null; warning?: boolean };
+  | { kind: "note"; text: (ctx: FieldContext) => string | null; warning?: boolean }
+  /** Plays a short rattle in the chosen click sound. Drawn by the editor. */
+  | { kind: "listen" };
 
 export const isField = (item: GroupItem): item is EditorField => !("kind" in item);
 
-export type GroupId = "look" | "labels" | "hub" | "lines" | "spin" | "after";
+export type GroupId = "look" | "labels" | "hub" | "lines" | "spin" | "sound" | "after";
 
 export const GROUPS: ReadonlyArray<{ id: GroupId; icon: string }> = [
   { id: "look", icon: "mdi:palette-outline" },
@@ -79,6 +82,7 @@ export const GROUPS: ReadonlyArray<{ id: GroupId; icon: string }> = [
   { id: "hub", icon: "mdi:record-circle-outline" },
   { id: "lines", icon: "mdi:dots-circle" },
   { id: "spin", icon: "mdi:rotate-right" },
+  { id: "sound", icon: "mdi:volume-high" },
   { id: "after", icon: "mdi:flag-outline" },
 ];
 
@@ -193,6 +197,39 @@ const palettePicture = (colours: ReadonlyArray<string>): { src: string; src_dark
         .map((c, i) => `<path d="M36 22L${point(i)}A20 20 0 0 1 ${point(i + 1)}Z" fill="${c}"/>`)
         .join("") +
       `<circle cx="36" cy="22" r="20" fill="none" stroke="${k.line}" stroke-width=".8"/>`,
+  );
+};
+
+/** Each click's waveform, sketched: what its envelope and ring look like.
+ *  `x` runs 0..1 over the picture; the result is the amplitude, -1..1. */
+const rough = (x: number): number => Math.sin(x * 913) * Math.cos(x * 377 + 1.3);
+const decay = (x: number, rate: number): number => Math.exp(-x * rate);
+const WAVES: Record<ClickSound, (x: number) => number> = {
+  classic: (x) => (x < 0.03 ? x / 0.03 : Math.max(0, 1 - (x - 0.03) / 0.4) ** 2) * rough(x),
+  wood: (x) =>
+    (x < 0.02 ? x / 0.02 : decay(x - 0.02, 9)) *
+    (Math.sin(Math.PI * 18 * x) + 0.3 * Math.sin(Math.PI * 44 * x)) *
+    0.8,
+  flapper: (x) =>
+    decay(x, 14) * rough(x) * 0.7 +
+    decay(x, 7) * Math.sin(Math.PI * 8 * x) * 0.5 +
+    (x > 0.45 ? 0.4 * decay(x - 0.45, 30) * rough(x) : 0),
+  pin: (x) => decay(x, 4) * Math.sin(Math.PI * 48 * x),
+  felt: (x) => (x < 0.12 ? x / 0.12 : decay(x - 0.12, 6)) * Math.sin(Math.PI * 10 * x) * 0.75,
+  ratchet: (x) => (x < 0.01 ? 1 : decay(x, 40)) * rough(x),
+};
+
+const wavePicture = (sound: ClickSound): { src: string; src_dark: string } => {
+  const wave = WAVES[sound];
+  const points = Array.from({ length: 121 }, (_, i) => {
+    const x = i / 120;
+    const y = 22 - Math.max(-1, Math.min(1, wave(x))) * 16;
+    return `${(6 + x * 60).toFixed(1)} ${y.toFixed(1)}`;
+  });
+  return picture(
+    (k) =>
+      `<path d="M6 22h60" stroke="${k.fill2}" stroke-width="1"/>` +
+      `<path d="M${points.join("L")}" fill="none" stroke="${k.line}" stroke-width="1.3" stroke-linejoin="round"/>`,
   );
 };
 
@@ -402,7 +439,21 @@ export const GROUP_ITEMS: Record<GroupId, ReadonlyArray<GroupItem>> = {
       get: (ctx) => !ctx.shown.disable_boost,
       set: (value) => ({ disable_boost: value !== true }),
     },
+  ],
+  sound: [
     { name: "sound", selector: TOGGLE },
+    {
+      name: "click_sound",
+      visible: (ctx) => ctx.shown.sound,
+      selector: (ctx) =>
+        box(
+          CLICK_SOUNDS.map((sound) =>
+            option(ctx, sound, `click_sound_${sound}`, wavePicture(sound)),
+          ),
+          2,
+        ),
+    },
+    { kind: "listen" },
   ],
   after: [
     {
@@ -553,7 +604,9 @@ const SUMMARY: Record<GroupId, (ctx: FieldContext) => Array<string | null>> = {
     shown.selector_mode
       ? null
       : t("editor.summary.friction", { level: normalizeFriction(config.friction) }),
-    t(shown.sound ? "editor.summary.sound" : "editor.summary.silent"),
+  ],
+  sound: ({ shown, t }) => [
+    shown.sound ? t(`editor.click_sound_${shown.click_sound}`) : t("editor.summary.off"),
   ],
   after: (ctx) => {
     const { config, shown, t } = ctx;

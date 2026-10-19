@@ -334,6 +334,13 @@ describe("sound", () => {
     expect(clicksPlayed()).toBe(3);
   });
 
+  it("clicks in the chosen sound", async () => {
+    const card = await mount({ click_sound: "wood" });
+    drag(card, 0, 50);
+    // A wood click is a noise tap over two body modes.
+    expect(audio.filter((op) => op[0] === "start")).toHaveLength(3);
+  });
+
   it("stays silent when sound is off", async () => {
     const card = await mount({ sound: false });
     click(card);

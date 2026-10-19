@@ -286,6 +286,57 @@ describe("fields that show a projection", () => {
   });
 });
 
+describe("the click sound", () => {
+  it("is picked in its own group, and only while there is sound", async () => {
+    const session = await open();
+    expect(session.form("click_sound")?.data.click_sound).toBe("classic");
+    expect(await session.change("click_sound", "pin")).toEqual({ type: TYPE, click_sound: "pin" });
+    // Silenced, the choice goes too, as the peg density does without pegs.
+    expect(await session.change("sound", false)).toEqual({ type: TYPE, sound: false });
+    expect(session.fields()).not.toContain("click_sound");
+  });
+
+  it("can be heard before it is saved", async () => {
+    const starts: number[] = [];
+    const node = (): Record<string, unknown> => ({
+      connect: <T>(next: T): T => next,
+      disconnect() {},
+      start: (t: number) => starts.push(t),
+      stop() {},
+      frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+      Q: { value: 0 },
+      gain: {
+        setValueAtTime() {},
+        linearRampToValueAtTime() {},
+        exponentialRampToValueAtTime() {},
+      },
+    });
+    class FakeAudio {
+      state = "running";
+      currentTime = 0;
+      sampleRate = 100;
+      destination = node();
+      createBuffer = (_c: number, n: number) => ({ getChannelData: () => new Float32Array(n) });
+      createBufferSource = node;
+      createOscillator = node;
+      createBiquadFilter = node;
+      createGain = node;
+      close = async (): Promise<void> => {};
+    }
+    vi.stubGlobal("AudioContext", FakeAudio);
+    const session = await open({ click_sound: "wood" });
+    const listen = session.root.querySelector<HTMLElement>(
+      ".ed-groups ha-button[aria-label^='Listen']",
+    );
+    listen!.click();
+    // Eleven wood clicks: a noise tap and two body modes each.
+    expect(starts).toHaveLength(33);
+    vi.unstubAllGlobals();
+    const silent = await open({ sound: false });
+    expect(silent.root.querySelector(".ed-groups ha-button[aria-label^='Listen']")).toBeNull();
+  });
+});
+
 describe("the segment rows", () => {
   const labels = ["a", "b", "c"];
 

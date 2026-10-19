@@ -50,6 +50,7 @@ describe("the groups", () => {
       "Hub & pointer",
       "Lines & pegs",
       "Spinning",
+      "Sound",
       "After a spin",
     ]);
     expect(panels(editor)[0].secondary).toBe("Pastel · Full circle");

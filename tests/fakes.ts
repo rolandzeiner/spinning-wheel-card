@@ -208,6 +208,11 @@ class FakeAudioContext {
   createGain(): unknown {
     return this.node("gain");
   }
+  createOscillator(): unknown {
+    return Object.assign(this.node("oscillator") as object, {
+      frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+    });
+  }
 }
 
 /** Clicks the card has scheduled so far. */

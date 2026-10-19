@@ -15,6 +15,7 @@ import { LitElement, html, nothing } from "lit";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 
+import { playSample } from "./click-sounds";
 import { DEFAULTS, normaliseConfig, tidyConfig } from "./config";
 import {
   COUNT_FIELD,
@@ -167,6 +168,41 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
     }
   }
 
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    void this._audio?.close().catch(() => {});
+    this._audio = null;
+  }
+
+  /** The Listen button's audio context: made on its first press, which is
+   *  the user gesture browsers want before they play anything. */
+  private _audio: AudioContext | null = null;
+
+  private _renderListen(ctx: FieldContext): TemplateResult | typeof nothing {
+    if (!ctx.shown.sound) return nothing;
+    const name = this._t(`editor.click_sound_${ctx.shown.click_sound}`);
+    return html`<div>
+      <ha-button
+        appearance="plain"
+        aria-label=${`${this._t("editor.listen")}: ${name}`}
+        @click=${() => this._listen(ctx)}
+      >
+        <ha-icon icon="mdi:play" slot="icon" aria-hidden="true"></ha-icon>
+        ${this._t("editor.listen")}
+      </ha-button>
+    </div>`;
+  }
+
+  /** A short rattle in the chosen sound, slowing to a stop. */
+  private _listen(ctx: FieldContext): void {
+    if (typeof window.AudioContext === "undefined") return;
+    this._audio ??= new AudioContext();
+    const audio = this._audio;
+    const play = (): void => playSample(ctx.shown.click_sound, audio);
+    if (audio.state === "suspended") void audio.resume().then(play, () => {});
+    else play();
+  }
+
   /** The editor speaks Home Assistant's language. */
   private _lang(): string {
     return resolveLang(this.hass);
@@ -239,6 +275,8 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
     if (typeof next.friction === "string") next.friction = normalizeFriction(next.friction);
     // The density means nothing with pegs off; don't leave it in the YAML.
     if (next.pegs !== true) delete next.peg_density;
+    // Likewise the kind of click, with the click sound off.
+    if (next.sound === false) delete next.click_sound;
     // The card refuses a list longer than `segments`, in to-do mode too,
     // where `segments` otherwise goes unused. A row edit on a long list
     // raises it rather than producing a config the card throws on.
@@ -323,6 +361,7 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
       flush();
       if (item.kind === "divider") out.push(html`<hr class="ed-divider" />`);
       else if (item.kind === "result") out.push(this._renderResult(ctx));
+      else if (item.kind === "listen") out.push(this._renderListen(ctx));
       else {
         const text = item.text(ctx);
         if (text === null) continue;

@@ -14,6 +14,7 @@ import type {
   TodoItem,
 } from "./types";
 import { fireEvent } from "./types";
+import { playClick } from "./click-sounds";
 import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction";
 import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
@@ -1931,78 +1932,14 @@ export class SpinningWheelCard extends LitElement {
     return this._pegsEnabled() ? this._pegIntervalIndex() : this._segmentIndexUnderPointer();
   }
 
-  /** Peg-click sound — a single focused filtered-noise burst: the dry
-   *  "tok" of a flapper striking a plastic peg. One layer, bandpassed
-   *  tight (Q≈3) at a mid frequency so it reads as a rounded "tok", not
-   *  a bright broadband "tss" — a low Q or a high centre is what makes
-   *  a noise click sound like crackling. A quadratic decay is baked
-   *  into the noise buffer for a rounded back-end, and the gain adds a
-   *  2 ms attack ramp (no sample-zero cliff) and an exponential tail.
-   *
-   *  `intensity` (rim speed mapped to 0..1) scales the click INVERSELY
-   *  in length: a slow strike is a longer, woody "tok"; a hard, fast
-   *  strike is short, tight and bright, so a dense fast-spin peg train
-   *  reads as a crisp rattle instead of overlapping into a smear. A
-   *  hard strike is also a touch louder and brighter. `when` is the
-   *  audio-clock start time — the caller staggers the clicks of one
-   *  frame across the frame interval rather than stacking them on
-   *  `currentTime`. The node chain is torn down in `onended`;
-   *  BufferSource nodes never self-disconnect, and on a fast spin
-   *  firing several clicks per frame an un-freed chain is a real leak. */
+  /** One peg / segment click in the configured `click_sound`. The voices
+   *  live in `click-sounds.ts`, shared with the editor's Listen button;
+   *  each scales length, loudness and brightness with `intensity` (rim
+   *  speed mapped to 0..1) and frees its nodes when it ends. `when` is the
+   *  audio-clock start: the caller staggers one frame's clicks across the
+   *  frame rather than stacking them on `currentTime`. */
   private _playTick(ctx: AudioContext, intensity: number, when: number): void {
-    const I = Math.max(0, Math.min(1, intensity));
-    const t0 = Math.max(when, ctx.currentTime);
-    // Shorter when fast → a crisp rattle; longer when slow → a woody
-    // tok. The fast end is very short so a dense peg train barely
-    // overlaps; the slow end is unchanged from the tuning that landed.
-    const dur = 0.061 - 0.048 * I; // 61 ms slow → 13 ms fast
-
-    // White-noise burst with a quadratic decay envelope baked in.
-    const sampleRate = ctx.sampleRate;
-    const samples = Math.max(1, Math.floor(sampleRate * dur));
-    const buf = ctx.createBuffer(1, samples, sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < samples; i++) {
-      const x = i / samples;
-      const env = (1 - x) * (1 - x);
-      data[i] = (Math.random() * 2 - 1) * env;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-
-    // Tight bandpass → focused "tok"; centre rises with intensity so a
-    // fast strike is crisper. ±8 % jitter so a fast train doesn't sound
-    // like one repeated sample.
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = (1500 + 550 * I) * (1 + (Math.random() - 0.5) * 0.16);
-    bp.Q.value = 3;
-
-    // Lowpass takes the ice-pick edge off — opens up when fast for snap.
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 3300 + 2200 * I;
-    lp.Q.value = 0.7;
-
-    const gainNode = ctx.createGain();
-    // Flatter loudness curve: fast clicks overlap and sum, so the per-
-    // click peak stays lower at speed (slow-drag level is unchanged).
-    const peak = 0.09 + 0.08 * I;
-    // Snappier attack when fast (1.1 ms) vs. softer when slow (2.4 ms).
-    const attack = 0.0024 - 0.0013 * I;
-    gainNode.gain.setValueAtTime(0, t0);
-    gainNode.gain.linearRampToValueAtTime(peak, t0 + attack);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-
-    src.connect(bp).connect(lp).connect(gainNode).connect(ctx.destination);
-    src.start(t0);
-    src.stop(t0 + dur + 0.02);
-    src.onended = (): void => {
-      src.disconnect();
-      bp.disconnect();
-      lp.disconnect();
-      gainNode.disconnect();
-    };
+    playClick(this.config.click_sound, ctx, intensity, when);
   }
 
   /** Detect peg / segment crossings since the previous call and react:

@@ -100,6 +100,7 @@ const RULES: ReadonlyArray<readonly [option: string, rule: Rule]> = [
   ["label_colors", list(isColour)],
   ["hub_text", text],
   ["sound", flag],
+  ["click_sound", oneOf("classic", "wood", "flapper", "pin", "felt", "ratchet")],
   ["text_orientation", oneOf("tangent", "radial")],
   ["theme", oneOf("default", "pastel", "pride", "neon")],
   ["hub_color", oneOf("theme", "black", "white")],
