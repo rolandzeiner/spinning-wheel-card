@@ -21,12 +21,12 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 - **TTS announcement** — opt-in: pick a `tts.*` engine and one or more `media_player.*` speakers and the winning label is spoken aloud after every spin. MDI icon labels are read without the `mdi:` prefix (`mdi:food-croissant` → "food croissant"). No script required.
 - **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
 - **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
-- **Label layout controls** (grouped in a collapsible section in the editor) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
+- **Label layout controls** (the editor's *Labels* group) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
 - **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
 - **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
-- **Synthesised peg-click sound** (Web Audio, no asset). Toggle off in config.
+- **Six peg-click sounds**, synthesised with Web Audio (no audio files): classic, wood block, rubber flapper, metal pin, felt and plastic ratchet. Every one clicks harder and shorter the faster the wheel turns. Picking a sound in the editor plays a short sample of it; switch the sound off for silence.
 - **Responsive canvas** — 140–1000 px, scales to the dashboard cell on both axes.
-- **Visual editor** with grouped sections (General / Label layout / Segment bindings / Advanced).
+- **Visual editor** — the segments as one list, each with its label, fill and text colour, weight and action, then collapsible groups that show their settings without opening: *Appearance*, *Labels*, *Hub & pointer*, *Lines & pegs*, *Spinning* and *After a spin*. The friction slider says how long a spin lasts; a to-do list can stand in for the segments.
 - **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
 - **WCAG 2.2 A+AA** — keyboard activation, focus-visible ring, `prefers-reduced-motion`, forced-colors fallback.
 
@@ -39,7 +39,7 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
   </tr>
   <tr>
     <td align="center"><em>Lovelace card</em></td>
-    <td align="center"><em>Visual editor — every option in one form</em></td>
+    <td align="center"><em>Visual editor</em></td>
   </tr>
 </table>
 
@@ -88,7 +88,7 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `pegs` | boolean | `false` | Render small pegs at the rim. Each peg fires a peg-click sound (gated by `sound`) and a small velocity bump as it passes the indicator. The wheel smoothly settles off any peg whose pixel footprint the indicator overlaps on stop; back-roll only fires when the wheel approached but didn't cross the peg (no random snap-back across cleanly-crossed pegs). |
 | `peg_density` | integer 0–4 | `1` | Extra pegs per segment beyond the always-present boundary peg. `0` = boundary pegs only (`segments` total); `1` = boundary + 1 mid (`2 × segments`, default); `4` = densely studded (`5 × segments`). Ignored when `pegs: false`. |
 | `result_entity` | `input_text.*` entity_id | none | Helper to receive the winning label after every spin. Editor's "Create dedicated helper" button auto-provisions one (admin only). |
-| `light_sync_entities` | array of `light.*` entity_ids | none | Lights that automatically match the winning segment's fill colour after every spin (`light.turn_on` with `rgb_color`). Independent of `actions` — no script needed. Only RGB-capable bulbs respond (`supported_color_modes` includes `rgb` / `rgbw` / `rgbww` / `hs` / `xy`); color-temp / brightness / on-off bulbs are skipped silently. Colours that can't be parsed (named CSS colours, `var(--…)`) also skip silently. |
+| `light_sync_entities` | array of `light.*` entity_ids | none | Lights that automatically match the winning segment's fill colour after every spin (`light.turn_on` with `rgb_color`). Independent of `actions` — no script needed. Only RGB-capable bulbs respond (`supported_color_modes` includes `rgb` / `rgbw` / `rgbww` / `hs` / `xy`); color-temp / brightness / on-off bulbs are skipped silently. Hex, `rgb()`, `hsl()` and named colours all work; a `var(--…)` colour skips silently. |
 | `tts_engine` | `tts.*` entity_id | none | TTS engine used to speak the winning label after every spin. Must be paired with `tts_announce_entities` — engine alone is a no-op. |
 | `tts_announce_entities` | array of `media_player.*` entity_ids | none | Speakers that announce the winning label after every spin, via `tts_engine` (`tts.speak`). Independent of `actions` — no script needed. MDI icon labels are spoken without the `mdi:` prefix and with hyphens read as spaces (`mdi:food-croissant` → "food croissant"). The engine's own language setting governs pronunciation. |
 | `todo_entity` | `todo.*` entity_id | none | Fill segments from this entity's open items (4–24, deduped). `segments`, `labels`, `text_orientation` are ignored while wired. |
@@ -100,19 +100,22 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 | `hub_text` | string | localised (`SPIN` / `DREH` / …) | Centre-hub label. Auto-shrinks. Empty hides. |
 | `hub_color` | `theme` / `black` / `white` | `theme` | Hub + indicator fill. `theme` uses HA's `--primary-color` with auto-contrast text. |
 | `sound` | boolean | `true` | Peg-click sound on segment crossings. |
+| `click_sound` | `classic` / `wood` / `flapper` / `pin` / `felt` / `ratchet` | `classic` | How each click sounds. `classic` is a short, light click; `wood` a warm knock with a hint of pitch; `flapper` a rubber flap that springs back on slow crossings; `pin` a bright metal tink; `felt` a muted thud; `ratchet` a crisp, dry tick. |
 | `show_status` | boolean | `true` | Show the line beneath the wheel (`Spinning…` / `Result: X` / idle hint). |
 
 ### Friction slider
 
 `friction: 1–10` controls how fast the wheel decays each frame, and (when `pegs: true`) how hard each peg brakes — one slider drives both. Default `5` reproduces the historical `medium` feel.
 
-| Level | @ 60 fps | Stops after | Per-peg drag |
-| --- | --- | --- | --- |
-| `1` | 0.998 | ~14 s | 0.016 rad/s |
-| `3` | 0.994 (≈ old `low`) | ~6 s | 0.048 rad/s |
-| `5` | 0.990 (= old `medium`) | ~4 s | 0.080 rad/s |
-| `7` | 0.982 (≈ old `high`) | ~2 s | 0.112 rad/s |
-| `10` | 0.970 | ~1.3 s | 0.160 rad/s |
+| Level | @ 60 fps | Stops after a click | With pegs | Per-peg drag |
+| --- | --- | --- | --- | --- |
+| `1` | 0.998 | ~27 s | ~22 s | 0.016 rad/s |
+| `3` | 0.994 (≈ old `low`) | ~9 s | ~7 s | 0.048 rad/s |
+| `5` | 0.990 (= old `medium`) | ~5 s | ~4 s | 0.080 rad/s |
+| `7` | 0.982 (≈ old `high`) | ~3 s | ~2.6 s | 0.112 rad/s |
+| `10` | 0.970 | ~2 s | ~1.7 s | 0.160 rad/s |
+
+The times are for a click of middle strength on 8 segments; with pegs at the default two per segment. A harder throw spins longer, more pegs brake sooner.
 
 Decay is frame-rate independent. Each tick applies viscous damping
 `ω *= friction^(60·dt)` followed by a Coulomb subtraction
@@ -338,7 +341,7 @@ Chrome / Edge / Firefox / Safari current major + previous. Uses Web Audio, Resiz
 ```bash
 npm install
 npm run build       # → dist/spinning-wheel-card.js
-npm run dev         # rollup watch mode
+npm run dev         # rebuilds on every save
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

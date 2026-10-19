@@ -1,19 +1,21 @@
-import * as en from "./languages/en.json";
-import * as de from "./languages/de.json";
-import * as fr from "./languages/fr.json";
-import * as it from "./languages/it.json";
-import * as es from "./languages/es.json";
-import * as pt from "./languages/pt.json";
-import * as nl from "./languages/nl.json";
-import * as zh from "./languages/zh.json";
-import * as ja from "./languages/ja.json";
+import en from "./languages/en.json";
+import de from "./languages/de.json";
+import fr from "./languages/fr.json";
+import it from "./languages/it.json";
+import es from "./languages/es.json";
+import pt from "./languages/pt.json";
+import nl from "./languages/nl.json";
+import zh from "./languages/zh.json";
+import ja from "./languages/ja.json";
 
 /** Single source of truth for bundled languages — ISO-639-1 code,
  *  native-language name (used as the editor dropdown label, never
  *  translated), and the imported JSON dict. Display order is what
  *  the editor renders, so keep English first (canonical fallback)
  *  with the rest in a stable order. To add a language, drop in the
- *  JSON file, import it above, and append an entry here. */
+ *  JSON file, default-import it above (vite.config.ts turns JSON named
+ *  exports off, so `import * as` would leave it empty), and append an
+ *  entry here. */
 const LANGUAGE_REGISTRY: ReadonlyArray<{
   code: string;
   nativeName: string;
@@ -45,16 +47,9 @@ export const AVAILABLE_LANGUAGES: ReadonlyArray<{
   nativeName: string;
 }> = LANGUAGE_REGISTRY.map(({ code, nativeName }) => ({ code, nativeName }));
 
-function resolveTranslation(
-  path: string,
-  dictionary: Record<string, unknown>,
-): string | undefined {
+function resolveTranslation(path: string, dictionary: Record<string, unknown>): string | undefined {
   const value = path.split(".").reduce<unknown>((acc, key) => {
-    if (
-      acc &&
-      typeof acc === "object" &&
-      key in (acc as Record<string, unknown>)
-    ) {
+    if (acc && typeof acc === "object" && key in (acc as Record<string, unknown>)) {
       return (acc as Record<string, unknown>)[key];
     }
     return undefined;
@@ -67,7 +62,7 @@ function resolveTranslation(
  *  as `lang`. Optional `vars` does `{name}` substitution. */
 export function localize(
   key: string,
-  lang: string | undefined = undefined,
+  lang?: string,
   vars?: Record<string, string | number>,
 ): string {
   // Strip BCP-47 region — dicts are ISO-639-1 lowercase.
@@ -86,10 +81,7 @@ export function localize(
       // like "Pay $50 to $&" must render literally, not as the matched
       // `{value}` placeholder.
       const replacement = String(v);
-      translated = translated.replace(
-        new RegExp(`\\{${k}\\}`, "g"),
-        () => replacement,
-      );
+      translated = translated.replace(new RegExp(`\\{${k}\\}`, "g"), () => replacement);
     }
   }
   return translated;
@@ -98,10 +90,7 @@ export function localize(
 /** Resolve UI language: `hass.locale.language` → `hass.language` →
  *  `navigator.language` → `"en"`. */
 export function resolveLang(
-  hass:
-    | { locale?: { language?: string }; language?: string }
-    | undefined
-    | null,
+  hass: { locale?: { language?: string }; language?: string } | undefined | null,
 ): string {
   return (
     hass?.locale?.language ??

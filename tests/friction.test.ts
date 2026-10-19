@@ -6,12 +6,14 @@
  * old YAML keeps working. Also pins the v1.2.4+ Coulomb deceleration
  * curve introduced for finite-time stop.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   coulombDecel,
   frictionMultiplier,
   normalizeFriction,
+  pegDrag,
+  stopSeconds,
 } from "../src/friction";
 
 describe("normalizeFriction", () => {
@@ -118,5 +120,39 @@ describe("coulombDecel", () => {
     for (let level = 1; level <= 10; level++) {
       expect(coulombDecel(level)).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("pegDrag", () => {
+  it("brakes 0.08 rad/s per peg at the default, scaled with the slider", () => {
+    expect(pegDrag(5)).toBeCloseTo(0.08, 6);
+    expect(pegDrag(1)).toBeCloseTo(0.016, 6);
+    expect(pegDrag(10)).toBeCloseTo(0.16, 6);
+  });
+});
+
+describe("stopSeconds", () => {
+  // The editor quotes it under the friction slider, for a click launch
+  // of 12 rad/s; the anchors pin what the slider says at each end.
+  it("takes about 27 s at the lightest level, 5 s at the default and 2 s at the heaviest", () => {
+    expect(stopSeconds(1, 12)).toBeCloseTo(26.6, 0);
+    expect(stopSeconds(5, 12)).toBeCloseTo(5.3, 0);
+    expect(stopSeconds(10, 12)).toBeCloseTo(2, 0);
+  });
+
+  it("gets shorter at every level up", () => {
+    for (let level = 2; level <= 10; level++) {
+      expect(stopSeconds(level, 12)).toBeLessThan(stopSeconds(level - 1, 12));
+    }
+  });
+
+  it("is shorter with pegs, each crossing one braking the wheel", () => {
+    // 8 segments with two pegs each: about a fifth shorter at the default.
+    expect(stopSeconds(5, 12, 16)).toBeCloseTo(4.2, 0);
+    expect(stopSeconds(5, 12, 16)).toBeLessThan(stopSeconds(5, 12, 8));
+  });
+
+  it("is zero for a wheel already at rest", () => {
+    expect(stopSeconds(5, 0)).toBe(0);
   });
 });

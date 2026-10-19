@@ -13,10 +13,14 @@ import type {
   TextOrientation,
   TodoItem,
 } from "./types";
-import { coulombDecel, frictionMultiplier, normalizeFriction } from "./friction";
+import { fireEvent } from "./types";
+import { playClick } from "./click-sounds";
+import { coulombDecel, frictionMultiplier, normalizeFriction, pegDrag } from "./friction";
 import { fetchOpenTodoItems } from "./todo";
 import { localize, resolveLang } from "./localize/localize";
 import { DEFAULT_LABEL_COLOR, THEME_PALETTES } from "./palettes";
+import { type NormalisedConfig, normaliseConfig, textOrientationDefault } from "./config";
+import { validateConfig } from "./validate";
 
 import "./editor";
 
@@ -30,8 +34,7 @@ interface WindowWithCustomCards extends Window {
   }>;
 }
 // hass not available at module init — use navigator.language for the picker.
-const initialLang =
-  typeof navigator !== "undefined" ? navigator.language : "en";
+const initialLang = typeof navigator !== "undefined" ? navigator.language : "en";
 
 // Idempotent — bundle may re-import (HACS + manual /local both
 // registered, dev-push iteration). Without the guard the picker grows
@@ -63,13 +66,12 @@ const HALF_BOTTOM_PAD_FRAC = 4 / DEFAULT_SIZE;
  *  "dial nub" + HALF_BOTTOM_PAD_FRAC breathing room. */
 const HALF_ASPECT = 0.5 + HUB_RADIUS_FRAC + HALF_BOTTOM_PAD_FRAC;
 
-
 /** Safety-net stop threshold. Coulomb friction usually reaches ω = 0
  *  in finite time before this threshold is consulted; the guard
  *  catches pathological float drift. */
 const STOP_THRESHOLD_RAD_PER_S = 0.01;
-const CLICK_IMPULSE_MIN = 8;   // rad/s ≈ 1.3 rev/s
-const CLICK_IMPULSE_MAX = 16;  // rad/s ≈ 2.5 rev/s
+const CLICK_IMPULSE_MIN = 8; // rad/s ≈ 1.3 rev/s
+const CLICK_IMPULSE_MAX = 16; // rad/s ≈ 2.5 rev/s
 const VELOCITY_SAMPLE_WINDOW_MS = 100;
 const MAX_VELOCITY_RAD_PER_S = 40;
 
@@ -86,10 +88,8 @@ export const wrapAngle = (a: number): number => ((a % TWO_PI) + TWO_PI) % TWO_PI
  *  Consumers that need the literal user-typed RGB triple (e.g. the
  *  `wheel_color_rgb` action payload) want this function as-is so the
  *  payload mirrors what was in YAML.
- *  Exported for tests; `_cssToRgbTriple` on the card class delegates here. */
-export const cssToRgbTriple = (
-  value: string,
-): readonly [number, number, number] | null => {
+ *  Exported for tests. */
+export const cssToRgbTriple = (value: string): readonly [number, number, number] | null => {
   const s = value.trim();
   if (s.startsWith("#")) {
     if (s.length === 7) {
@@ -124,22 +124,18 @@ export const cssToRgbTriple = (
  *  (i.e. mid-grey, not black). Without this, auto-contrast misjudges
  *  translucent fills and picks the wrong text colour (WCAG 1.4.3).
  *  Returns null for inputs `cssToRgbTriple` doesn't accept. */
-export const cssRgbForLuminance = (
-  value: string,
-): readonly [number, number, number] | null => {
+export const cssRgbForLuminance = (value: string): readonly [number, number, number] | null => {
   const s = value.trim();
   // Hex values are opaque by definition — fall through to the
   // existing parser.
   if (s.startsWith("#")) return cssToRgbTriple(s);
-  const m = s.match(
-    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)/i,
-  );
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)/i);
   if (!m) return null;
   const r = parseInt(m[1]!, 10);
   const g = parseInt(m[2]!, 10);
   const b = parseInt(m[3]!, 10);
   if (m[4] === undefined) return [r, g, b];
-  const a = Math.max(0, Math.min(1, parseFloat(m[4]!)));
+  const a = Math.max(0, Math.min(1, parseFloat(m[4])));
   if (!Number.isFinite(a) || a >= 1) return [r, g, b];
   const blend = (c: number): number => Math.round(c * a + 255 * (1 - a));
   return [blend(r), blend(g), blend(b)];
@@ -168,6 +164,45 @@ export const pickFontPx = (
   return { px: minPx, fits: false };
 };
 
+/** `text` cut back until it fits `budget` with a trailing "…". Returned
+ *  unchanged when it already fits; never cut below one character. Pure —
+ *  `measure` is the only dependency on the canvas context. */
+export const ellipsize = (
+  measure: (text: string) => number,
+  text: string,
+  budget: number,
+): string => {
+  if (measure(text) <= budget) return text;
+  let truncated = text;
+  while (truncated.length > 1 && measure(truncated + "…") > budget) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + "…";
+};
+
+/** One value per segment, shared by every segment with the same label —
+ *  the spin result is the label, so equal labels must look and act alike.
+ *  `pick` runs once per unique label, in order of first appearance, with
+ *  that label's slot number and the index of its first segment. */
+export const mapByUniqueLabel = <T>(
+  labels: ReadonlyArray<string>,
+  pick: (slot: number, index: number) => T,
+): T[] => {
+  const byLabel = new Map<string, T>();
+  return labels.map((label, i) => {
+    if (!byLabel.has(label)) byLabel.set(label, pick(byLabel.size, i));
+    return byLabel.get(label) as T;
+  });
+};
+
+const canvasFont = (weight: 600 | 700, px: number): string =>
+  `${weight} ${px}px ui-sans-serif, system-ui, sans-serif`;
+
+/** Smallest label font the auto-fit shrinks to. */
+const MIN_LABEL_PX = 7;
+/** Arcs at or below this (~15°) have no room for a readable label. */
+const MIN_LABEL_ARC = 0.26;
+
 /** Matches `mdi:foo` / `hass:foo` / any namespaced HA icon ref.
  *  Stateless (no `g` flag) — safe to share between `_looksLikeIcon`
  *  and `toSpokenLabel`. */
@@ -195,17 +230,6 @@ const TICK_MIN_INTENSITY = 0.4; // intensity floor at near-zero speed
 // few per ~16 ms anyway.
 const TICK_MAX_PER_FRAME = 8;
 
-/** Peg brake bump at slider level 5 (the new default). Applied once
- *  per `_onSegmentCrossing` call — once per animation frame while
- *  spinning, or once per pointer-move while dragging — regardless of
- *  how many pegs were swept that call; only the audio path clicks per
- *  peg. `_pegDrag()` scales linearly with the 1–10 friction slider so
- *  light setups (level 1) get ~0.016 rad/s per braked frame, heavy
- *  setups (level 10) get ~0.16. Capped at zero in the use-site so the
- *  brake can't reverse the spin direction. Composes with the
- *  continuous friction decay; one slider drives both. */
-const PEG_DRAG_RAD_PER_S = 0.08;
-
 /** Peg centre placement as a fraction of the wheel `radius` (the outer
  *  edge of the slice fills). 1.0 sits the peg exactly on the rim;
  *  smaller pulls it inward. 0.96 nudges them visibly into the disc
@@ -231,7 +255,7 @@ const PEG_BACKROLL_MAX_PROB = 0.5;
 const DRAG_COMMIT_RAD = 0.04;
 
 interface VelocitySample {
-  t: number;        // performance.now()
+  t: number; // performance.now()
   angleDelta: number;
 }
 
@@ -240,13 +264,7 @@ interface VelocitySample {
  *  can't honour `rgb_color` (color_temp-only / brightness-only / on-off
  *  / white-only). HA's `light.turn_on` would silently no-op those
  *  upstream, but bailing here makes the misconfiguration deliberate. */
-const RGB_CAPABLE_COLOR_MODES: ReadonlySet<string> = new Set([
-  "rgb",
-  "rgbw",
-  "rgbww",
-  "hs",
-  "xy",
-]);
+const RGB_CAPABLE_COLOR_MODES: ReadonlySet<string> = new Set(["rgb", "rgbw", "rgbww", "hs", "xy"]);
 
 /** Cross-instance, cross-mount icon path cache. Keys are bare icon
  *  names (`mdi:home`); values are the resolved SVG `d` string, or
@@ -284,8 +302,6 @@ interface LabelRenderPlan {
   textHalfWidth: number;
   /** Per-glyph code points (split for tangent rendering). */
   chars: ReadonlyArray<string>;
-  /** Per-glyph pixel widths at `fontPx`. Mirrors `chars`. */
-  glyphWidths: ReadonlyArray<number>;
   /** Per-glyph angle subtended at `labelRadius`. Mirrors `chars`. */
   glyphAngularWidths: ReadonlyArray<number>;
   /** Sum of `glyphAngularWidths` — also cached so `_drawArchedText`
@@ -293,24 +309,75 @@ interface LabelRenderPlan {
   totalAngular: number;
 }
 
+/** What every label on the wheel shares, worked out once per cache build. */
+interface LabelGeometry {
+  labelFontPx: number;
+  labelRadius: number;
+  /** Hub-to-rim room a radial label can use. */
+  radialChannel: number;
+  orientation: TextOrientation;
+  useAutoFit: boolean;
+}
+
+/** Hub + indicator colours, resolved from the theme's CSS variables. */
+interface WheelTheme {
+  indicatorFill: string;
+  hubLight: string;
+  hubDark: string;
+  hubText: string;
+  hubStroke: string;
+}
+
+/** Per-spin draw cache. Everything in `_draw` that doesn't depend on
+ *  `_angle` lives here so the RAF tick avoids per-frame allocations
+ *  and `ctx.measureText` calls. Built lazily on the first `_draw`
+ *  call after invalidation; reused every subsequent frame until
+ *  config / todo / size / icon-load triggers `_invalidateDrawCache`.
+ *  The cache rebuild is one full pass of measure-and-shrink (~200
+ *  `measureText` calls for a 20-segment radial wheel with long
+ *  labels) — but only ONCE per spin instead of every frame, taking
+ *  the per-frame work from ~600 measureText calls to zero. */
+interface DrawCache {
+  arcs: ReadonlyArray<number>;
+  segmentColors: ReadonlyArray<string>;
+  segmentLabelColors: ReadonlyArray<string>;
+  radius: number;
+  hubRadius: number;
+  labelFontPx: number;
+  labelRadius: number;
+  flip: boolean;
+  orientation: TextOrientation;
+  labelPlans: ReadonlyArray<LabelRenderPlan>;
+  pegRadius: number;
+  pegSize: number;
+  pegStep: number;
+  totalPegs: number;
+  pegsEnabled: boolean;
+  /** "" when the hub label is hidden (empty config OR selector mode). */
+  hubText: string;
+  /** Already shrunk to fit `hubRadius * 1.7` — no per-frame measure
+   *  loop. 0 when `hubText` is empty. */
+  hubFontPx: number;
+}
+
 export class SpinningWheelCard extends LitElement {
   public static getConfigElement(): LovelaceCardEditor {
-    return document.createElement(
-      "spinning-wheel-card-editor",
-    ) as LovelaceCardEditor;
+    return document.createElement("spinning-wheel-card-editor");
   }
 
   public static getStubConfig(): Record<string, unknown> {
-    // Omit `name` — render() falls back to localised default so the
-    // header tracks the user's language without baking a string into YAML.
-    return { segments: 8, friction: 5 };
+    // Empty on purpose. `name` is left out so render() falls back to the
+    // localised default and the header tracks the user's language; the
+    // rest come from DEFAULTS. A default written in here is saved into the
+    // YAML, where it stays pinned even if DEFAULTS changes.
+    return {};
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @state() private config: SpinningWheelCardConfig = {
+  @state() private config: NormalisedConfig = normaliseConfig({
     type: "spinning-wheel-card",
-  };
+  });
 
   @state() private _result: string | null = null;
   @state() private _spinning = false;
@@ -350,327 +417,16 @@ export class SpinningWheelCard extends LitElement {
   public setConfig(config: SpinningWheelCardConfig): void {
     // Prefer incoming language so an edit that flips language AND adds
     // an error reports the error in the new language.
-    const lang =
-      (config?.language as string | undefined) ??
-      this.config?.language ??
-      resolveLang(this.hass);
-    if (!config || typeof config !== "object") {
-      throw new Error(localize("errors.invalid_config", lang));
-    }
-    if (config.name !== undefined && typeof config.name !== "string") {
-      throw new Error(localize("errors.name_type", lang));
-    }
-    if (config.language !== undefined && typeof config.language !== "string") {
-      throw new Error(localize("errors.language_type", lang));
-    }
-    if (config.segments !== undefined) {
-      if (
-        typeof config.segments !== "number" ||
-        config.segments < 4 ||
-        config.segments > 24 ||
-        !Number.isInteger(config.segments)
-      ) {
-        throw new Error(localize("errors.segments_range", lang));
-      }
-    }
-    if (config.friction !== undefined) {
-      const f = config.friction;
-      const isPreset =
-        typeof f === "string" && ["low", "medium", "high"].includes(f);
-      const isLevel =
-        typeof f === "number" &&
-        Number.isInteger(f) &&
-        f >= 1 &&
-        f <= 10;
-      if (!isPreset && !isLevel) {
-        throw new Error(localize("errors.friction_range", lang));
-      }
-    }
-    const segments = config.segments ?? 8;
-    if (config.labels !== undefined) {
-      if (
-        !Array.isArray(config.labels) ||
-        !config.labels.every((l) => typeof l === "string")
-      ) {
-        throw new Error(localize("errors.labels_type", lang));
-      }
-      if (config.labels.length > segments) {
-        throw new Error(
-          localize("errors.labels_length", lang, {
-            len: config.labels.length,
-            segments,
-          }),
-        );
-      }
-    }
-    if (config.weights !== undefined) {
-      if (
-        !Array.isArray(config.weights) ||
-        !config.weights.every(
-          (w) => typeof w === "number" && Number.isFinite(w) && w > 0,
-        )
-      ) {
-        throw new Error(localize("errors.weights_type", lang));
-      }
-      if (config.weights.length === 0) {
-        throw new Error(localize("errors.weights_empty", lang));
-      }
-      if (config.weights.length > segments) {
-        throw new Error(
-          localize("errors.weights_length", lang, {
-            len: config.weights.length,
-            segments,
-          }),
-        );
-      }
-    }
-    if (config.colors !== undefined) {
-      if (
-        !Array.isArray(config.colors) ||
-        // null entries are theme-passthrough sentinels — only reject
-        // entries that are neither null nor a non-empty string.
-        !config.colors.every(
-          (c) => c === null || (typeof c === "string" && c.length > 0),
-        )
-      ) {
-        throw new Error(localize("errors.colors_type", lang));
-      }
-      if (config.colors.length === 0) {
-        throw new Error(localize("errors.colors_empty", lang));
-      }
-      if (config.colors.length > segments) {
-        throw new Error(
-          localize("errors.colors_length", lang, {
-            len: config.colors.length,
-            segments,
-          }),
-        );
-      }
-    }
-    if (config.label_colors !== undefined) {
-      if (
-        !Array.isArray(config.label_colors) ||
-        !config.label_colors.every(
-          (c) => c === null || (typeof c === "string" && c.length > 0),
-        )
-      ) {
-        throw new Error(localize("errors.label_colors_type", lang));
-      }
-      if (config.label_colors.length === 0) {
-        throw new Error(localize("errors.label_colors_empty", lang));
-      }
-      if (config.label_colors.length > segments) {
-        throw new Error(
-          localize("errors.label_colors_length", lang, {
-            len: config.label_colors.length,
-            segments,
-          }),
-        );
-      }
-    }
-    if (config.hub_text !== undefined && typeof config.hub_text !== "string") {
-      throw new Error(localize("errors.hub_text_type", lang));
-    }
-    if (config.sound !== undefined && typeof config.sound !== "boolean") {
-      throw new Error(localize("errors.sound_type", lang));
-    }
-    if (
-      config.text_orientation !== undefined &&
-      !["tangent", "radial"].includes(config.text_orientation)
-    ) {
-      throw new Error(localize("errors.text_orientation_value", lang));
-    }
-    if (
-      config.theme !== undefined &&
-      !["default", "pastel", "pride", "neon"].includes(config.theme)
-    ) {
-      throw new Error(localize("errors.theme_value", lang));
-    }
-    if (
-      config.hub_color !== undefined &&
-      !["theme", "black", "white"].includes(config.hub_color)
-    ) {
-      throw new Error(localize("errors.hub_color_value", lang));
-    }
-    if (
-      config.show_status !== undefined &&
-      typeof config.show_status !== "boolean"
-    ) {
-      throw new Error(localize("errors.show_status_type", lang));
-    }
-    if (config.todo_entity !== undefined) {
-      if (typeof config.todo_entity !== "string") {
-        throw new Error(localize("errors.todo_entity_type", lang));
-      }
-      if (config.todo_entity !== "" && !/^todo\.[a-z0-9_]+$/.test(config.todo_entity)) {
-        throw new Error(localize("errors.todo_entity_invalid", lang));
-      }
-    }
-    if (config.actions !== undefined) {
-      if (!Array.isArray(config.actions)) {
-        throw new Error(localize("errors.actions_type", lang));
-      }
-      if (config.actions.length > segments) {
-        throw new Error(
-          localize("errors.actions_length", lang, {
-            len: config.actions.length,
-            segments,
-          }),
-        );
-      }
-      for (const a of config.actions) {
-        if (a === null) continue;
-        if (typeof a === "string") {
-          // Empty strings tolerated; non-empty must be `script.<name>`.
-          if (a !== "" && !/^script\.[a-z0-9_]+$/.test(a)) {
-            throw new Error(
-              localize("errors.actions_string", lang, { value: a }),
-            );
-          }
-          continue;
-        }
-        if (
-          typeof a === "object" &&
-          typeof (a as { action?: unknown }).action === "string"
-        ) {
-          continue;
-        }
-        throw new Error(localize("errors.actions_type", lang));
-      }
-    }
-    if (
-      config.disable_confirm_actions !== undefined &&
-      typeof config.disable_confirm_actions !== "boolean"
-    ) {
-      throw new Error(localize("errors.disable_confirm_actions_type", lang));
-    }
-    if (
-      config.disable_boost !== undefined &&
-      typeof config.disable_boost !== "boolean"
-    ) {
-      throw new Error(localize("errors.disable_boost_type", lang));
-    }
-    if (
-      config.half_circle !== undefined &&
-      typeof config.half_circle !== "boolean"
-    ) {
-      throw new Error(localize("errors.half_circle_type", lang));
-    }
-    if (
-      config.selector_mode !== undefined &&
-      typeof config.selector_mode !== "boolean"
-    ) {
-      throw new Error(localize("errors.selector_mode_type", lang));
-    }
-    if (
-      config.segment_borders !== undefined &&
-      typeof config.segment_borders !== "boolean"
-    ) {
-      throw new Error(localize("errors.segment_borders_type", lang));
-    }
-    if (config.pegs !== undefined && typeof config.pegs !== "boolean") {
-      throw new Error(localize("errors.pegs_type", lang));
-    }
-    if (config.peg_density !== undefined) {
-      if (
-        typeof config.peg_density !== "number" ||
-        !Number.isInteger(config.peg_density) ||
-        config.peg_density < 0 ||
-        config.peg_density > 4
-      ) {
-        throw new Error(localize("errors.peg_density_range", lang));
-      }
-    }
-    if (
-      config.label_auto_fit !== undefined &&
-      typeof config.label_auto_fit !== "boolean"
-    ) {
-      throw new Error(localize("errors.label_auto_fit_type", lang));
-    }
-    if (config.label_font_scale !== undefined) {
-      if (
-        typeof config.label_font_scale !== "number" ||
-        !Number.isInteger(config.label_font_scale) ||
-        config.label_font_scale < 70 ||
-        config.label_font_scale > 150
-      ) {
-        throw new Error(localize("errors.label_font_scale_range", lang));
-      }
-    }
-    if (config.label_radius_offset !== undefined) {
-      if (
-        typeof config.label_radius_offset !== "number" ||
-        !Number.isInteger(config.label_radius_offset) ||
-        config.label_radius_offset < -20 ||
-        config.label_radius_offset > 20
-      ) {
-        throw new Error(localize("errors.label_radius_offset_range", lang));
-      }
-    }
-    if (
-      config.label_flip !== undefined &&
-      typeof config.label_flip !== "boolean"
-    ) {
-      throw new Error(localize("errors.label_flip_type", lang));
-    }
-    if (
-      config.wheel_context !== undefined &&
-      typeof config.wheel_context !== "boolean"
-    ) {
-      throw new Error(localize("errors.wheel_context_type", lang));
-    }
-    if (config.result_entity !== undefined) {
-      if (typeof config.result_entity !== "string") {
-        throw new Error(localize("errors.result_entity_type", lang));
-      }
-      if (
-        config.result_entity !== "" &&
-        !/^input_text\.[a-z0-9_]+$/.test(config.result_entity)
-      ) {
-        throw new Error(localize("errors.result_entity_invalid", lang));
-      }
-    }
-    if (config.light_sync_entities !== undefined) {
-      if (!Array.isArray(config.light_sync_entities)) {
-        throw new Error(localize("errors.light_sync_entities_type", lang));
-      }
-      for (const e of config.light_sync_entities) {
-        if (typeof e !== "string" || !/^light\.[a-z0-9_]+$/.test(e)) {
-          throw new Error(
-            localize("errors.light_sync_entities_invalid", lang, { value: String(e) }),
-          );
-        }
-      }
-    }
-    if (config.tts_engine !== undefined) {
-      if (typeof config.tts_engine !== "string") {
-        throw new Error(localize("errors.tts_engine_type", lang));
-      }
-      if (
-        config.tts_engine !== "" &&
-        !/^tts\.[a-z0-9_]+$/.test(config.tts_engine)
-      ) {
-        throw new Error(localize("errors.tts_engine_invalid", lang));
-      }
-    }
-    if (config.tts_announce_entities !== undefined) {
-      if (!Array.isArray(config.tts_announce_entities)) {
-        throw new Error(localize("errors.tts_announce_entities_type", lang));
-      }
-      for (const e of config.tts_announce_entities) {
-        if (typeof e !== "string" || !/^media_player\.[a-z0-9_]+$/.test(e)) {
-          throw new Error(
-            localize("errors.tts_announce_entities_invalid", lang, {
-              value: String(e),
-            }),
-          );
-        }
-      }
-    }
+    const lang = config?.language ?? this.config?.language ?? resolveLang(this.hass);
+    // Validation reads the raw config, so a mistyped value still throws;
+    // everything after it reads the normalised one. Defaults come from
+    // the one table the editor also reads — see config.ts.
+    validateConfig(config, lang);
+    const next = normaliseConfig(config);
     // Drop stale items on todo_entity swap so they don't render briefly
     // before the next state change triggers a refetch.
     const prevTodo = this.config.todo_entity ?? null;
-    const nextTodo = config.todo_entity ?? null;
+    const nextTodo = next.todo_entity ?? null;
     if (prevTodo !== nextTodo) {
       this._todoItems = null;
       this._todoLastEntityState = null;
@@ -680,14 +436,10 @@ export class SpinningWheelCard extends LitElement {
     // baseline so the next crossing detection re-seeds in the new
     // scale instead of comparing across scales (would fire a spurious
     // click on the next frame).
-    const prevPegsOn = this.config.pegs ?? false;
-    const nextPegsOn = config.pegs ?? false;
-    const prevDensity = this.config.peg_density ?? 1;
-    const nextDensity = config.peg_density ?? 1;
-    if (prevPegsOn !== nextPegsOn || prevDensity !== nextDensity) {
+    if (this.config.pegs !== next.pegs || this.config.peg_density !== next.peg_density) {
       this._lastTickSeg = -1;
     }
-    this.config = { ...config };
+    this.config = next;
     this._invalidateThemeCache();
     this._invalidateDrawCache();
     this._result = null;
@@ -702,16 +454,10 @@ export class SpinningWheelCard extends LitElement {
     return this.config.hub_text ?? localize("hub.default_text", this._lang());
   }
   private _soundEnabled(): boolean {
-    return this.config.sound ?? true;
+    return this.config.sound;
   }
   private _textOrientation(): TextOrientation {
-    if (this.config.text_orientation !== undefined) {
-      return this.config.text_orientation;
-    }
-    // Long todo summaries read better along the spoke than wrapped on
-    // the rim — default radial when filled from a todo list.
-    if (this._isTodoMode()) return "radial";
-    return "tangent";
+    return this.config.text_orientation ?? textOrientationDefault(this._isTodoMode());
   }
 
   /** Todo mode = entity wired AND ≥1 open items being rendered. */
@@ -780,7 +526,7 @@ export class SpinningWheelCard extends LitElement {
       // Clamp to 4..24; < 4 items still render via label cycling.
       return Math.max(4, Math.min(24, todo.length));
     }
-    return this.config.segments ?? 8;
+    return this.config.segments;
   }
   /** Resolved 1–10 slider level for the current config, with pre-v1.2
    *  string presets transparently aliased. */
@@ -805,7 +551,7 @@ export class SpinningWheelCard extends LitElement {
    *  per-peg bump — 5 (default) reproduces the historical 0.08 value
    *  exactly, 1 gives a feather-touch, 10 a heavy ratchet. */
   private _pegDrag(): number {
-    return PEG_DRAG_RAD_PER_S * (this._frictionLevel() / 5);
+    return pegDrag(this._frictionLevel());
   }
   /** Labels expanded to length = segments; cycles short arrays;
    *  defaults to "1".."N". */
@@ -845,7 +591,7 @@ export class SpinningWheelCard extends LitElement {
     }
   }
   private _themePalette(): ReadonlyArray<string> {
-    return THEME_PALETTES[this.config.theme ?? "default"];
+    return THEME_PALETTES[this.config.theme];
   }
 
   /** Per-segment fill colour. Walks labels in order; each new unique
@@ -865,10 +611,7 @@ export class SpinningWheelCard extends LitElement {
   private _segmentLabelColors(): ReadonlyArray<string> {
     const custom = this.config.label_colors;
     const hasAnyCustom =
-      Array.isArray(custom) &&
-      custom.some(
-        (c) => typeof c === "string" && c.length > 0,
-      );
+      Array.isArray(custom) && custom.some((c) => typeof c === "string" && c.length > 0);
     const fills = this._segmentColors();
     const autoFallback = fills.map((fill) => {
       // Use the alpha-aware variant so translucent fills
@@ -879,27 +622,14 @@ export class SpinningWheelCard extends LitElement {
       return this._isLight([rgb[0], rgb[1], rgb[2]]) ? "#1a1a1a" : "#ffffff";
     });
     if (!hasAnyCustom) return autoFallback;
-    // User set at least one entry. Per-segment merge: explicit value
+    // User set at least one entry. Per-label merge: explicit value
     // wins; null / empty fall through to auto-contrast at that index.
-    const labels = this._expandedLabels();
-    const map = new Map<string, string>();
-    let assigned = 0;
-    const out: string[] = new Array(labels.length);
-    for (let i = 0; i < labels.length; i++) {
-      const lbl = labels[i] ?? "";
-      let c = map.get(lbl);
-      if (c === undefined) {
-        const candidate = custom?.[assigned % custom.length];
-        c =
-          typeof candidate === "string" && candidate.length > 0
-            ? candidate
-            : (autoFallback[i] ?? DEFAULT_LABEL_COLOR);
-        map.set(lbl, c);
-        assigned += 1;
-      }
-      out[i] = c;
-    }
-    return out;
+    return mapByUniqueLabel(this._expandedLabels(), (slot, i) => {
+      const candidate = custom?.[slot % custom.length];
+      return typeof candidate === "string" && candidate.length > 0
+        ? candidate
+        : (autoFallback[i] ?? DEFAULT_LABEL_COLOR);
+    });
   }
 
   /** Palette cycled across unique labels in order of first appearance.
@@ -911,29 +641,13 @@ export class SpinningWheelCard extends LitElement {
     custom: ReadonlyArray<string | null> | undefined,
     defaults: ReadonlyArray<string>,
   ): ReadonlyArray<string> {
-    const labels = this._expandedLabels();
-    const palette: ReadonlyArray<string | null> =
-      custom && custom.length > 0 ? custom : defaults;
-    const map = new Map<string, string>();
-    let assigned = 0;
-    const out: string[] = new Array(labels.length);
-    for (let i = 0; i < labels.length; i++) {
-      const lbl = labels[i] ?? "";
-      let c = map.get(lbl);
-      if (c === undefined) {
-        const candidate = palette[assigned % palette.length];
-        c =
-          typeof candidate === "string" && candidate.length > 0
-            ? candidate
-            : (defaults[assigned % defaults.length] ??
-              defaults[0] ??
-              "#888");
-        map.set(lbl, c);
-        assigned += 1;
-      }
-      out[i] = c;
-    }
-    return out;
+    const palette: ReadonlyArray<string | null> = custom && custom.length > 0 ? custom : defaults;
+    return mapByUniqueLabel(this._expandedLabels(), (slot) => {
+      const candidate = palette[slot % palette.length];
+      return typeof candidate === "string" && candidate.length > 0
+        ? candidate
+        : (defaults[slot % defaults.length] ?? defaults[0] ?? "#888");
+    });
   }
 
   /** Per-segment ActionConfig. Same-label-same-action mapping mirrors
@@ -941,29 +655,13 @@ export class SpinningWheelCard extends LitElement {
   private _segmentActions(): ReadonlyArray<ActionConfig | null> {
     const labels = this._expandedLabels();
     const src = this.config.actions;
-    if (!src || src.length === 0) {
-      return new Array<ActionConfig | null>(labels.length).fill(null);
-    }
-    const map = new Map<string, ActionConfig | null>();
-    let assigned = 0;
-    const out: (ActionConfig | null)[] = new Array(labels.length);
-    for (let i = 0; i < labels.length; i++) {
-      const lbl = labels[i] ?? "";
-      if (!map.has(lbl)) {
-        const raw = src[assigned % src.length];
-        map.set(lbl, this._normalizeAction(raw));
-        assigned += 1;
-      }
-      out[i] = map.get(lbl) ?? null;
-    }
-    return out;
+    if (!src || src.length === 0) return labels.map(() => null);
+    return mapByUniqueLabel(labels, (slot) => this._normalizeAction(src[slot % src.length]));
   }
 
   /** `script.<name>` shorthand → `perform-action`; any other string
    *  or null → null. Object entries pass through (setConfig validated). */
-  private _normalizeAction(
-    raw: string | ActionConfig | null | undefined,
-  ): ActionConfig | null {
+  private _normalizeAction(raw: string | ActionConfig | null | undefined): ActionConfig | null {
     if (raw == null) return null;
     if (typeof raw === "string") {
       if (!/^script\.[a-z0-9_]+$/.test(raw)) return null;
@@ -1000,11 +698,9 @@ export class SpinningWheelCard extends LitElement {
    *  `confirmation: false` opts a single action out. Falls through to
    *  `window.confirm` — dep-free, blocking. */
   private async _confirmAction(cfg: ActionConfig): Promise<boolean> {
-    if (this.config.disable_confirm_actions === true) return true;
+    if (this.config.disable_confirm_actions) return true;
     const cfgConfirm: ConfirmationConfig | undefined =
-      "confirmation" in cfg
-        ? (cfg.confirmation as ConfirmationConfig | undefined)
-        : undefined;
+      "confirmation" in cfg ? (cfg.confirmation as ConfirmationConfig | undefined) : undefined;
     if (cfgConfirm === false) return true;
     const text =
       typeof cfgConfirm === "object" && cfgConfirm?.text
@@ -1033,97 +729,66 @@ export class SpinningWheelCard extends LitElement {
     if (!(await this._confirmAction(cfg))) return;
     switch (cfg.action) {
       case "perform-action":
-      case "call-service": {
-        const svc =
-          cfg.action === "perform-action" ? cfg.perform_action : cfg.service;
-        if (typeof svc !== "string") return;
-        const dot = svc.indexOf(".");
-        if (dot <= 0 || dot === svc.length - 1) return;
-        const domain = svc.slice(0, dot);
-        const name = svc.slice(dot + 1);
-        const userData =
-          cfg.action === "call-service"
-            ? (cfg.data ?? cfg.service_data ?? {})
-            : (cfg.data ?? {});
-        const data =
-          context !== undefined ? { ...context, ...userData } : userData;
-        const target = "target" in cfg ? cfg.target : undefined;
-        await this.hass.callService?.(domain, name, data, target);
+      case "call-service":
+        await this._callService(cfg, context);
         return;
-      }
-      case "navigate": {
-        if (typeof cfg.navigation_path !== "string") return;
-        if (cfg.navigation_replace) {
-          window.history.replaceState(null, "", cfg.navigation_path);
-        } else {
-          window.history.pushState(null, "", cfg.navigation_path);
-        }
-        // HA's frontend listens for this on `window` — same event
-        // hui-* cards dispatch.
-        window.dispatchEvent(
-          new CustomEvent("location-changed", {
-            detail: { replace: cfg.navigation_replace ?? false },
-            bubbles: true,
-            composed: true,
-          }),
-        );
+      case "navigate":
+        this._navigate(cfg.navigation_path, cfg.navigation_replace ?? false);
         return;
-      }
-      case "url": {
+      case "url":
         if (typeof cfg.url_path !== "string") return;
         window.open(cfg.url_path, "_blank", "noopener,noreferrer");
         return;
-      }
-      case "more-info": {
-        if (!cfg.entity) return;
-        this.dispatchEvent(
-          new CustomEvent("hass-more-info", {
-            detail: { entityId: cfg.entity },
-            bubbles: true,
-            composed: true,
-          }),
-        );
-        return;
-      }
-      case "toggle": {
-        if (!cfg.entity) return;
-        await this.hass.callService?.(
-          "homeassistant",
-          "toggle",
-          {},
-          { entity_id: cfg.entity },
-        );
-        return;
-      }
-      case "assist": {
-        // Same CustomEvent HA's own action handler dispatches.
-        this.dispatchEvent(
-          new CustomEvent("hass-assist-show", {
-            detail: {
-              pipeline_id: cfg.pipeline_id,
-              start_listening: cfg.start_listening ?? false,
-            },
-            bubbles: true,
-            composed: true,
-          }),
-        );
-        return;
-      }
-      case "fire-dom-event": {
-        const detail: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(cfg)) {
-          if (k !== "action") detail[k] = v;
+      case "more-info":
+        if (cfg.entity) {
+          fireEvent(this, "hass-more-info", { entityId: cfg.entity });
         }
-        this.dispatchEvent(
-          new CustomEvent("ll-custom", {
-            detail,
-            bubbles: true,
-            composed: true,
-          }),
+        return;
+      case "toggle":
+        if (!cfg.entity) return;
+        await this.hass.callService?.("homeassistant", "toggle", {}, { entity_id: cfg.entity });
+        return;
+      case "assist":
+        // Same CustomEvent HA's own action handler dispatches.
+        fireEvent(this, "hass-assist-show", {
+          pipeline_id: cfg.pipeline_id,
+          start_listening: cfg.start_listening ?? false,
+        });
+        return;
+      case "fire-dom-event":
+        fireEvent(
+          this,
+          "ll-custom",
+          Object.fromEntries(Object.entries(cfg).filter(([k]) => k !== "action")),
         );
         return;
-      }
     }
+  }
+
+  private async _callService(
+    cfg: Extract<ActionConfig, { action: "perform-action" | "call-service" }>,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
+    const svc = cfg.action === "perform-action" ? cfg.perform_action : cfg.service;
+    if (typeof svc !== "string") return;
+    const dot = svc.indexOf(".");
+    if (dot <= 0 || dot === svc.length - 1) return;
+    const userData =
+      cfg.action === "call-service" ? (cfg.data ?? cfg.service_data ?? {}) : (cfg.data ?? {});
+    const data = context !== undefined ? { ...context, ...userData } : userData;
+    await this.hass.callService?.(svc.slice(0, dot), svc.slice(dot + 1), data, cfg.target);
+  }
+
+  private _navigate(path: string, replace: boolean): void {
+    if (typeof path !== "string") return;
+    if (replace) {
+      window.history.replaceState(null, "", path);
+    } else {
+      window.history.pushState(null, "", path);
+    }
+    // HA's frontend listens for this on `window` — same event
+    // hui-* cards dispatch.
+    fireEvent(window, "location-changed", { replace });
   }
 
   /** Cached arc widths. `_arcs()` is called from the RAF tick chain
@@ -1175,28 +840,18 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _attachResizeObserver(): void {
-    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
-      | HTMLElement
-      | null;
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as HTMLElement | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     if (!wrap || !c) return;
     // Seed from layout if resolved; observer's first delivery fixes
     // it within a frame either way.
-    const rect = wrap.getBoundingClientRect();
-    if (rect.width > 0 || rect.height > 0) {
-      this._size = this._clampSize(this._fitDim(rect.width, rect.height));
-      this._applyCanvasSize();
-    }
+    if (this._sizeFromWrap(wrap)) this._applyCanvasSize();
     this._resizeObserver = new ResizeObserver((entries) => {
       // Entries deliver on a microtask; a recent `disconnect()` does
       // not unqueue them — bail when detached.
       if (!this.isConnected) return;
       for (const e of entries) {
-        const next = this._clampSize(
-          this._fitDim(e.contentRect.width, e.contentRect.height),
-        );
+        const next = this._clampSize(this._fitDim(e.contentRect.width, e.contentRect.height));
         // Tolerance avoids redraws on sub-pixel jitter.
         if (Math.abs(next - this._size) >= 1) {
           this._size = next;
@@ -1209,6 +864,20 @@ export class SpinningWheelCard extends LitElement {
     // Observe the wrap, not the canvas — observing the canvas would
     // create a no-op feedback loop (we drive its CSS box ourselves).
     this._resizeObserver.observe(wrap);
+  }
+
+  /** Take `_size` from the wrap's current box. False, and `_size` left
+   *  alone, while the wrap has no layout yet. */
+  private _sizeFromWrap(wrap: HTMLElement): boolean {
+    const rect = wrap.getBoundingClientRect();
+    if (!(rect.width > 0 || rect.height > 0)) return false;
+    const next = this._clampSize(this._fitDim(rect.width, rect.height));
+    if (next !== this._size) {
+      this._size = next;
+      // The draw cache holds the geometry of the size it was built for.
+      this._invalidateDrawCache();
+    }
+    return true;
   }
 
   /** Effective diameter from a container box. Square mode: min(w, h).
@@ -1227,27 +896,19 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _isHalfMode(): boolean {
-    return this.config.half_circle === true;
+    return this.config.half_circle;
   }
 
   private _isSelectorMode(): boolean {
-    return this.config.selector_mode === true;
+    return this.config.selector_mode;
   }
 
   private _pegsEnabled(): boolean {
-    return this.config.pegs === true;
+    return this.config.pegs;
   }
 
   private _wheelContextEnabled(): boolean {
-    return this.config.wheel_context === true;
-  }
-
-  /** Class shim around the module-level `cssToRgbTriple` — kept so any
-   *  existing `this._cssToRgbTriple(...)` call sites stay valid. */
-  private _cssToRgbTriple(
-    css: string,
-  ): readonly [number, number, number] | null {
-    return cssToRgbTriple(css);
+    return this.config.wheel_context;
   }
 
   /** Build the auto-injected payload merged into action `data` when
@@ -1266,9 +927,9 @@ export class SpinningWheelCard extends LitElement {
       wheel_color: color,
       wheel_label_color: labelColor,
     };
-    const colorRgb = this._cssToRgbTriple(color);
+    const colorRgb = cssToRgbTriple(color);
     if (colorRgb !== null) ctx.wheel_color_rgb = colorRgb;
-    const labelColorRgb = this._cssToRgbTriple(labelColor);
+    const labelColorRgb = cssToRgbTriple(labelColor);
     if (labelColorRgb !== null) ctx.wheel_label_color_rgb = labelColorRgb;
     return ctx;
   }
@@ -1297,10 +958,7 @@ export class SpinningWheelCard extends LitElement {
     const target = wrapAngle(-angle + a0 / 2);
     const totalPegs = this._pegsPerSegment() * n;
     const radius = this._size / 2 - this._size * RIM_INSET_FRAC;
-    const pegPx = Math.max(
-      2,
-      (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE,
-    );
+    const pegPx = Math.max(2, (this._size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE);
     // 1.0 × angular half-width — only treat the indicator as "on the
     // peg" when its centre overlaps the painted pixel footprint. A
     // wider buffer catches cases where the indicator is clearly past
@@ -1361,11 +1019,8 @@ export class SpinningWheelCard extends LitElement {
     // — i.e. `naturalSign === -lastDir`. Match against that to
     // suppress the back-roll for cleanly-crossed pegs.
     const lastDir = this._lastSpinDirection;
-    const wheelCrossedPeg =
-      lastDir !== 0 && plan.naturalSign === -lastDir;
-    const backRollProb = wheelCrossedPeg
-      ? 0
-      : plan.proximity * PEG_BACKROLL_MAX_PROB;
+    const wheelCrossedPeg = lastDir !== 0 && plan.naturalSign === -lastDir;
+    const backRollProb = wheelCrossedPeg ? 0 : plan.proximity * PEG_BACKROLL_MAX_PROB;
     const flip = Math.random() < backRollProb;
     const sign = (flip ? -plan.naturalSign : plan.naturalSign) as 1 | -1;
     const newTarget = wrapAngle(plan.pegAngle + sign * plan.deadzone);
@@ -1450,17 +1105,13 @@ export class SpinningWheelCard extends LitElement {
   }
 
   private _canvasCssHeight(): number {
-    return this._isHalfMode()
-      ? Math.round(this._size * HALF_ASPECT)
-      : this._size;
+    return this._isHalfMode() ? Math.round(this._size * HALF_ASPECT) : this._size;
   }
 
   /** Inline width/height keeps the next ResizeObserver delivery stable
    *  (CSS-driven sizing re-fires spuriously). */
   private _applyCanvasSize(): void {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     if (!c) return;
     c.style.width = `${this._size}px`;
     c.style.height = `${this._canvasCssHeight()}px`;
@@ -1496,13 +1147,7 @@ export class SpinningWheelCard extends LitElement {
     return Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(w)));
   }
 
-  private _resolvedThemeCache: {
-    indicatorFill: string;
-    hubLight: string;
-    hubDark: string;
-    hubText: string;
-    hubStroke: string;
-  } | null = null;
+  private _resolvedThemeCache: WheelTheme | null = null;
 
   /** Drop the resolved-theme cache. Called from `updated()` on dark-mode
    *  / theme-name / hub_color changes and from setConfig — anywhere
@@ -1511,38 +1156,7 @@ export class SpinningWheelCard extends LitElement {
     this._resolvedThemeCache = null;
   }
 
-  /** Per-spin draw cache. Everything in `_draw` that doesn't depend on
-   *  `_angle` lives here so the RAF tick avoids per-frame allocations
-   *  and `ctx.measureText` calls. Built lazily on the first `_draw`
-   *  call after invalidation; reused every subsequent frame until
-   *  config / todo / size / icon-load triggers `_invalidateDrawCache`.
-   *  The cache rebuild is one full pass of measure-and-shrink (~200
-   *  `measureText` calls for a 20-segment radial wheel with long
-   *  labels) — but only ONCE per spin instead of every frame, taking
-   *  the per-frame work from ~600 measureText calls to zero. */
-  private _drawCache: {
-    arcs: ReadonlyArray<number>;
-    expandedLabels: ReadonlyArray<string>;
-    segmentColors: ReadonlyArray<string>;
-    segmentLabelColors: ReadonlyArray<string>;
-    labelFontPx: number;
-    labelRadius: number;
-    useAutoFit: boolean;
-    flip: boolean;
-    orientation: TextOrientation;
-    isTodoMode: boolean;
-    labelPlans: ReadonlyArray<LabelRenderPlan>;
-    pegRadius: number;
-    pegSize: number;
-    pegStep: number;
-    totalPegs: number;
-    pegsEnabled: boolean;
-    /** "" when the hub label is hidden (empty config OR selector mode). */
-    hubText: string;
-    /** Already shrunk to fit `hubRadius * 1.7` — no per-frame measure
-     *  loop. 0 when `hubText` is empty. */
-    hubFontPx: number;
-  } | null = null;
+  private _drawCache: DrawCache | null = null;
 
   /** Drop the draw cache. Called from setConfig, _fetchTodoItems'
    *  success path, the ResizeObserver size-change branch, and after
@@ -1558,214 +1172,40 @@ export class SpinningWheelCard extends LitElement {
    *  subsequent `_draw` frame. The expensive bits — measure-and-shrink
    *  font selection, per-glyph width measurement for tangent text —
    *  happen here so the RAF tick never calls `ctx.measureText`. */
-  private _buildDrawCache(ctx: CanvasRenderingContext2D): NonNullable<
-    typeof this._drawCache
-  > {
+  private _buildDrawCache(ctx: CanvasRenderingContext2D): DrawCache {
     const arcs = this._arcs();
     const n = arcs.length;
     const expandedLabels = this._expandedLabels();
-    const segmentColors = this._segmentColors();
-    const segmentLabelColors = this._segmentLabelColors();
-
     const size = this._size;
     const radius = size / 2 - size * RIM_INSET_FRAC;
     const hubRadius = size * HUB_RADIUS_FRAC;
 
-    const fontScale = this.config.label_font_scale ?? 100;
-    const labelFontPx = Math.max(
-      7,
-      Math.round((size * 0.05 * fontScale) / 100),
+    const geometry = this._labelGeometry(radius, hubRadius);
+    const labelPlans = arcs.map((arc, i) =>
+      this._buildLabelPlan(ctx, expandedLabels[i] ?? "", arc, geometry),
     );
-    const isTodoMode = this._isTodoMode();
-    const useAutoFit = isTodoMode || this.config.label_auto_fit === true;
-    const minLabelPx = 7;
-    const flip = this.config.label_flip === true;
-    const orientation = this._textOrientation();
-
-    const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
-    const offsetFrac = (this.config.label_radius_offset ?? 0) / 100;
-    const safeRadius = Math.max(1, radius);
-    const minFrac = Math.min(
-      0.95,
-      (hubRadius + labelFontPx * 0.6) / safeRadius,
-    );
-    const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
-    const labelRadius =
-      radius *
-      Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
-
-    const radialInnerLimit = hubRadius + labelFontPx * 0.4;
-    const radialOuterLimit = radius - labelFontPx * 0.3;
-    const radialChannel = Math.max(
-      0,
-      radialOuterLimit - radialInnerLimit,
-    );
-
-    const labelPlans: LabelRenderPlan[] = [];
-    for (let i = 0; i < n; i++) {
-      const arc = arcs[i] ?? 0;
-      const text = expandedLabels[i] ?? "";
-
-      // Icon (`mdi:foo`) → cache the resolved iconPath state. Success
-      // path uses iconPath only; missing falls through to text render
-      // of the literal so the user spots a typo; pending skips render
-      // until the next cache rebuild (icon-load triggers invalidate).
-      if (this._looksLikeIcon(text)) {
-        const iconPath = this._getIconPath(text);
-        if (typeof iconPath === "string" || iconPath === undefined) {
-          labelPlans.push({
-            isIcon: true,
-            iconPath,
-            rawText: text,
-            display: text,
-            fontPx: labelFontPx,
-            textHalfWidth: 0,
-            chars: [],
-            glyphWidths: [],
-            glyphAngularWidths: [],
-            totalAngular: 0,
-          });
-          continue;
-        }
-        // iconPath === null → fall through to text rendering below.
-      }
-
-      // Arc too narrow (< ~15°) for any readable label — store an
-      // empty plan so indices align; `_draw` will skip rendering.
-      if (arc <= 0.26) {
-        labelPlans.push({
-          isIcon: false,
-          iconPath: null,
-          rawText: text,
-          display: "",
-          fontPx: labelFontPx,
-          textHalfWidth: 0,
-          chars: [],
-          glyphWidths: [],
-          glyphAngularWidths: [],
-          totalAngular: 0,
-        });
-        continue;
-      }
-
-      // Width budget: radial = full hub→rim channel; tangent = arc
-      // span at labelRadius.
-      const widthBudget =
-        orientation === "radial"
-          ? radialChannel * 0.95
-          : arc * labelRadius * 0.85;
-
-      // Pick font size — auto-fit shrinks; fixed keeps labelFontPx.
-      let chosenPx: number;
-      if (useAutoFit) {
-        const measure = (px: number): number => {
-          ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-          return ctx.measureText(text).width;
-        };
-        const picked = pickFontPx(
-          measure,
-          labelFontPx,
-          minLabelPx,
-          widthBudget,
-        );
-        chosenPx = picked.px;
-      } else {
-        chosenPx = labelFontPx;
-      }
-
-      // Ellipsize at chosen px so each label has its final render form
-      // baked into the cache.
-      ctx.font = `600 ${chosenPx}px ui-sans-serif, system-ui, sans-serif`;
-      let display: string;
-      if (ctx.measureText(text).width <= widthBudget) {
-        display = text;
-      } else {
-        let truncated = text;
-        while (
-          truncated.length > 1 &&
-          ctx.measureText(truncated + "…").width > widthBudget
-        ) {
-          truncated = truncated.slice(0, -1);
-        }
-        display = truncated + "…";
-      }
-
-      const textHalfWidth = ctx.measureText(display).width / 2;
-
-      // Tangent: pre-compute per-glyph widths + angular subtensions at
-      // labelRadius so `_drawArchedText` never measures during a spin.
-      let chars: ReadonlyArray<string> = [];
-      let glyphWidths: ReadonlyArray<number> = [];
-      let glyphAngularWidths: ReadonlyArray<number> = [];
-      let totalAngular = 0;
-      if (orientation === "tangent") {
-        const charArr = Array.from(display);
-        const gw = charArr.map((c) => ctx.measureText(c).width);
-        const aw = gw.map((w) => w / Math.max(1, labelRadius));
-        chars = charArr;
-        glyphWidths = gw;
-        glyphAngularWidths = aw;
-        totalAngular = aw.reduce((s, a) => s + a, 0);
-      }
-
-      labelPlans.push({
-        isIcon: false,
-        iconPath: null,
-        rawText: text,
-        display,
-        fontPx: chosenPx,
-        textHalfWidth,
-        chars,
-        glyphWidths,
-        glyphAngularWidths,
-        totalAngular,
-      });
-    }
 
     const pegsEnabled = this._pegsEnabled();
-    const pegSize = pegsEnabled
-      ? Math.max(2, (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE)
-      : 0;
+    const pegSize = pegsEnabled ? Math.max(2, (size * PEG_SIZE_PX_AT_DEFAULT) / DEFAULT_SIZE) : 0;
     const pegRadius = pegsEnabled ? radius * PEG_RADIUS_FRAC : 0;
     const totalPegs = pegsEnabled ? this._pegsPerSegment() * n : 0;
     const pegStep = pegsEnabled && totalPegs > 0 ? TWO_PI / totalPegs : 0;
 
-    // Hub text + pre-shrunk font size. Selector mode hides the hub
-    // label (the centre prompt no longer matches drag-to-pick). The
-    // shrink loop runs once here at cache build time so `_draw` only
-    // does fillText + the static save/restore per frame.
-    const rawHubText = this._hubText();
-    const hubTextOn = !!rawHubText && !this._isSelectorMode();
-    let hubText = "";
-    let hubFontPx = 0;
-    if (hubTextOn) {
-      hubText = rawHubText;
-      const baseSize = Math.max(7, Math.round(size * 0.038));
-      const minSize = Math.max(6, Math.round(baseSize * 0.55));
-      const maxWidth = hubRadius * 1.7;
-      let fontSize = baseSize;
-      ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      while (
-        ctx.measureText(hubText).width > maxWidth &&
-        fontSize > minSize
-      ) {
-        fontSize -= 1;
-        ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      }
-      hubFontPx = fontSize;
-    }
+    // Selector mode hides the hub label (the centre prompt no longer
+    // matches drag-to-pick). The font is shrunk to fit once, here, so
+    // `_draw` only does fillText + the static save/restore per frame.
+    const hubText = this._isSelectorMode() ? "" : this._hubText();
 
-    const cache = {
+    const cache: DrawCache = {
       arcs,
-      expandedLabels,
-      segmentColors,
-      segmentLabelColors,
-      labelFontPx,
-      labelRadius,
-      useAutoFit,
-      flip,
-      orientation,
-      isTodoMode,
+      segmentColors: this._segmentColors(),
+      segmentLabelColors: this._segmentLabelColors(),
+      radius,
+      hubRadius,
+      labelFontPx: geometry.labelFontPx,
+      labelRadius: geometry.labelRadius,
+      flip: this.config.label_flip,
+      orientation: geometry.orientation,
       labelPlans,
       pegRadius,
       pegSize,
@@ -1773,26 +1213,131 @@ export class SpinningWheelCard extends LitElement {
       totalPegs,
       pegsEnabled,
       hubText,
-      hubFontPx,
+      hubFontPx: hubText ? this._hubFontPx(ctx, hubText, hubRadius) : 0,
     };
     this._drawCache = cache;
     return cache;
   }
 
-  private _resolveTheme(ctx: CanvasRenderingContext2D): {
-    indicatorFill: string;
-    hubLight: string;
-    hubDark: string;
-    hubText: string;
-    hubStroke: string;
-  } {
+  /** Label font size and where on the spoke labels sit. The radius is
+   *  clamped so a label never paints inside the hub or off the disc. */
+  private _labelGeometry(radius: number, hubRadius: number): LabelGeometry {
+    const labelFontPx = Math.max(
+      MIN_LABEL_PX,
+      Math.round((this._size * 0.05 * this.config.label_font_scale) / 100),
+    );
+    const isTodoMode = this._isTodoMode();
+    const orientation = this._textOrientation();
+
+    const baseFrac = isTodoMode && orientation === "radial" ? 0.55 : 0.66;
+    const offsetFrac = this.config.label_radius_offset / 100;
+    const safeRadius = Math.max(1, radius);
+    const minFrac = Math.min(0.95, (hubRadius + labelFontPx * 0.6) / safeRadius);
+    const maxFrac = Math.max(minFrac, 1 - (labelFontPx * 0.6) / safeRadius);
+    const labelRadius = radius * Math.min(maxFrac, Math.max(minFrac, baseFrac + offsetFrac));
+
+    const radialInnerLimit = hubRadius + labelFontPx * 0.4;
+    const radialOuterLimit = radius - labelFontPx * 0.3;
+    return {
+      labelFontPx,
+      labelRadius,
+      radialChannel: Math.max(0, radialOuterLimit - radialInnerLimit),
+      orientation,
+      // Todo summaries are arbitrary text, so todo mode always fits.
+      useAutoFit: isTodoMode || this.config.label_auto_fit,
+    };
+  }
+
+  /** One segment's label, measured and cut to fit. */
+  private _buildLabelPlan(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    arc: number,
+    g: LabelGeometry,
+  ): LabelRenderPlan {
+    const blank: LabelRenderPlan = {
+      isIcon: false,
+      iconPath: null,
+      rawText: text,
+      display: "",
+      fontPx: g.labelFontPx,
+      textHalfWidth: 0,
+      chars: [],
+      glyphAngularWidths: [],
+      totalAngular: 0,
+    };
+
+    // Icon (`mdi:foo`): a resolved path is painted as the icon, a pending
+    // one is skipped until the load invalidates the cache, and a missing
+    // one falls through to text so the user spots the typo.
+    if (this._looksLikeIcon(text)) {
+      const iconPath = this._getIconPath(text);
+      if (iconPath !== null) {
+        return { ...blank, isIcon: true, iconPath, display: text };
+      }
+    }
+
+    // Too narrow for any readable label — a blank plan keeps the indices
+    // aligned and `_draw` skips it.
+    if (arc <= MIN_LABEL_ARC) return blank;
+
+    // Width budget: radial = full hub→rim channel; tangent = arc
+    // span at labelRadius.
+    const widthBudget =
+      g.orientation === "radial" ? g.radialChannel * 0.95 : arc * g.labelRadius * 0.85;
+
+    // Auto-fit shrinks; fixed keeps labelFontPx.
+    const measureAt = (px: number): number => {
+      ctx.font = canvasFont(600, px);
+      return ctx.measureText(text).width;
+    };
+    const fontPx = g.useAutoFit
+      ? pickFontPx(measureAt, g.labelFontPx, MIN_LABEL_PX, widthBudget).px
+      : g.labelFontPx;
+
+    // Ellipsize at the chosen size so each label has its final render
+    // form baked into the cache.
+    ctx.font = canvasFont(600, fontPx);
+    const measure = (s: string): number => ctx.measureText(s).width;
+    const display = ellipsize(measure, text, widthBudget);
+    const plan = {
+      ...blank,
+      display,
+      fontPx,
+      textHalfWidth: measure(display) / 2,
+    };
+    if (g.orientation !== "tangent") return plan;
+
+    // Tangent: per-glyph angular subtensions at labelRadius, so
+    // `_drawArchedText` never measures during a spin.
+    const chars = Array.from(display);
+    const glyphAngularWidths = chars.map((c) => measure(c) / Math.max(1, g.labelRadius));
+    return {
+      ...plan,
+      chars,
+      glyphAngularWidths,
+      totalAngular: glyphAngularWidths.reduce((s, a) => s + a, 0),
+    };
+  }
+
+  /** Largest hub font, from the base size down to 55 % of it, at which
+   *  `text` fits inside the hub. */
+  private _hubFontPx(ctx: CanvasRenderingContext2D, text: string, hubRadius: number): number {
+    const basePx = Math.max(7, Math.round(this._size * 0.038));
+    const minPx = Math.max(6, Math.round(basePx * 0.55));
+    const measureAt = (px: number): number => {
+      ctx.font = canvasFont(700, px);
+      return ctx.measureText(text).width;
+    };
+    return pickFontPx(measureAt, basePx, minPx, hubRadius * 1.7).px;
+  }
+
+  private _resolveTheme(ctx: CanvasRenderingContext2D): WheelTheme {
     if (this._resolvedThemeCache !== null) return this._resolvedThemeCache;
     const cs = getComputedStyle(this);
-    const dividerColor =
-      cs.getPropertyValue("--divider-color").trim() ||
-      "rgba(0,0,0,0.45)";
+    const dividerColor = cs.getPropertyValue("--divider-color").trim() || "rgba(0,0,0,0.45)";
 
-    const choice: HubColor = this.config.hub_color ?? "theme";
+    const choice: HubColor = this.config.hub_color;
 
     if (choice === "black") {
       // Subtle gradient (dark grey highlight → black edge) so the hub
@@ -1820,8 +1365,7 @@ export class SpinningWheelCard extends LitElement {
 
     // Theme accent — indicator + hub use --primary-color; hub label
     // auto-picks black/white via WCAG luminance.
-    const primary =
-      cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
+    const primary = cs.getPropertyValue("--primary-color").trim() || "#03a9f4";
     const rgb = this._cssColorToRgb(primary, ctx);
     this._resolvedThemeCache = {
       indicatorFill: primary,
@@ -1834,10 +1378,7 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** CSS colour → [r, g, b] via the canvas fillStyle round-trip. */
-  private _cssColorToRgb(
-    color: string,
-    ctx: CanvasRenderingContext2D,
-  ): [number, number, number] {
+  private _cssColorToRgb(color: string, ctx: CanvasRenderingContext2D): [number, number, number] {
     const prev = ctx.fillStyle;
     ctx.fillStyle = color;
     const canon = String(ctx.fillStyle);
@@ -1864,14 +1405,9 @@ export class SpinningWheelCard extends LitElement {
   }
 
   /** Tint toward white (positive delta) or black (negative). */
-  private _adjustLightness(
-    [r, g, b]: [number, number, number],
-    delta: number,
-  ): string {
+  private _adjustLightness([r, g, b]: [number, number, number], delta: number): string {
     const apply = (c: number): number =>
-      delta >= 0
-        ? Math.round(c + (255 - c) * delta)
-        : Math.round(c * (1 + delta));
+      delta >= 0 ? Math.round(c + (255 - c) * delta) : Math.round(c * (1 + delta));
     return `rgb(${apply(r)}, ${apply(g)}, ${apply(b)})`;
   }
 
@@ -1917,9 +1453,9 @@ export class SpinningWheelCard extends LitElement {
       const aw = angularWidths[i] ?? 0;
       const charAngle = angle + aw / 2;
       ctx.save();
-      ctx.rotate(charAngle);              // +X now points at this glyph's spoke
-      ctx.translate(radius, 0);           // … out along that spoke
-      ctx.rotate(Math.PI / 2);            // … then turn so +X is tangent (CW)
+      ctx.rotate(charAngle); // +X now points at this glyph's spoke
+      ctx.translate(radius, 0); // … out along that spoke
+      ctx.rotate(Math.PI / 2); // … then turn so +X is tangent (CW)
       ctx.fillText(chars[i] ?? "", 0, 0);
       ctx.restore();
       angle += aw;
@@ -1985,10 +1521,9 @@ export class SpinningWheelCard extends LitElement {
             /* ignore */
           }
         }
-        const svgIcon = probe.shadowRoot?.querySelector("ha-svg-icon") as
-          | (HTMLElement & { path?: string })
-          | null
-          | undefined;
+        const svgIcon = probe.shadowRoot?.querySelector<HTMLElement & { path?: string }>(
+          "ha-svg-icon",
+        );
         // Modern ha-svg-icon.path → its shadow <path> → ha-icon's own
         // <path> (legacy iron-icon flow).
         path =
@@ -2064,12 +1599,8 @@ export class SpinningWheelCard extends LitElement {
       return;
     }
     this._lastFrameMs = performance.now();
-    // Baseline — so the first frame doesn't tick spuriously. Match the
-    // index space `_onSegmentCrossing` will use (2N peg intervals when
-    // pegs on, N segment intervals otherwise).
-    this._lastTickSeg = this._pegsEnabled()
-      ? this._pegIntervalIndex()
-      : this._segmentIndexUnderPointer();
+    // Baseline — so the first frame doesn't tick spuriously.
+    this._lastTickSeg = this._tickIndex();
     const tick = (now: number): void => {
       const dt = Math.min(0.05, (now - this._lastFrameMs) / 1000);
       this._lastFrameMs = now;
@@ -2145,12 +1676,6 @@ export class SpinningWheelCard extends LitElement {
     this._angle = wrapAngle(a0 / 2 - cumStart - arc / 2);
   }
 
-  /** Rotate so the segment under the pointer lands centred at 12. Pure
-   *  setter on `_angle` — caller owns redraw + announce. */
-  private _snapToSegmentUnderPointer(): void {
-    this._snapToSegmentIndex(this._segmentIndexUnderPointer());
-  }
-
   /** Segment under the 12-o'clock pointer. Walks cumulative arcs until
    *  the running sum exceeds the pointer angle. */
   private _segmentIndexUnderPointer(): number {
@@ -2207,9 +1732,7 @@ export class SpinningWheelCard extends LitElement {
     const actions = this._segmentActions();
     const action = actions[idx];
     if (action) {
-      const context = this._wheelContextEnabled()
-        ? this._buildWheelContext(idx)
-        : undefined;
+      const context = this._wheelContextEnabled() ? this._buildWheelContext(idx) : undefined;
       void this._dispatchAction(action, context);
     }
   }
@@ -2217,9 +1740,7 @@ export class SpinningWheelCard extends LitElement {
   /** Write the winning label to `result_entity`. Truncates to 255
    *  chars (HA's MAX_LENGTH_STATE_STATE — longer todo summaries would
    *  otherwise be rejected by the input_text guard). */
-  private async _writeResultToEntity(
-    result: string | null,
-  ): Promise<void> {
+  private async _writeResultToEntity(result: string | null): Promise<void> {
     if (!result) return;
     const entity = this.config.result_entity;
     if (!entity) return;
@@ -2231,10 +1752,7 @@ export class SpinningWheelCard extends LitElement {
         value,
       });
     } catch (err) {
-      console.warn(
-        "[spinning-wheel-card] input_text.set_value failed:",
-        err,
-      );
+      console.warn("[spinning-wheel-card] input_text.set_value failed:", err);
     }
   }
 
@@ -2243,34 +1761,35 @@ export class SpinningWheelCard extends LitElement {
    *  (hex / rgb() / rgba()); for named colours and the like, falls
    *  back to a canvas `fillStyle` round-trip. `var(--…)` cannot be
    *  resolved this way and returns null — caller should skip silently. */
-  private _resolveSegmentRgb(
-    color: string,
-  ): readonly [number, number, number] | null {
+  private _resolveSegmentRgb(color: string): readonly [number, number, number] | null {
     const direct = cssToRgbTriple(color);
     if (direct !== null) return direct;
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     const ctx = c?.getContext("2d");
     if (!ctx) return null;
+    // Canvas ignores a colour string it can't parse and keeps its current
+    // fillStyle. So probe from two different fills: a valid colour lands on
+    // the same canonical value both times, an invalid one leaves each probe
+    // where it started. One probe can't tell a rejected colour from one
+    // that equals the current fill (a "black" segment under a black hub).
     const prev = ctx.fillStyle;
-    ctx.fillStyle = color;
-    const canon = String(ctx.fillStyle);
+    const probe = (start: string): typeof prev => {
+      ctx.fillStyle = start;
+      ctx.fillStyle = color;
+      return ctx.fillStyle;
+    };
+    const fromBlack = probe("#000000");
+    const fromWhite = probe("#ffffff");
     ctx.fillStyle = prev;
-    // Canvas rejects unknown colour strings by leaving fillStyle
-    // unchanged — if canon matches the previous canonicalised value,
-    // the input wasn't a valid CSS colour.
-    if (canon === String(prev)) return null;
-    return cssToRgbTriple(canon);
+    if (fromBlack !== fromWhite || typeof fromBlack !== "string") return null;
+    return cssToRgbTriple(fromBlack);
   }
 
   /** Set every entity in `light_sync_entities` to the winning segment's
    *  fill colour. Fire-and-forget — failures are logged and the spin
    *  result / configured actions still fire. Skips lights silently
    *  when the colour can't be resolved to RGB. */
-  private async _syncLights(
-    rgb: readonly [number, number, number],
-  ): Promise<void> {
+  private async _syncLights(rgb: readonly [number, number, number]): Promise<void> {
     const entities = this.config.light_sync_entities;
     if (!Array.isArray(entities) || entities.length === 0) return;
     if (!this.hass?.callService) return;
@@ -2285,12 +1804,8 @@ export class SpinningWheelCard extends LitElement {
       // color_temp / brightness / on-off would silently no-op
       // upstream; we skip earlier so it's a deliberate drop, not
       // a service-call ghost.
-      const modes = this.hass.states?.[entity]?.attributes
-        ?.supported_color_modes;
-      if (
-        Array.isArray(modes) &&
-        !modes.some((m) => RGB_CAPABLE_COLOR_MODES.has(m as string))
-      ) {
+      const modes = this.hass.states?.[entity]?.attributes?.supported_color_modes;
+      if (Array.isArray(modes) && !modes.some((m) => RGB_CAPABLE_COLOR_MODES.has(m as string))) {
         continue;
       }
       try {
@@ -2299,10 +1814,7 @@ export class SpinningWheelCard extends LitElement {
           rgb_color: [rgb[0], rgb[1], rgb[2]],
         });
       } catch (err) {
-        console.warn(
-          `[spinning-wheel-card] light.turn_on failed for ${entity}:`,
-          err,
-        );
+        console.warn(`[spinning-wheel-card] light.turn_on failed for ${entity}:`, err);
       }
     }
   }
@@ -2359,17 +1871,29 @@ export class SpinningWheelCard extends LitElement {
       if (ctx.state === "running") {
         this._audioReady = true;
       } else {
-        void ctx
-          .resume()
-          .then(() => {
-            this._audioReady = true;
-          })
-          .catch(() => {});
+        this._resumeAudio(ctx);
       }
     } catch {
       return null;
     }
     return this._audioCtx;
+  }
+
+  private _resumeAudio(ctx: AudioContext): void {
+    void ctx
+      .resume()
+      .then(() => {
+        this._audioReady = true;
+      })
+      .catch(() => {});
+  }
+
+  /** Wake the audio context from inside a user gesture — browsers keep
+   *  it suspended until one. Shared by pointerdown and keydown. */
+  private _warmAudio(): void {
+    if (!this._soundEnabled()) return;
+    const ctx = this._ensureAudio();
+    if (ctx?.state === "suspended") this._resumeAudio(ctx);
   }
 
   /** Map rim speed (rad/s) to click intensity 0..1. Monotonic — a
@@ -2391,78 +1915,20 @@ export class SpinningWheelCard extends LitElement {
     return this._pegsEnabled() ? this._pegsPerSegment() * n : n;
   }
 
-  /** Peg-click sound — a single focused filtered-noise burst: the dry
-   *  "tok" of a flapper striking a plastic peg. One layer, bandpassed
-   *  tight (Q≈3) at a mid frequency so it reads as a rounded "tok", not
-   *  a bright broadband "tss" — a low Q or a high centre is what makes
-   *  a noise click sound like crackling. A quadratic decay is baked
-   *  into the noise buffer for a rounded back-end, and the gain adds a
-   *  2 ms attack ramp (no sample-zero cliff) and an exponential tail.
-   *
-   *  `intensity` (rim speed mapped to 0..1) scales the click INVERSELY
-   *  in length: a slow strike is a longer, woody "tok"; a hard, fast
-   *  strike is short, tight and bright, so a dense fast-spin peg train
-   *  reads as a crisp rattle instead of overlapping into a smear. A
-   *  hard strike is also a touch louder and brighter. `when` is the
-   *  audio-clock start time — the caller staggers the clicks of one
-   *  frame across the frame interval rather than stacking them on
-   *  `currentTime`. The node chain is torn down in `onended`;
-   *  BufferSource nodes never self-disconnect, and on a fast spin
-   *  firing several clicks per frame an un-freed chain is a real leak. */
+  /** The click boundary interval under the indicator, in that same index
+   *  space. */
+  private _tickIndex(): number {
+    return this._pegsEnabled() ? this._pegIntervalIndex() : this._segmentIndexUnderPointer();
+  }
+
+  /** One peg / segment click in the configured `click_sound`. The voices
+   *  live in `click-sounds.ts`, shared with the editor's Listen button;
+   *  each scales length, loudness and brightness with `intensity` (rim
+   *  speed mapped to 0..1) and frees its nodes when it ends. `when` is the
+   *  audio-clock start: the caller staggers one frame's clicks across the
+   *  frame rather than stacking them on `currentTime`. */
   private _playTick(ctx: AudioContext, intensity: number, when: number): void {
-    const I = Math.max(0, Math.min(1, intensity));
-    const t0 = Math.max(when, ctx.currentTime);
-    // Shorter when fast → a crisp rattle; longer when slow → a woody
-    // tok. The fast end is very short so a dense peg train barely
-    // overlaps; the slow end is unchanged from the tuning that landed.
-    const dur = 0.061 - 0.048 * I; // 61 ms slow → 13 ms fast
-
-    // White-noise burst with a quadratic decay envelope baked in.
-    const sampleRate = ctx.sampleRate;
-    const samples = Math.max(1, Math.floor(sampleRate * dur));
-    const buf = ctx.createBuffer(1, samples, sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < samples; i++) {
-      const x = i / samples;
-      const env = (1 - x) * (1 - x);
-      data[i] = (Math.random() * 2 - 1) * env;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-
-    // Tight bandpass → focused "tok"; centre rises with intensity so a
-    // fast strike is crisper. ±8 % jitter so a fast train doesn't sound
-    // like one repeated sample.
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = (1500 + 550 * I) * (1 + (Math.random() - 0.5) * 0.16);
-    bp.Q.value = 3;
-
-    // Lowpass takes the ice-pick edge off — opens up when fast for snap.
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 3300 + 2200 * I;
-    lp.Q.value = 0.7;
-
-    const gainNode = ctx.createGain();
-    // Flatter loudness curve: fast clicks overlap and sum, so the per-
-    // click peak stays lower at speed (slow-drag level is unchanged).
-    const peak = 0.09 + 0.08 * I;
-    // Snappier attack when fast (1.1 ms) vs. softer when slow (2.4 ms).
-    const attack = 0.0024 - 0.0013 * I;
-    gainNode.gain.setValueAtTime(0, t0);
-    gainNode.gain.linearRampToValueAtTime(peak, t0 + attack);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-
-    src.connect(bp).connect(lp).connect(gainNode).connect(ctx.destination);
-    src.start(t0);
-    src.stop(t0 + dur + 0.02);
-    src.onended = (): void => {
-      src.disconnect();
-      bp.disconnect();
-      lp.disconnect();
-      gainNode.disconnect();
-    };
+    playClick(this.config.click_sound, ctx, intensity, when);
   }
 
   /** Detect peg / segment crossings since the previous call and react:
@@ -2490,9 +1956,7 @@ export class SpinningWheelCard extends LitElement {
       this._lastTickSeg = -1;
       return;
     }
-    const cur = pegsOn
-      ? this._pegIntervalIndex()
-      : this._segmentIndexUnderPointer();
+    const cur = this._tickIndex();
     if (this._lastTickSeg === -1) {
       this._lastTickSeg = cur;
       return;
@@ -2508,42 +1972,40 @@ export class SpinningWheelCard extends LitElement {
     if (nCross === 0) return;
     this._lastTickSeg = cur;
 
-    if (audioOn) {
-      const ctx = this._ensureAudio();
-      if (ctx && this._audioReady && ctx.state === "running") {
-        const clicks = Math.min(Math.abs(nCross), TICK_MAX_PER_FRAME);
-        const intensity = this._tickIntensity(speed);
-        const audioNow = ctx.currentTime;
-        const span = Math.max(0, Math.min(0.05, frameDtSec));
-        for (let j = 0; j < clicks; j++) {
-          // Even spacing + sub-slot jitter → a rattle, not a grid tone.
-          const frac = (j + Math.random()) / clicks;
-          this._playTick(ctx, intensity, audioNow + frac * span);
-        }
-      } else if (ctx && ctx.state === "suspended") {
-        void ctx
-          .resume()
-          .then(() => {
-            this._audioReady = true;
-          })
-          .catch(() => {});
-      }
-    }
+    if (audioOn) this._playCrossingClicks(Math.abs(nCross), speed, frameDtSec);
+    if (pegsOn) this._applyPegBrake();
+  }
 
-    if (pegsOn) {
-      // Brake bump opposite to current motion. Capped at zero so
-      // an at-rest wheel doesn't reverse direction on residual ω.
-      const sign = this._omega >= 0 ? 1 : -1;
-      const next = this._omega - sign * this._pegDrag();
-      this._omega =
-        Math.sign(next) === sign || next === 0 ? next : 0;
+  /** One click per boundary crossed, staggered across the frame. */
+  private _playCrossingClicks(crossed: number, speed: number, frameDtSec: number): void {
+    const ctx = this._ensureAudio();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      this._resumeAudio(ctx);
+      return;
+    }
+    if (!this._audioReady || ctx.state !== "running") return;
+    const clicks = Math.min(crossed, TICK_MAX_PER_FRAME);
+    const intensity = this._tickIntensity(speed);
+    const audioNow = ctx.currentTime;
+    const span = Math.max(0, Math.min(0.05, frameDtSec));
+    for (let j = 0; j < clicks; j++) {
+      // Even spacing + sub-slot jitter → a rattle, not a grid tone.
+      const frac = (j + Math.random()) / clicks;
+      this._playTick(ctx, intensity, audioNow + frac * span);
     }
   }
 
+  /** Brake bump opposite to current motion. Capped at zero so an
+   *  at-rest wheel doesn't reverse direction on residual ω. */
+  private _applyPegBrake(): void {
+    const sign = this._omega >= 0 ? 1 : -1;
+    const next = this._omega - sign * this._pegDrag();
+    this._omega = Math.sign(next) === sign || next === 0 ? next : 0;
+  }
+
   private _wheelRect(): DOMRect | null {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     return c?.getBoundingClientRect() ?? null;
   }
 
@@ -2576,25 +2038,11 @@ export class SpinningWheelCard extends LitElement {
     // Don't zero omega — we don't yet know if this is click or drag.
     // Click-during-spin should boost; only a drag past DRAG_COMMIT_RAD
     // commandeers (handled in pointermove).
-    if (this._soundEnabled()) {
-      const ctx = this._ensureAudio();
-      if (ctx?.state === "suspended") {
-        void ctx
-          .resume()
-          .then(() => {
-            this._audioReady = true;
-          })
-          .catch(() => {});
-      }
-      // Only seed when RAF isn't running — otherwise the loop owns
-      // _lastTickSeg and reseeding would race the next tick. Same
-      // index-space split as `_onSegmentCrossing` (peg intervals when
-      // pegs on, segment intervals otherwise).
-      if (this._rafId === null) {
-        this._lastTickSeg = this._pegsEnabled()
-          ? this._pegIntervalIndex()
-          : this._segmentIndexUnderPointer();
-      }
+    this._warmAudio();
+    // Only seed when RAF isn't running — otherwise the loop owns
+    // _lastTickSeg and reseeding would race the next tick.
+    if (this._soundEnabled() && this._rafId === null) {
+      this._lastTickSeg = this._tickIndex();
     }
     (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
     ev.preventDefault();
@@ -2635,15 +2083,10 @@ export class SpinningWheelCard extends LitElement {
     const t = ev.timeStamp || performance.now();
     // Elapsed since the previous pointer move — the drag's frame `dt`.
     const prevSample = this._velocitySamples[this._velocitySamples.length - 1];
-    const dtSec = prevSample
-      ? Math.max(0.001, (t - prevSample.t) / 1000)
-      : 0.016;
+    const dtSec = prevSample ? Math.max(0.001, (t - prevSample.t) / 1000) : 0.016;
     this._velocitySamples.push({ t, angleDelta: delta });
     const cutoff = t - VELOCITY_SAMPLE_WINDOW_MS;
-    while (
-      this._velocitySamples.length > 0 &&
-      this._velocitySamples[0]!.t < cutoff
-    ) {
+    while (this._velocitySamples.length > 0 && this._velocitySamples[0]!.t < cutoff) {
       this._velocitySamples.shift();
     }
 
@@ -2658,84 +2101,35 @@ export class SpinningWheelCard extends LitElement {
     this._dragging = false;
     (ev.currentTarget as Element).releasePointerCapture?.(ev.pointerId);
 
-    const isSelector = this._isSelectorMode();
-
-    if (!this._dragMoved) {
-      // Click without drag.
-      if (isSelector) {
-        // No-op — selector mode treats bare clicks as ambiguous
-        // ("where on the wheel did you click?"). Drag picks; Space /
-        // Enter re-fires the current selection.
-      } else {
-        const wasSpinning =
-          Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
-        if (wasSpinning && this.config.disable_boost === true) {
-          // disable_boost: ignore clicks during motion (drag-to-throw
-          // is a different path and unaffected).
-        } else {
-          const mag =
-            CLICK_IMPULSE_MIN +
-            Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
-          if (wasSpinning) {
-            // Boost in the wheel's current direction; cap at MAX_VELOCITY
-            // so repeated clicks don't compound past the upper bound.
-            const sign = this._omega >= 0 ? 1 : -1;
-            const next = this._omega + sign * mag;
-            this._omega = Math.max(
-              -MAX_VELOCITY_RAD_PER_S,
-              Math.min(MAX_VELOCITY_RAD_PER_S, next),
-            );
-          } else {
-            // Fresh start — random direction. Cancel any in-progress
-            // settle tween so the new spin can claim the RAF slot.
-            this._cancelSettleTween();
-            const sign = Math.random() < 0.5 ? -1 : 1;
-            this._omega = sign * mag;
-            this._result = null;
-          }
-        }
+    if (this._isSelectorMode()) {
+      if (this._dragMoved) {
+        // Selector drag release — snap to centre and announce. No
+        // momentum sampling, no RAF loop.
+        this._omega = 0;
+        this._spinning = false;
+        this._lastTickSeg = -1;
+        this._velocitySamples = [];
+        this._dragAccumulated = 0;
+        this._selectSegment(this._segmentIndexUnderPointer());
+        return;
       }
-    } else if (isSelector) {
-      // Selector drag release — snap to centre and announce. No
-      // momentum sampling, no RAF loop.
-      this._snapToSegmentUnderPointer();
-      this._omega = 0;
-      this._spinning = false;
-      this._lastTickSeg = -1;
-      this._velocitySamples = [];
-      this._dragAccumulated = 0;
-      this._announceResult();
-      this._draw();
-      return;
+      // A bare click doesn't move the wheel ("where on the wheel did
+      // you click?") — drag picks. It falls through to the stop path
+      // below, which announces the segment already under the pointer.
+    } else if (this._dragMoved) {
+      const thrown = this._flickVelocity(ev.timeStamp || performance.now());
+      if (thrown !== null) this._omega = thrown;
     } else {
-      // Sample-window-averaged angular velocity → ω.
-      const now = ev.timeStamp || performance.now();
-      const cutoff = now - VELOCITY_SAMPLE_WINDOW_MS;
-      const samples = this._velocitySamples.filter((s) => s.t >= cutoff);
-      if (samples.length >= 2) {
-        const totalDelta = samples.reduce((s, x) => s + x.angleDelta, 0);
-        const span =
-          (samples[samples.length - 1]!.t - samples[0]!.t) / 1000;
-        if (span > 0) {
-          let v = totalDelta / span;
-          v = Math.max(
-            -MAX_VELOCITY_RAD_PER_S,
-            Math.min(MAX_VELOCITY_RAD_PER_S, v),
-          );
-          this._omega = v;
-        }
-      }
+      this._applyClickImpulse();
     }
     this._velocitySamples = [];
     this._dragAccumulated = 0;
 
-    if (
-      Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S &&
-      this._rafId === null
-    ) {
+    if (this._rafId !== null) return;
+    if (Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S) {
       this._spinning = true;
       this._startAnim();
-    } else if (this._rafId === null) {
+    } else {
       // Drag-to-stop: _stopAnim ran on drag-commit but _spinning is
       // still true. Run through _finalizeStop so any peg-stop is
       // smoothly settled the same way as a natural friction stop.
@@ -2743,6 +2137,51 @@ export class SpinningWheelCard extends LitElement {
       this._finalizeStop(true);
     }
   };
+
+  /** Click / Space / Enter: kick a resting wheel off in a random
+   *  direction, or boost a spinning one the way it is already going.
+   *  False when `disable_boost` swallowed it. Drag-to-throw is a
+   *  different path and unaffected. */
+  private _applyClickImpulse(): boolean {
+    const wasSpinning = Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
+    if (wasSpinning && this.config.disable_boost) return false;
+    const mag = CLICK_IMPULSE_MIN + Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
+    if (wasSpinning) {
+      // Cap at MAX_VELOCITY so repeated clicks don't compound past the
+      // upper bound.
+      const sign = this._omega >= 0 ? 1 : -1;
+      const next = this._omega + sign * mag;
+      this._omega = Math.max(-MAX_VELOCITY_RAD_PER_S, Math.min(MAX_VELOCITY_RAD_PER_S, next));
+    } else {
+      // Cancel any in-progress settle tween so the new spin can claim
+      // the RAF slot.
+      this._cancelSettleTween();
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      this._omega = sign * mag;
+      this._result = null;
+    }
+    return true;
+  }
+
+  /** Angular velocity of the drag just released: the average over the
+   *  last VELOCITY_SAMPLE_WINDOW_MS, capped. Null when the pointer
+   *  rested too long before release to call it a throw. */
+  private _flickVelocity(now: number): number | null {
+    const cutoff = now - VELOCITY_SAMPLE_WINDOW_MS;
+    const samples = this._velocitySamples.filter((s) => s.t >= cutoff);
+    if (samples.length < 2) return null;
+    const span = (samples[samples.length - 1]!.t - samples[0]!.t) / 1000;
+    if (span <= 0) return null;
+    const totalDelta = samples.reduce((s, x) => s + x.angleDelta, 0);
+    return Math.max(-MAX_VELOCITY_RAD_PER_S, Math.min(MAX_VELOCITY_RAD_PER_S, totalDelta / span));
+  }
+
+  /** Selector mode: centre segment `idx` under the indicator and fire it. */
+  private _selectSegment(idx: number): void {
+    this._snapToSegmentIndex(idx);
+    this._announceResult();
+    this._draw();
+  }
 
   private _onPointerCancel = (ev: PointerEvent): void => {
     if (!this._dragging) return;
@@ -2757,84 +2196,43 @@ export class SpinningWheelCard extends LitElement {
     const isSelector = this._isSelectorMode();
     // Selector mode adds ArrowLeft/ArrowRight for keyboard ±1-segment
     // navigation (mouse uses drag; this closes the parity gap).
-    const isArrow =
-      isSelector && (ev.key === "ArrowRight" || ev.key === "ArrowLeft");
+    const isArrow = isSelector && (ev.key === "ArrowRight" || ev.key === "ArrowLeft");
     if (ev.key !== " " && ev.key !== "Enter" && !isArrow) return;
     ev.preventDefault();
-    // Warm audio on first user gesture (same pathway as pointerdown).
-    if (this._soundEnabled()) {
-      const ctx = this._ensureAudio();
-      if (ctx?.state === "suspended") {
-        void ctx
-          .resume()
-          .then(() => {
-            this._audioReady = true;
-          })
-          .catch(() => {});
-      }
-    }
+    this._warmAudio();
     if (isSelector) {
-      if (isArrow) {
-        const arcs = this._arcs();
-        const n = arcs.length;
-        if (n === 0) return;
-        const cur = this._segmentIndexUnderPointer();
-        const next =
-          ev.key === "ArrowRight" ? (cur + 1) % n : (cur - 1 + n) % n;
-        this._snapToSegmentIndex(next);
-        this._announceResult();
-        this._draw();
-        return;
-      }
-      // Re-fire the existing selection. Gated on `_result !== null`
-      // so Tab+Space on a fresh card can't fire segment 0 unintended.
-      if (this._result === null) return;
-      this._snapToSegmentUnderPointer();
-      this._announceResult();
-      this._draw();
+      this._onSelectorKey(ev.key);
       return;
     }
-    const wasSpinning = Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S;
-    // Same `disable_boost` gate as the pointer path.
-    if (wasSpinning && this.config.disable_boost === true) return;
-    const mag =
-      CLICK_IMPULSE_MIN +
-      Math.random() * (CLICK_IMPULSE_MAX - CLICK_IMPULSE_MIN);
-    if (wasSpinning) {
-      const sign = this._omega >= 0 ? 1 : -1;
-      const next = this._omega + sign * mag;
-      this._omega = Math.max(
-        -MAX_VELOCITY_RAD_PER_S,
-        Math.min(MAX_VELOCITY_RAD_PER_S, next),
-      );
-    } else {
-      // Cancel any in-progress settle tween so the new spin can claim
-      // the RAF slot.
-      this._cancelSettleTween();
-      const sign = Math.random() < 0.5 ? -1 : 1;
-      this._omega = sign * mag;
-      this._result = null;
-    }
-    if (
-      Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S &&
-      this._rafId === null
-    ) {
+    if (!this._applyClickImpulse()) return;
+    if (Math.abs(this._omega) >= STOP_THRESHOLD_RAD_PER_S && this._rafId === null) {
       this._spinning = true;
       this._startAnim();
     }
   };
 
+  /** Selector-mode keys: an arrow moves the selection one segment,
+   *  Space / Enter re-fire the current one. */
+  private _onSelectorKey(key: string): void {
+    const cur = this._segmentIndexUnderPointer();
+    if (key === "ArrowRight" || key === "ArrowLeft") {
+      const n = this._arcs().length;
+      if (n === 0) return;
+      this._selectSegment((cur + (key === "ArrowRight" ? 1 : -1) + n) % n);
+      return;
+    }
+    // Gated on `_result !== null` so Tab+Space on a fresh card can't
+    // fire segment 0 unintended.
+    if (this._result !== null) this._selectSegment(cur);
+  }
+
   private _draw(): void {
-    const c = this.shadowRoot?.getElementById("wheel") as
-      | HTMLCanvasElement
-      | null;
+    const c = this.shadowRoot?.getElementById("wheel") as HTMLCanvasElement | null;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
 
     const size = this._size;
     const center = size / 2;
-    const radius = size / 2 - size * RIM_INSET_FRAC;
-    const hubRadius = size * HUB_RADIUS_FRAC;
     const halfMode = this._isHalfMode();
     // canvasH may be shorter than `size` in half mode — using `size`
     // here would clearRect pixels that no longer exist.
@@ -2857,16 +2255,7 @@ export class SpinningWheelCard extends LitElement {
     ctx.clearRect(0, 0, size, canvasH);
 
     const cache = this._drawCache ?? this._buildDrawCache(ctx);
-    const arcs = cache.arcs;
-    const n = arcs.length;
-    const colors = cache.segmentColors;
-    const labelColors = cache.segmentLabelColors;
-    const orientation = cache.orientation;
     const theme = this._resolveTheme(ctx);
-    const labelFontPx = cache.labelFontPx;
-    const labelRadius = cache.labelRadius;
-    const labelFlip = cache.flip;
-    const labelPlans = cache.labelPlans;
 
     // Half-circle: clip disc paint to the upper half (the lower half
     // still rotates internally). Hub + pointer paint AFTER restore, so
@@ -2880,11 +2269,24 @@ export class SpinningWheelCard extends LitElement {
 
     // Rotate by -π/2 (puts +X at 12 o'clock) then -arcs[0]/2 (centres
     // segment 0 on the pointer at _angle=0).
-    const a0 = arcs[0] ?? (Math.PI * 2) / n;
+    const a0 = cache.arcs[0] ?? (Math.PI * 2) / cache.arcs.length;
     ctx.save();
     ctx.translate(center, center);
     ctx.rotate(this._angle - Math.PI / 2 - a0 / 2);
+    this._paintSegments(ctx, cache);
+    this._paintRim(ctx, cache, theme.indicatorFill);
+    ctx.restore();
 
+    // Release the upper-half clip so hub + pointer can paint below.
+    if (halfMode) ctx.restore();
+
+    this._paintHub(ctx, cache, theme, center);
+    this._paintPointer(ctx, theme.indicatorFill);
+  }
+
+  /** The slices and their labels, in the wheel's rotated frame. */
+  private _paintSegments(ctx: CanvasRenderingContext2D, cache: DrawCache): void {
+    const { arcs, radius } = cache;
     // Borderless mode bleeds the canvas-clear colour through the
     // sub-pixel antialiasing along each diagonal seam between two
     // adjacent filled wedges. ~1 px of angular slack at the rim
@@ -2893,19 +2295,18 @@ export class SpinningWheelCard extends LitElement {
     // (~0.005 rad at radius 250), no visible hairline gap. The
     // separator stroke already covers the seam when borders are on,
     // so skip the slack in that path.
-    const borderless = this.config.segment_borders === false;
+    const borderless = !this.config.segment_borders;
     const seamSlack = borderless ? 1 / Math.max(1, radius) : 0;
 
-    let cursor = 0;
-    for (let i = 0; i < n; i++) {
+    let start = 0;
+    for (let i = 0; i < arcs.length; i++) {
       const arc = arcs[i] ?? 0;
-      const start = cursor;
-      const end = cursor + arc;
+      const end = start + arc;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, radius, start - seamSlack, end + seamSlack);
       ctx.closePath();
-      ctx.fillStyle = colors[i] ?? "#888";
+      ctx.fillStyle = cache.segmentColors[i] ?? "#888";
       ctx.fill();
       // Per-segment separator stroke. Defaults on; opt out via
       // `segment_borders: false` for a flatter look.
@@ -2914,73 +2315,89 @@ export class SpinningWheelCard extends LitElement {
         ctx.strokeStyle = "rgba(255,255,255,0.65)";
         ctx.stroke();
       }
-
-      // Below ~15° (≈ 4 %) there's no readable space; cache marks
-      // those plans with empty `display` so we can skip cheaply.
-      const plan = labelPlans[i];
-      if (plan && arc > 0.26) {
-        const midAngle = start + arc / 2;
-        const fillColor = labelColors[i] ?? "#1a1a1a";
-
-        // Resolved icon → paint the SVG path; no text rendering.
-        if (plan.isIcon && typeof plan.iconPath === "string") {
-          const iconPx = Math.round(labelFontPx * 1.5);
-          this._drawSegmentIcon(
-            ctx,
-            plan.iconPath,
-            midAngle,
-            labelRadius,
-            iconPx,
-            fillColor,
-            orientation,
-          );
-        } else if (plan.isIcon && plan.iconPath === undefined) {
-          // Pending — async load triggers _invalidateDrawCache + redraw.
-        } else if (plan.display.length > 0) {
-          // Text label OR icon-missing fallback (rendered as literal).
-          // Display string + chosen font + glyph widths all baked into
-          // the plan — zero `measureText` calls on this frame.
-          ctx.save();
-          ctx.fillStyle = fillColor;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.font = `600 ${plan.fontPx}px ui-sans-serif, system-ui, sans-serif`;
-
-          if (orientation === "radial") {
-            // Shift draw centre inward/outward when text would
-            // otherwise poke past the hub edge or rim. `textHalfWidth`
-            // is the pre-computed `measureText(display).width / 2`.
-            const radialInnerLimit = hubRadius + plan.fontPx * 0.4;
-            const radialOuterLimit = radius - plan.fontPx * 0.3;
-            let pos = labelRadius;
-            const halfW = plan.textHalfWidth;
-            if (pos + halfW > radialOuterLimit) pos = radialOuterLimit - halfW;
-            if (pos - halfW < radialInnerLimit) pos = radialInnerLimit + halfW;
-            ctx.rotate(midAngle);
-            ctx.translate(pos, 0);
-            if (!labelFlip) ctx.rotate(Math.PI);
-            ctx.fillText(plan.display, 0, 0);
-          } else {
-            this._drawArchedText(
-              ctx,
-              plan.chars,
-              plan.glyphAngularWidths,
-              plan.totalAngular,
-              midAngle,
-              labelRadius,
-              labelFlip,
-            );
-          }
-          ctx.restore();
-        }
-      }
-
-      cursor += arc;
+      if (arc > MIN_LABEL_ARC) this._paintLabel(ctx, cache, i, start + arc / 2);
+      start = end;
     }
+  }
 
+  /** Segment `i`'s icon or text, centred on `midAngle`. */
+  private _paintLabel(
+    ctx: CanvasRenderingContext2D,
+    cache: DrawCache,
+    i: number,
+    midAngle: number,
+  ): void {
+    const plan = cache.labelPlans[i];
+    if (!plan) return;
+    const fillColor = cache.segmentLabelColors[i] ?? "#1a1a1a";
+
+    // Resolved icon → paint the SVG path; no text rendering.
+    if (plan.isIcon && typeof plan.iconPath === "string") {
+      this._drawSegmentIcon(
+        ctx,
+        plan.iconPath,
+        midAngle,
+        cache.labelRadius,
+        Math.round(cache.labelFontPx * 1.5),
+        fillColor,
+        cache.orientation,
+      );
+      return;
+    }
+    // Pending — async load triggers _invalidateDrawCache + redraw.
+    if (plan.isIcon && plan.iconPath === undefined) return;
+    if (plan.display.length === 0) return;
+
+    // Text label OR icon-missing fallback (rendered as literal).
+    // Display string + chosen font + glyph widths all baked into
+    // the plan — zero `measureText` calls on this frame.
+    ctx.save();
+    ctx.fillStyle = fillColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = canvasFont(600, plan.fontPx);
+    if (cache.orientation === "radial") {
+      this._drawRadialText(ctx, cache, plan, midAngle);
+    } else {
+      this._drawArchedText(
+        ctx,
+        plan.chars,
+        plan.glyphAngularWidths,
+        plan.totalAngular,
+        midAngle,
+        cache.labelRadius,
+        cache.flip,
+      );
+    }
+    ctx.restore();
+  }
+
+  /** Text along the spoke. The draw centre shifts inward / outward when
+   *  the text would otherwise poke past the hub edge or the rim. Caller
+   *  owns font/fillStyle/align. */
+  private _drawRadialText(
+    ctx: CanvasRenderingContext2D,
+    cache: DrawCache,
+    plan: LabelRenderPlan,
+    midAngle: number,
+  ): void {
+    const innerLimit = cache.hubRadius + plan.fontPx * 0.4;
+    const outerLimit = cache.radius - plan.fontPx * 0.3;
+    const halfW = plan.textHalfWidth;
+    let pos = cache.labelRadius;
+    if (pos + halfW > outerLimit) pos = outerLimit - halfW;
+    if (pos - halfW < innerLimit) pos = innerLimit + halfW;
+    ctx.rotate(midAngle);
+    ctx.translate(pos, 0);
+    if (!cache.flip) ctx.rotate(Math.PI);
+    ctx.fillText(plan.display, 0, 0);
+  }
+
+  /** The outer ring and, when enabled, the pegs on it. */
+  private _paintRim(ctx: CanvasRenderingContext2D, cache: DrawCache, pegFill: string): void {
     // Soft outer ring — CSS drop-shadow carries the depth.
     ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, cache.radius, 0, Math.PI * 2);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "rgba(0, 0, 0, 0.30)";
     ctx.stroke();
@@ -2994,36 +2411,39 @@ export class SpinningWheelCard extends LitElement {
     // ring tint; the half-circle clip handles the lower half. Colour
     // matches the indicator/hub accent so the pegs read against any
     // segment fill.
-    if (cache.pegsEnabled) {
-      ctx.fillStyle = theme.indicatorFill;
-      const pegRadius = cache.pegRadius;
-      const pegSize = cache.pegSize;
-      const pegStep = cache.pegStep;
-      for (let i = 0; i < cache.totalPegs; i++) {
-        const a = i * pegStep;
-        ctx.beginPath();
-        ctx.arc(
-          Math.cos(a) * pegRadius,
-          Math.sin(a) * pegRadius,
-          pegSize,
-          0,
-          TWO_PI,
-        );
-        ctx.fill();
-      }
+    if (!cache.pegsEnabled) return;
+    ctx.fillStyle = pegFill;
+    for (let i = 0; i < cache.totalPegs; i++) {
+      const a = i * cache.pegStep;
+      ctx.beginPath();
+      ctx.arc(
+        Math.cos(a) * cache.pegRadius,
+        Math.sin(a) * cache.pegRadius,
+        cache.pegSize,
+        0,
+        TWO_PI,
+      );
+      ctx.fill();
     }
+  }
 
-    ctx.restore();
-
-    // Release the upper-half clip so hub + pointer can paint below.
-    if (halfMode) ctx.restore();
-
-    // Hub — does not rotate.
+  /** The hub and its label — neither rotates. */
+  private _paintHub(
+    ctx: CanvasRenderingContext2D,
+    cache: DrawCache,
+    theme: WheelTheme,
+    center: number,
+  ): void {
+    const hubRadius = cache.hubRadius;
     ctx.beginPath();
     ctx.arc(center, center, hubRadius, 0, Math.PI * 2);
     const grad = ctx.createRadialGradient(
-      center - hubRadius * 0.22, center - hubRadius * 0.22, 2,
-      center, center, hubRadius,
+      center - hubRadius * 0.22,
+      center - hubRadius * 0.22,
+      2,
+      center,
+      center,
+      hubRadius,
     );
     grad.addColorStop(0, theme.hubLight);
     grad.addColorStop(1, theme.hubDark);
@@ -3036,17 +2456,20 @@ export class SpinningWheelCard extends LitElement {
     // Hub text — chosen `hubFontPx` is pre-shrunk in `_buildDrawCache`
     // so no per-frame `measureText` loop. Selector mode and empty text
     // are both encoded as `hubText === ""` in the cache.
-    if (cache.hubText.length > 0) {
-      ctx.save();
-      ctx.font = `700 ${cache.hubFontPx}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.fillStyle = theme.hubText;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cache.hubText, center, center);
-      ctx.restore();
-    }
+    if (cache.hubText.length === 0) return;
+    ctx.save();
+    ctx.font = canvasFont(700, cache.hubFontPx);
+    ctx.fillStyle = theme.hubText;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(cache.hubText, center, center);
+    ctx.restore();
+  }
 
-    // Pointer triangle, apex into the wheel.
+  /** Pointer triangle, apex into the wheel. */
+  private _paintPointer(ctx: CanvasRenderingContext2D, fill: string): void {
+    const size = this._size;
+    const center = size / 2;
     const pHalfW = size * POINTER_HALF_WIDTH_FRAC;
     const pTop = size * POINTER_TOP_FRAC;
     const pTip = size * POINTER_TIP_FRAC;
@@ -3055,17 +2478,30 @@ export class SpinningWheelCard extends LitElement {
     ctx.lineTo(center - pHalfW, pTop);
     ctx.lineTo(center + pHalfW, pTop);
     ctx.closePath();
-    ctx.fillStyle = theme.indicatorFill;
+    ctx.fillStyle = fill;
     ctx.fill();
   }
 
   // _resolveTheme reads CSS vars per-draw — nothing else schedules a
   // paint on a light/dark flip.
   private _prevDarkMode: boolean | undefined = undefined;
-  private _prevTheme: string | undefined = undefined;
+  private _prevTheme: unknown = undefined;
+
+  /** The parts of `hass` the card renders from: locale, theme flip, todo
+   *  entity state. */
+  private _watchedHass(hass: HomeAssistant): ReadonlyArray<unknown> {
+    const todoEntity = this.config.todo_entity;
+    return [
+      hass.locale?.language,
+      hass.language,
+      hass.themes?.darkMode,
+      hass.themes?.theme,
+      todoEntity ? hass.states?.[todoEntity]?.state : undefined,
+    ];
+  }
 
   /** Filter `hass`-only updates so unrelated entity ticks don't re-run
-   *  the update cycle. Care list: locale, theme flip, todo entity state.
+   *  the update cycle: only a change to `_watchedHass` gets through.
    *  Non-hass changes always allow (lit-3 SKILL § identity compare). */
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this.config) return false;
@@ -3075,100 +2511,81 @@ export class SpinningWheelCard extends LitElement {
     if (!changed.has("hass")) return false;
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
-    if (prev.locale?.language !== this.hass.locale?.language) return true;
-    if (prev.language !== this.hass.language) return true;
-    if (prev.themes?.darkMode !== this.hass.themes?.darkMode) return true;
-    const prevTheme = (prev.themes as { theme?: string } | undefined)?.theme;
-    const nextTheme = (this.hass.themes as { theme?: string } | undefined)
-      ?.theme;
-    if (prevTheme !== nextTheme) return true;
-    const todoEntity = this.config.todo_entity;
-    if (todoEntity) {
-      if (prev.states?.[todoEntity]?.state !== this.hass.states?.[todoEntity]?.state) {
-        return true;
-      }
-    }
-    return false;
+    const before = this._watchedHass(prev);
+    return this._watchedHass(this.hass).some((v, i) => v !== before[i]);
   }
 
   protected override updated(changed: PropertyValues): void {
-    let needsDraw =
-      changed.has("config") ||
-      changed.has("_result") ||
-      changed.has("_todoItems");
+    let needsDraw = changed.has("config") || changed.has("_result") || changed.has("_todoItems");
     if (changed.has("config")) {
-      // half_circle toggle reshapes the canvas without changing the
-      // wrap; ResizeObserver wouldn't refire on its own. Gated to the
-      // first render and actual half_circle flips — the editor emits a
-      // fresh config object on every keystroke, and re-running
-      // getBoundingClientRect() + resize for each one is a forced
-      // layout per keystroke. Idempotent when diameter is unchanged.
-      const prevConfig = changed.get("config") as
-        | SpinningWheelCardConfig
-        | undefined;
-      if (
-        prevConfig === undefined ||
-        prevConfig.half_circle !== this.config.half_circle
-      ) {
-        const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as
-          | HTMLElement
-          | null;
-        if (wrap) {
-          const rect = wrap.getBoundingClientRect();
-          if (rect.width > 0 || rect.height > 0) {
-            this._size = this._clampSize(
-              this._fitDim(rect.width, rect.height),
-            );
-          }
-        }
-        this._applyCanvasSize();
-      }
+      this._resizeOnHalfCircleFlip(changed.get("config") as SpinningWheelCardConfig | undefined);
     }
-    if (changed.has("hass") && this.hass) {
-      const dark = this.hass.themes?.darkMode;
-      const themeName = (this.hass.themes as { theme?: string } | undefined)
-        ?.theme;
-      if (dark !== this._prevDarkMode || themeName !== this._prevTheme) {
-        this._prevDarkMode = dark;
-        this._prevTheme = themeName;
-        this._invalidateThemeCache();
-        needsDraw = true;
-      }
+    if (changed.has("hass") && this.hass && this._themeFlipped(this.hass)) {
+      this._invalidateThemeCache();
+      needsDraw = true;
     }
-    // Watch the todo entity's `state` (open-item count). Covers adds,
-    // removes, completions, undos.
-    if (this.config.todo_entity) {
-      const entity = this.hass?.states?.[this.config.todo_entity];
-      const stateNow = entity?.state ?? null;
-      if (stateNow !== this._todoLastEntityState) {
-        this._todoLastEntityState = stateNow;
-        if (stateNow !== null) void this._fetchTodoItems();
-      }
-    }
+    this._refetchTodoOnStateChange();
     if (needsDraw) this._draw();
+  }
+
+  /** half_circle toggle reshapes the canvas without changing the wrap;
+   *  ResizeObserver wouldn't refire on its own. Gated to the first
+   *  render and actual half_circle flips — the editor emits a fresh
+   *  config object on every keystroke, and re-running
+   *  getBoundingClientRect() + resize for each one is a forced layout
+   *  per keystroke. Idempotent when diameter is unchanged. */
+  private _resizeOnHalfCircleFlip(prevConfig: SpinningWheelCardConfig | undefined): void {
+    if (prevConfig !== undefined && prevConfig.half_circle === this.config.half_circle) {
+      return;
+    }
+    const wrap = this.shadowRoot?.querySelector(".wheel-wrap") as HTMLElement | null;
+    if (wrap) this._sizeFromWrap(wrap);
+    this._applyCanvasSize();
+  }
+
+  /** True when HA's theme or its light/dark mode changed since the last
+   *  call. */
+  private _themeFlipped(hass: HomeAssistant): boolean {
+    const dark = hass.themes?.darkMode;
+    const themeName = hass.themes?.theme;
+    if (dark === this._prevDarkMode && themeName === this._prevTheme) {
+      return false;
+    }
+    this._prevDarkMode = dark;
+    this._prevTheme = themeName;
+    return true;
+  }
+
+  /** Watch the todo entity's `state` (open-item count). Covers adds,
+   *  removes, completions, undos. */
+  private _refetchTodoOnStateChange(): void {
+    const todoEntity = this.config.todo_entity;
+    if (!todoEntity) return;
+    const stateNow = this.hass?.states?.[todoEntity]?.state ?? null;
+    if (stateNow === this._todoLastEntityState) return;
+    this._todoLastEntityState = stateNow;
+    if (stateNow !== null) void this._fetchTodoItems();
+  }
+
+  /** The status line as plain text. The visually hidden status line
+   *  uses it as is, so screen readers always hear a literal value (no
+   *  "ha-icon" jargon). */
+  private _statusText(lang: string): string {
+    if (this._spinning) return localize("status.spinning", lang);
+    if (this._result !== null) {
+      return localize("status.result", lang, { value: this._result });
+    }
+    // todo wired but empty / not yet fetched — say so instead of
+    // rendering placeholder 1..N labels silently.
+    const todoEmpty =
+      !!this.config.todo_entity && (this._todoItems === null || this._todoItems.length === 0);
+    if (todoEmpty) return localize("status.todo_empty", lang);
+    return localize(this._isSelectorMode() ? "status.idle_selector" : "status.idle", lang);
   }
 
   protected override render(): TemplateResult {
     const lang = this._lang();
-    // todo wired but empty / not yet fetched — surface in the status
-    // line instead of rendering placeholder 1..N labels silently.
-    const todoEmpty =
-      !!this.config.todo_entity &&
-      (this._todoItems === null || this._todoItems.length === 0) &&
-      !this._spinning &&
-      this._result === null;
-    const idleKey = this._isSelectorMode()
-      ? "status.idle_selector"
-      : "status.idle";
-    // Plain-text status string — used for the canvas's aria-label so
-    // screen readers always hear a literal value (no "ha-icon" jargon).
-    const statusText = this._spinning
-      ? localize("status.spinning", lang)
-      : this._result !== null
-        ? localize("status.result", lang, { value: this._result })
-        : todoEmpty
-          ? localize("status.todo_empty", lang)
-          : localize(idleKey, lang);
+    const statusText = this._statusText(lang);
     // Rich status node — same content, but when the result is an MDI
     // icon string the {value} slot renders <ha-icon> instead of bare
     // text. Falls back to plain text for typed labels and the other
@@ -3179,9 +2596,7 @@ export class SpinningWheelCard extends LitElement {
         : statusText;
     // Empty / whitespace `name` hides ha-card's header — fresh installs
     // show a clean wheel until the user opts in.
-    const header = this.config.name?.trim()
-      ? this.config.name
-      : undefined;
+    const header = this.config.name?.trim() ? this.config.name : undefined;
     const halfMode = this._isHalfMode();
 
     return html`
@@ -3197,9 +2612,9 @@ export class SpinningWheelCard extends LitElement {
               tabindex="0"
               aria-roledescription=${localize("a11y.wheel_role", lang)}
               aria-label=${localize("a11y.wheel_label", lang)}
-              aria-keyshortcuts=${this._isSelectorMode()
-                ? "Space Enter ArrowLeft ArrowRight"
-                : "Space Enter"}
+              aria-keyshortcuts=${
+                this._isSelectorMode() ? "Space Enter ArrowLeft ArrowRight" : "Space Enter"
+              }
               @pointerdown=${this._onPointerDown}
               @pointermove=${this._onPointerMove}
               @pointerup=${this._onPointerUp}
@@ -3214,14 +2629,12 @@ export class SpinningWheelCard extends LitElement {
                but kept in the DOM as a polite live region — disabling
                the indicator is a layout choice, not an a11y choice. -->
           <div
-            class=${this.config.show_status === false
-              ? "status status-sr-only"
-              : "status"}
+            class=${!this.config.show_status ? "status status-sr-only" : "status"}
             aria-live="polite"
             aria-atomic="true"
             aria-busy=${this._spinning ? "true" : "false"}
           >
-            ${this.config.show_status === false ? statusText : statusNode}
+            ${!this.config.show_status ? statusText : statusNode}
           </div>
         </div>
       </ha-card>

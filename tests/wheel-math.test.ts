@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment happy-dom
+ *
  * Unit tests for the pure-math helpers in `src/spinning-wheel-card.ts`.
  *
  * Covers angle wrapping (used everywhere in the physics loop and segment
@@ -9,10 +11,13 @@
  * either silently corrupts EVERY spin (wrong segment chosen, wrong
  * `wheel_color_rgb` injected into action data).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
+  cssRgbForLuminance,
   cssToRgbTriple,
+  ellipsize,
+  mapByUniqueLabel,
   pickFontPx,
   toSpokenLabel,
   wrapAngle,
@@ -119,8 +124,10 @@ describe("pickFontPx", () => {
   // canvas measureText — exact glyph widths vary by font/glyph, but the
   // monotonic "smaller font → narrower text" relationship is what the
   // shrink loop relies on).
-  const linear = (textWidthAt1Px: number) => (px: number): number =>
-    textWidthAt1Px * px;
+  const linear =
+    (textWidthAt1Px: number) =>
+    (px: number): number =>
+      textWidthAt1Px * px;
 
   it("returns startPx when text already fits", () => {
     // 4 px-wide text, budget 100, start at 14 → fits immediately.
@@ -191,9 +198,7 @@ describe("toSpokenLabel", () => {
     // name itself is hyphen-only per MDI, but underscores are handled
     // defensively all the same.
     expect(toSpokenLabel("mdi:home")).toBe("home");
-    expect(toSpokenLabel("mdi:food-croissant-thing")).toBe(
-      "food croissant thing",
-    );
+    expect(toSpokenLabel("mdi:food-croissant-thing")).toBe("food croissant thing");
   });
 
   it("collapses runs of separators to a single space", () => {
@@ -210,5 +215,81 @@ describe("toSpokenLabel", () => {
 
   it("returns empty string for empty input", () => {
     expect(toSpokenLabel("")).toBe("");
+  });
+});
+
+describe("cssRgbForLuminance", () => {
+  it("reads opaque colours like cssToRgbTriple", () => {
+    expect(cssRgbForLuminance("#102030")).toEqual([16, 32, 48]);
+    expect(cssRgbForLuminance(" rgb(1, 2, 3) ")).toEqual([1, 2, 3]);
+    expect(cssRgbForLuminance("rgba(1, 2, 3, 1)")).toEqual([1, 2, 3]);
+  });
+
+  it("blends a see-through colour onto white", () => {
+    // Half-transparent black on a white card is mid-grey, not black —
+    // which is what decides between dark and light label text.
+    expect(cssRgbForLuminance("rgba(0, 0, 0, 0.5)")).toEqual([128, 128, 128]);
+    expect(cssRgbForLuminance("rgba(255, 0, 0, 0)")).toEqual([255, 255, 255]);
+    expect(cssRgbForLuminance("rgba(0, 0, 0, 0.25)")).toEqual([191, 191, 191]);
+  });
+
+  it("treats an alpha outside 0–1 as its nearest end", () => {
+    expect(cssRgbForLuminance("rgba(10, 20, 30, 7)")).toEqual([10, 20, 30]);
+  });
+
+  it("returns null for what it can't parse", () => {
+    expect(cssRgbForLuminance("navy")).toBeNull();
+    expect(cssRgbForLuminance("var(--primary-color)")).toBeNull();
+    expect(cssRgbForLuminance("#12")).toBeNull();
+  });
+});
+
+describe("ellipsize", () => {
+  // One unit wide per character.
+  const measure = (text: string): number => text.length;
+
+  it("returns text that fits unchanged", () => {
+    expect(ellipsize(measure, "Dishes", 6)).toBe("Dishes");
+    expect(ellipsize(measure, "", 0)).toBe("");
+  });
+
+  it("cuts until the text and its ellipsis fit", () => {
+    expect(ellipsize(measure, "Take out the bins", 8)).toBe("Take ou…");
+  });
+
+  it("keeps the first character however little room there is", () => {
+    expect(ellipsize(measure, "Dishes", 0)).toBe("D…");
+  });
+});
+
+describe("mapByUniqueLabel", () => {
+  it("picks once per label and shares the pick between its segments", () => {
+    const picks: Array<[number, number]> = [];
+    const out = mapByUniqueLabel(["a", "b", "a", "c", "b"], (slot, index) => {
+      picks.push([slot, index]);
+      return `colour-${slot}`;
+    });
+    expect(out).toEqual(["colour-0", "colour-1", "colour-0", "colour-2", "colour-1"]);
+    // Slot numbers count unique labels; the index is the first segment
+    // carrying each one.
+    expect(picks).toEqual([
+      [0, 0],
+      [1, 1],
+      [2, 3],
+    ]);
+  });
+
+  it("shares a null pick too, instead of picking again", () => {
+    let calls = 0;
+    const out = mapByUniqueLabel(["a", "a", "a"], () => {
+      calls += 1;
+      return null;
+    });
+    expect(out).toEqual([null, null, null]);
+    expect(calls).toBe(1);
+  });
+
+  it("returns nothing for no labels", () => {
+    expect(mapByUniqueLabel([], () => 1)).toEqual([]);
   });
 });

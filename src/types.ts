@@ -98,19 +98,13 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-export type LovelaceCard = HTMLElement;
+type LovelaceCard = HTMLElement;
 
 /** `bubbles: true` + `composed: true` are required so the event crosses
  *  the editor's shadow boundary and reaches the dashboard's
  *  card-editor listener. */
-export function fireEvent<T>(
-  node: HTMLElement,
-  type: string,
-  detail: T,
-): void {
-  node.dispatchEvent(
-    new CustomEvent(type, { detail, bubbles: true, composed: true }),
-  );
+export function fireEvent<T>(node: EventTarget, type: string, detail: T): void {
+  node.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
 }
 
 declare global {
@@ -171,6 +165,14 @@ export interface EntitySelectorConfig {
   exclude_entities?: string[];
 }
 
+/** `description` and `image` are drawn by `mode: "box"` only. */
+export interface SelectOption {
+  value: string;
+  label: string;
+  description?: string;
+  image?: string | { src: string; src_dark?: string };
+}
+
 export type HASelector =
   | { entity: EntitySelectorConfig }
   | { area: { multiple?: boolean } }
@@ -188,10 +190,13 @@ export type HASelector =
     }
   | {
       select: {
-        mode?: "dropdown" | "list";
+        /** `box` (frontend 2025.3+) draws a tile per option with its
+         *  description and image; older frontends fall back to a dropdown. */
+        mode?: "dropdown" | "list" | "box";
+        box_max_columns?: number;
         multiple?: boolean;
         custom_value?: boolean;
-        options: ReadonlyArray<{ value: string; label: string }>;
+        options: ReadonlyArray<SelectOption>;
       };
     }
   | { color_rgb: Record<string, never> }
@@ -227,10 +232,7 @@ export interface HaFormExpandableSchema {
   flatten?: boolean;
   schema: ReadonlyArray<HaFormSchema>;
 }
-export type HaFormSchema =
-  | HaFormSelectorSchema
-  | HaFormGridSchema
-  | HaFormExpandableSchema;
+export type HaFormSchema = HaFormSelectorSchema | HaFormGridSchema | HaFormExpandableSchema;
 
 /** Pre-v1.2 string presets — still accepted in saved YAML, silently
  *  coerced to the new 1–10 integer scale (low → 3, medium → 5,
@@ -245,6 +247,10 @@ export type Friction = number | FrictionPreset;
 
 /** Built-in palette presets. Custom `colors` always wins over `theme`. */
 export type Theme = "default" | "pastel" | "pride" | "neon";
+
+/** How each peg / segment click sounds. All six are synthesised in
+ *  `click-sounds.ts`; `classic` is the card's original click. */
+export type ClickSound = "classic" | "wood" | "flapper" | "pin" | "felt" | "ratchet";
 
 /** Hub + indicator fill mode. `theme` uses HA's `--primary-color`;
  *  `black` / `white` are solid with auto-contrast hub text. */
@@ -298,6 +304,7 @@ export interface SpinningWheelCardConfig extends LovelaceCardConfig {
   hub_color?: HubColor;
   /** Play a peg-click sound on each segment crossing. Default true. */
   sound?: boolean;
+  click_sound?: ClickSound;
   /** Show the status line beneath the wheel. Default true. */
   show_status?: boolean;
   /** Label orientation. `tangent` wraps along the rim; `radial` reads

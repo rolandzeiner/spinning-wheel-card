@@ -55,3 +55,35 @@ export const coulombDecel = (level: number): number => {
   const calibrated = 0.3; // rad/s² at slider 5
   return calibrated * (level / 5);
 };
+
+/** Brake bump a peg gives as it passes the pointer, in rad/s: 0.08 at
+ *  level 5, scaled by the same 1–10 slider. The card applies it once per
+ *  frame that crosses a peg, however many pegs that frame swept. */
+export const pegDrag = (level: number): number => 0.08 * (level / 5);
+
+/** Seconds a wheel launched at `omega` rad/s takes to stop at this
+ *  friction level, stepped at 60 fps with the card's own terms and stop
+ *  threshold. `pegs` is the number of pegs around the rim, 0 for none;
+ *  each frame that crosses one brakes by `pegDrag`, as in the card.
+ *  The editor quotes it under the friction slider. */
+export const stopSeconds = (level: number, omega: number, pegs = 0): number => {
+  const dt = 1 / 60;
+  const viscous = frictionMultiplier(level);
+  const coulomb = coulombDecel(level) * dt;
+  const pegStep = pegs > 0 ? (Math.PI * 2) / pegs : 0;
+  let speed = omega;
+  let angle = 0;
+  let passed = 0;
+  let t = 0;
+  while (speed >= 0.01 && t < 120) {
+    angle += speed * dt;
+    speed *= viscous;
+    speed = speed <= coulomb ? 0 : speed - coulomb;
+    if (pegStep > 0 && Math.floor(angle / pegStep) > passed) {
+      passed = Math.floor(angle / pegStep);
+      speed = Math.max(0, speed - pegDrag(level));
+    }
+    t += dt;
+  }
+  return t;
+};
