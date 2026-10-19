@@ -107,13 +107,15 @@ All options optional. Use the visual editor (Add Card → Spinning Wheel Card �
 
 `friction: 1–10` controls how fast the wheel decays each frame, and (when `pegs: true`) how hard each peg brakes — one slider drives both. Default `5` reproduces the historical `medium` feel.
 
-| Level | @ 60 fps | Stops after a click | Per-peg drag |
-| --- | --- | --- | --- |
-| `1` | 0.998 | ~27 s | 0.016 rad/s |
-| `3` | 0.994 (≈ old `low`) | ~9 s | 0.048 rad/s |
-| `5` | 0.990 (= old `medium`) | ~5 s | 0.080 rad/s |
-| `7` | 0.982 (≈ old `high`) | ~3 s | 0.112 rad/s |
-| `10` | 0.970 | ~2 s | 0.160 rad/s |
+| Level | @ 60 fps | Stops after a click | With pegs | Per-peg drag |
+| --- | --- | --- | --- | --- |
+| `1` | 0.998 | ~27 s | ~22 s | 0.016 rad/s |
+| `3` | 0.994 (≈ old `low`) | ~9 s | ~7 s | 0.048 rad/s |
+| `5` | 0.990 (= old `medium`) | ~5 s | ~4 s | 0.080 rad/s |
+| `7` | 0.982 (≈ old `high`) | ~3 s | ~2.6 s | 0.112 rad/s |
+| `10` | 0.970 | ~2 s | ~1.7 s | 0.160 rad/s |
+
+The times are for a click of middle strength on 8 segments; with pegs at the default two per segment. A harder throw spins longer, more pegs brake sooner.
 
 Decay is frame-rate independent. Each tick applies viscous damping
 `ω *= friction^(60·dt)` followed by a Coulomb subtraction
