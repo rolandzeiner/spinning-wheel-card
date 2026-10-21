@@ -1,6 +1,6 @@
 # Spinning Wheel Card
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![Version](https://img.shields.io/github/v/release/rolandzeiner/spinning-wheel-card?label=version&color=blue)](https://github.com/rolandzeiner/spinning-wheel-card/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
@@ -47,9 +47,13 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
 
 ### HACS (recommended)
 
+1. Open HACS and search for **Spinning Wheel Card**.
+2. Select it and choose **Download**.
+3. Hard-refresh your browser (⌘⇧R or Ctrl⇧R).
+
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=spinning-wheel-card&category=plugin)
 
-HACS → **Frontend** → ⋯ → **Custom repositories** → add `https://github.com/rolandzeiner/spinning-wheel-card` as type **Lovelace** → install → hard-refresh (⌘⇧R).
+Not in the search yet? In HACS, open ⋮ → **Custom repositories**, add `https://github.com/rolandzeiner/spinning-wheel-card` with type **Dashboard**, then search again.
 
 ### Manual
 
