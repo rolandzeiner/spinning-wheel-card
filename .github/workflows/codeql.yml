@@ -1,7 +1,9 @@
 name: CodeQL
 
-# JavaScript/TypeScript-only — this repo ships a Lovelace card, no
-# Python. Runs on every push to main/dev, every PR targeting main,
+# Scans the card's JavaScript/TypeScript (no Python: this repo ships a
+# Lovelace card) and the workflow files themselves, for script injection,
+# missing token permissions and untrusted checkouts. Runs on every push
+# to main/dev, every PR targeting main,
 # and weekly on Tuesday 04:23 UTC for advisories on stale code.
 #
 # workflow_dispatch exists to re-run a scan that GitHub's own
@@ -38,6 +40,8 @@ jobs:
       matrix:
         include:
           - language: javascript-typescript
+            build-mode: none
+          - language: actions
             build-mode: none
 
     steps:
