@@ -98,8 +98,6 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-type LovelaceCard = HTMLElement;
-
 /** `bubbles: true` + `composed: true` are required so the event crosses
  *  the editor's shadow boundary and reaches the dashboard's
  *  card-editor listener. */
@@ -110,7 +108,6 @@ export function fireEvent<T>(node: EventTarget, type: string, detail: T): void {
 declare global {
   interface HTMLElementTagNameMap {
     "spinning-wheel-card-editor": LovelaceCardEditor;
-    "hui-error-card": LovelaceCard;
     "ha-form": HaFormElement;
     "ha-selector": HaSelectorElement;
   }
