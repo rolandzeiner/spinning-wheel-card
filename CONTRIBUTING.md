@@ -21,17 +21,16 @@ npm run build    # = vp build; one-shot production build (minified)
 
 For live testing in a Home Assistant install:
 
-1. Install the card via HACS as a custom repository (HACS auto-registers
-   the Lovelace resource at `/hacsfiles/spinning-wheel-card/spinning-wheel-card.js`).
+1. Install the card through the Marketplace (HACS), which registers the
+   dashboard resource for you.
 2. After each rebuild, copy `dist/spinning-wheel-card.js` into
-   `<config>/www/community/spinning-wheel-card/` on the HA host (HACS
-   serves that folder at `/hacsfiles/`), and delete the
-   `spinning-wheel-card.js.gz` beside it. HACS writes that gzipped copy
-   on install and Home Assistant serves it in preference, so without the
-   delete the browser keeps getting the old card.
+   `<config>/www/community/spinning-wheel-card/` on the HA host, and
+   delete the `spinning-wheel-card.js.gz` beside it. The install leaves
+   that gzipped copy there and Home Assistant serves it in preference,
+   so without the delete the browser keeps getting the old card.
 3. Hard-refresh the browser (⌘⇧R / Ctrl⇧R) to pick up the new bytes.
-   The resource URL carries the release tag, so iterations on the same
-   tag rely on the browser cache being bypassed.
+   The resource URL doesn't change between rebuilds, so only a bypassed
+   browser cache fetches the new file.
 
 ## Verification gate (must pass before PR)
 
@@ -43,13 +42,17 @@ git diff --exit-code -- dist/    # committed bundle must match that build
 node -c dist/spinning-wheel-card.js   # syntax sanity-check
 ```
 
-Commit `dist/` alongside your `src/` change. HACS serves the committed
-bundle directly, so a `src/` edit without a rebuild ships code that no
-longer matches the source — the fourth command is what catches it, and
-CI fails the build on the same check.
+Commit `dist/` alongside your `src/` change. Users install the
+`spinning-wheel-card.js` attached to each GitHub release, and
+`release.yml` copies that asset from the tagged `dist/` without
+rebuilding it. A `src/` edit without a rebuild therefore ships code that
+no longer matches the source — the fourth command is what catches it,
+and CI fails the build on the same check.
 
-CI runs the same five plus `npm audit --omit=dev --audit-level=high`,
-HACS plugin validation, and CodeQL JS/TS analysis.
+CI runs the same five plus `npm audit --omit=dev --audit-level=high`
+and HACS plugin validation. CodeQL analyses the JavaScript/TypeScript
+and the workflows (`actions`) on pushes to `main` and `dev`, on pull
+requests to `main`, and weekly.
 
 ## Tests
 
@@ -61,6 +64,8 @@ sets nothing for them). Those that need a DOM opt into one with an
   `editor-helpers.test.ts`, `editor-defaults.test.ts`,
   `editor-fields.test.ts` — pure functions. `editor-fields.test.ts` also
   fails when an option with a default has no field in the editor.
+- `click-sounds.test.ts` — the six click voices, against an audio
+  context that records what they schedule.
 - `card.test.ts`, `card-draw.test.ts` — the card itself, mounted, spun
   and painted. happy-dom has no canvas, no Web Audio and no animation
   frames, so `tests/fakes.ts` stands in for them: its canvas records
