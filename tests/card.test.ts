@@ -753,6 +753,26 @@ describe("what a result sets off", () => {
     expect(calls).toEqual([]);
   });
 
+  it("shows the result but sets nothing off as the edit dialog's preview", async () => {
+    const card = await mount({
+      selector_mode: true,
+      segments: 4,
+      labels: ["a", "b", "c", "d"],
+      actions: [null, "script.party"],
+      disable_confirm_actions: true,
+      result_entity: "input_text.result",
+      light_sync_entities: ["light.a"],
+      tts_engine: "tts.piper",
+      tts_announce_entities: ["media_player.kitchen"],
+    });
+    card.preview = true;
+    press(card, "ArrowRight");
+    await flush();
+    await flush();
+    expect(statusText(card)).toBe("Result: b");
+    expect(calls).toEqual([]);
+  });
+
   it("carries on when a service call fails", async () => {
     env.failServices = true;
     const card = await winning({

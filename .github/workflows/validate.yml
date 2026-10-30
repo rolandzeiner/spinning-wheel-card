@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         # Installs the vp CLI, Node 24 (pinned below; drop node-version to
         # follow devEngines.runtime) and the npm devEngines asks for, and
         # caches npm's cache. Install runs as its own step below so the

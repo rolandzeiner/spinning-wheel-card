@@ -374,6 +374,11 @@ export class SpinningWheelCard extends LitElement {
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
+  /** Set by HA: "grid" in a sections view, "panel" in a panel view, unset
+   *  in the add-card picker. Reflected so the styles fill only a cell. */
+  @property({ reflect: true }) public layout?: string;
+  /** Set by HA while the card is the edit-card dialog's live preview. */
+  @property({ type: Boolean }) public preview = false;
 
   @state() private config: NormalisedConfig = normaliseConfig({
     type: "spinning-wheel-card",
@@ -1712,6 +1717,10 @@ export class SpinningWheelCard extends LitElement {
     const labels = this._expandedLabels();
     const idx = this._segmentIndexUnderPointer();
     this._result = labels[idx] ?? null;
+    // In the edit-card dialog's live preview a spin is the user trying the
+    // wheel out: show the result, but touch nothing outside the card -- no
+    // result_entity write, light sync, TTS or segment action.
+    if (this.preview) return;
     // Write to result_entity BEFORE the action — automations triggered
     // on the entity state-change should see the new value by the time
     // they run. Fire-and-forget; a deleted helper mustn't break the chain.
@@ -2665,19 +2674,30 @@ export class SpinningWheelCard extends LitElement {
   }
 
   static override styles: CSSResultGroup = css`
-    /* Height must flow :host → ha-card → card-content → wheel-wrap so
-       the canvas sizes to min(width, height). Without it the row-drag
-       handle in the dashboard editor binds to nothing. */
     :host {
       display: block;
       color-scheme: light dark;
-      height: 100%;
     }
     ha-card {
       overflow: hidden;
-      height: 100%;
       display: flex;
       flex-direction: column;
+    }
+    /* Height must flow :host → ha-card → card-content → wheel-wrap so
+       the canvas sizes to min(width, height). Without it the row-drag
+       handle in the dashboard editor binds to nothing.
+       Gated on the layout HA sets on the card ("grid" in a sections view
+       and its edit dialog, "panel" in a panel view), as Mushroom and HA's
+       tile card gate it. The add-card picker sets none and centres each
+       preview in a tile as tall as the tallest preview in its row; an
+       ungated 100% resolved against that tile and stretched the card. */
+    :host([layout="grid"]),
+    :host([layout="panel"]) {
+      height: 100%;
+    }
+    :host([layout="grid"]) ha-card,
+    :host([layout="panel"]) ha-card {
+      height: 100%;
     }
     .card-content {
       padding: var(--ha-space-4, 16px);

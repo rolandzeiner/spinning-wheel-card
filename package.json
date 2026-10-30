@@ -1,6 +1,6 @@
 {
   "name": "spinning-wheel-card",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "private": true,
   "description": "Standalone Lovelace custom card — a click-to-spin / drag-to-flick wheel with momentum-based physics.",
   "type": "module",

@@ -1,34 +1,11 @@
-# Spinning Wheel Card
+# <sub><sub><img src="https://raw.githubusercontent.com/rolandzeiner/spinning-wheel-card/main/brand/icon.png" width="40" height="40" alt=""></sub></sub> Spinning Wheel Card
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Catalog-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![Version](https://img.shields.io/github/v/release/rolandzeiner/spinning-wheel-card?label=version&color=blue)](https://github.com/rolandzeiner/spinning-wheel-card/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 
-A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic angular-momentum physics (drag to throw, friction decay), 4–24 segments, optional per-segment Lovelace actions, todo-list integration. Pure frontend — no Python required.
-
-## Features
-
-- **Click-to-spin / drag-to-throw** with two-stage friction: exponential viscous decay at speed + Coulomb axle term for finite-time stop. Frame-rate-independent. Tunable via a 1–10 slider (pre-v1.2 `low` / `medium` / `high` strings still accepted).
-- **Half-circle mode** — render as a dome (pointer top, hub on the cut line). Compact for narrow cells.
-- **Selector mode** — no spin, no momentum. Drag to align a segment with the indicator and release to fire its action; hub text hides since the centre prompt no longer applies.
-- **Rim pegs** — opt-in real-prize-wheel feel: visible pegs at the rim, each one fires a click sound and a tiny brake bump as it passes the indicator. Optional `peg_density` slider (0–4) for how many extra pegs sit inside each segment. Sine ease-in-out settle nudges the wheel off any peg it overlaps on stop; back-roll only happens when the wheel approached but didn't quite cross the peg ("the peg almost blocked it") — cleanly-crossed pegs never snap back.
-- **Per-segment** labels, weights, colours, label colours, Lovelace actions. Lists shorter than `segments` cycle; same-label segments share fill / label colour / action.
-- **MDI icons as labels** — type `mdi:home` and the icon paints in place of text. The result line shows the icon glyph too, not the literal `mdi:` identifier.
-- **Result helper** — write the winning label into an `input_text.*` so HA automations trigger on `platform: state`.
-- **Wheel context** — opt-in: every fired action gets the winning segment merged into its `data` payload (`wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color`, `wheel_label_color_rgb`). One generic script can then handle every segment.
-- **Light colour sync** — opt-in entity picker: pick one or more `light.*` entities and they auto-match the winning segment's fill colour after every spin. No script required; runs independently of `actions`.
-- **TTS announcement** — opt-in: pick a `tts.*` engine and one or more `media_player.*` speakers and the winning label is spoken aloud after every spin. MDI icon labels are read without the `mdi:` prefix (`mdi:food-croissant` → "food croissant"). No script required.
-- **Todo-list integration** — point at a `todo.*` entity; segments fill from its open items.
-- **Two label orientations** — *tangent* (around the rim) or *radial* (along the spoke).
-- **Label layout controls** (the editor's *Labels* group) — auto-fit toggle shrinks long labels to fit (the amino-acid / chemistry-wheel friendly path), font-size scale (70–150 %), radial-position offset (-20 … +20 %), and a flip toggle that reverses the reading direction (radial: hub→rim instead of rim→hub; tangent: glyph tops face the wheel centre — the "text on the bottom of a coin" convention).
-- **Segment borders** — thin white separator stroke between slices; toggle off for a flatter, edge-to-edge look.
-- **Theme-aware** indicator + hub; auto-contrast hub label AND segment labels via WCAG luminance (black on light slices, white on dark) when `label_colors` is unset.
-- **Six peg-click sounds**, synthesised with Web Audio (no audio files): classic, wood block, rubber flapper, metal pin, felt and plastic ratchet. Every one clicks harder and shorter the faster the wheel turns. Picking a sound in the editor plays a short sample of it; switch the sound off for silence.
-- **Responsive canvas** — 140–1000 px, scales to the dashboard cell on both axes.
-- **Visual editor** — the segments as one list, each with its label, fill and text colour, weight and action, then collapsible groups that show their settings without opening: *Appearance*, *Labels*, *Hub & pointer*, *Lines & pegs*, *Spinning* and *After a spin*. The friction slider says how long a spin lasts; a to-do list can stand in for the segments.
-- **9 bundled languages** — `en` / `de` / `fr` / `it` / `es` / `pt` / `nl` / `zh` / `ja`; falls back to English.
-- **WCAG 2.2 A+AA** — keyboard activation, focus-visible ring, `prefers-reduced-motion`, forced-colors fallback.
+A prize wheel for your Home Assistant dashboard: click to spin it or drag to throw it, and let the winning segment run an action, set a light or fill a helper. The card runs entirely in your browser, with nothing to set up on the Home Assistant side.
 
 ## Screenshots
 
@@ -43,90 +20,96 @@ A click-to-spin / drag-to-flick wheel for Home Assistant Lovelace. Realistic ang
   </tr>
 </table>
 
+## Features
+
+- Click to spin or drag to throw, with momentum and friction that feel physical. One slider sets how long a spin lasts.
+- 4 to 24 segments with their own labels or MDI icons, sizes, fill and text colours, plus four built-in palettes.
+- A half-circle layout for narrow cells, and a pick mode where you drag a segment to the pointer instead of spinning.
+- Optional pegs on the rim that click and brake the wheel, with six synthesised click sounds to choose from.
+- The winning segment can run an action, write its label to a text helper, or come from your to-do list.
+- Lights can take the winning colour and speakers can announce the result, without writing a script.
+- A visual editor for every option, in English, German, French, Italian, Spanish, Portuguese, Dutch, Chinese and Japanese.
+- Keyboard control, screen-reader announcements, reduced motion and high-contrast support, built to WCAG 2.2 AA.
+
 ## Installation
 
-### HACS (recommended)
+### Marketplace (recommended)
 
-1. Open HACS and search for **Spinning Wheel Card**.
-2. Select it and choose **Download**.
-3. Hard-refresh your browser (⌘⇧R or Ctrl⇧R).
+The Marketplace is HACS, built into Home Assistant since 2026.11.
 
-[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=spinning-wheel-card&category=plugin)
+1. In Home Assistant, go to **Settings → Marketplace** and search for **Spinning Wheel Card**.
+2. Select it, then select **Install**. Then reload your browser.
 
-Not in the search yet? In HACS, open ⋮ → **Custom repositories**, add `https://github.com/rolandzeiner/spinning-wheel-card` with type **Dashboard**, then search again.
+[![Open this repository in the Marketplace of your Home Assistant.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=spinning-wheel-card&category=plugin)
+
+On Home Assistant older than 2026.11, use HACS instead: search for **Spinning Wheel Card**, select **Download**, then reload the browser.
 
 ### Manual
 
-Download `spinning-wheel-card.js` from the [latest release](https://github.com/rolandzeiner/spinning-wheel-card/releases), copy to `<config>/www/community/spinning-wheel-card/`, and add a Lovelace resource at `/local/community/spinning-wheel-card/spinning-wheel-card.js` (type **JavaScript module**).
+1. Download `spinning-wheel-card.js` from the [latest release](https://github.com/rolandzeiner/spinning-wheel-card/releases/latest).
+2. Copy it to `<config>/www/community/spinning-wheel-card/`.
+3. Go to **Settings → Dashboards**, then ⋮ → **Resources**, and add `/local/community/spinning-wheel-card/spinning-wheel-card.js` with type **JavaScript module**.
+4. Reload your browser.
 
-## Quick start
+## Configuration
+
+Every option is optional. In a dashboard, select **Add card** and pick **Spinning Wheel** to use the visual editor, or write YAML.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `name` | string | none | Header text. Empty hides the header. |
+| `language` | language code | auto | Overrides the language Home Assistant uses. Unsupported codes fall back to English. |
+| `segments` | integer 4–24 | `8` | Number of segments. Ignored while `todo_entity` is set. |
+| `friction` | integer 1–10 | `5` | How fast the wheel slows down: `1` spins long, `10` stops quickly. Also sets how hard each peg brakes. The strings `low`, `medium` and `high` still work and mean `3`, `5` and `7`. See *Friction*. |
+| `theme` | `default` / `pastel` / `pride` / `neon` | `default` | Palette for segments without their own fill colour. See *Theme presets*. |
+| `labels` | list of strings | `1` … `N` | Segment labels. A shorter list repeats. `mdi:icon-name` draws an icon. Ignored while `todo_entity` is set. |
+| `weights` | list of numbers | all equal | Relative segment sizes. A segment with weight `2` is twice as large, and twice as likely, as one with `1`. A shorter list repeats. |
+| `colors` | list of CSS colours | from `theme` | Fill colours (hex, `rgb()`, `hsl()`, `var(--…)` or a colour name), one per unique label in the order the labels first appear. `null` leaves a segment to the theme. |
+| `label_colors` | list of CSS colours | auto | Text colours, matched to labels like `colors`. Unset, each label is black or white, whichever contrasts more with its fill. |
+| `actions` | list | none | What runs when a segment wins, matched to labels like `colors`: a `script.<name>` shorthand, a Lovelace [action](https://www.home-assistant.io/dashboards/actions/) object, or `null` for nothing. |
+| `disable_confirm_actions` | boolean | `false` | Runs actions without asking first. `confirmation: false` on a single action skips the prompt for that action only. |
+| `wheel_context` | boolean | `false` | Adds the winning segment to the `data` of every `perform-action` and `call-service` action as `wheel_index`, `wheel_label`, `wheel_color`, `wheel_color_rgb`, `wheel_label_color` and `wheel_label_color_rgb`. Keys you set in `data` take precedence. |
+| `disable_boost` | boolean | `false` | Ignores clicks, **Space** and **Enter** while the wheel turns. Dragging still works. |
+| `half_circle` | boolean | `false` | Shows only the upper half, with the hub on the cut edge, so the card gets shorter. |
+| `selector_mode` | boolean | `false` | Pick mode: no spinning. Drag a segment to the pointer and let go to run its action. The hub shows no text. |
+| `segment_borders` | boolean | `true` | Thin white lines between segments. Turn them off for a flat look. |
+| `pegs` | boolean | `false` | Pegs on the rim. Each one clicks and brakes the wheel slightly as it passes the pointer. A wheel that stops on a peg settles off it. |
+| `peg_density` | integer 0–4 | `1` | Extra pegs per segment, on top of the one at each segment boundary: `0` gives one peg per segment, `4` gives five. Needs `pegs`. |
+| `result_entity` | `input_text` entity | none | Text helper that gets the winning label after every spin. In the editor, an admin can create one with **Create helper**. |
+| `light_sync_entities` | list of `light` entities | none | Lights set to the winning segment's fill colour after every spin, through `light.turn_on` with `rgb_color`. Works without `actions`. |
+| `tts_engine` | `tts` entity | none | Text-to-speech engine that speaks the winning label. Needs `tts_announce_entities`. |
+| `tts_announce_entities` | list of `media_player` entities | none | Speakers that announce the winning label after every spin, through `tts.speak`. Icon labels are read without `mdi:` and with hyphens as spaces, so `mdi:food-croissant` becomes "food croissant". |
+| `todo_entity` | `todo` entity | none | Fills the segments from the open items of this to-do list. `segments` and `labels` are ignored while it is set. |
+| `text_orientation` | `tangent` / `radial` | `tangent` (`radial` with `todo_entity`) | `tangent` runs labels along the rim, `radial` along the spoke. |
+| `label_auto_fit` | boolean | `false` | Shrinks long labels to fit their segment, down to 7 px, then shortens them with an ellipsis. Off, labels keep the size from `label_font_scale` and are cut short. Always on with `todo_entity`. |
+| `label_font_scale` | integer 70–150 | `100` | Label size in percent, icon labels included. With `label_auto_fit` it is the largest size. |
+| `label_radius_offset` | integer -20–20 | `0` | Moves labels toward the hub (negative) or the rim (positive), in percent of the radius, from 66 % (55 % for radial labels with `todo_entity`). Labels never overlap the hub or leave the wheel. |
+| `label_flip` | boolean | `false` | Reverses the reading direction. Radial labels then read from the hub outward. Tangent labels turn their tops toward the centre, which reads better when results land at the bottom of the wheel. |
+| `hub_text` | string | `SPIN` (localised) | Hub label. It shrinks to fit, and an empty string hides it. |
+| `hub_color` | `theme` / `black` / `white` | `theme` | Fill of the hub and pointer. `theme` uses your theme's primary colour. The hub text is black or white, whichever contrasts more. |
+| `sound` | boolean | `true` | A click each time a segment boundary passes the pointer, or each peg when `pegs` is on. |
+| `click_sound` | `classic` / `wood` / `flapper` / `pin` / `felt` / `ratchet` | `classic` | How each click sounds: `classic` a short, light click, `wood` a warm knock, `flapper` a rubber flap that springs back on slow crossings, `pin` a bright metal tink, `felt` a muted thud, `ratchet` a crisp, dry tick. Faster crossings click harder and shorter. The editor plays a sample when you pick one. |
+| `show_status` | boolean | `true` | The line under the wheel: **Spinning…**, the result, or a hint. When hidden, screen readers still hear it. |
+
+The smallest configuration:
 
 ```yaml
 type: custom:spinning-wheel-card
 ```
 
-8 numeric segments, medium friction, sound on, tangent labels, language auto-detected.
+That gives 8 numbered segments, friction 5, sound on, labels along the rim and the language of your Home Assistant.
 
-## Configuration
+### Friction
 
-All options optional. Use the visual editor (Add Card → Spinning Wheel Card → ⚙) or YAML.
+| `friction` | Stops after a click | With pegs |
+| --- | --- | --- |
+| `1` | about 27 s | about 22 s |
+| `3` | about 9 s | about 7 s |
+| `5` | about 5 s | about 4 s |
+| `7` | about 3 s | about 2.6 s |
+| `10` | about 2 s | about 1.7 s |
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `name` | string | unset | Card header text. Empty / unset hides the header. |
-| `language` | ISO-639-1 string | auto | Override the auto-detected display language. Unsupported codes fall back to English. |
-| `segments` | integer 4–24 | `8` | Slice count. Ignored when `todo_entity` is set. |
-| `friction` | integer 1–10 | `5` | Wheel dampening. 1 = long lazy spin, 5 = classic, 10 = stops quickly. Also scales the per-peg brake bump when `pegs: true`. Pre-v1.2 string presets (`low` / `medium` / `high`) are silently coerced to `3` / `5` / `7`. |
-| `theme` | `default` / `pastel` / `pride` / `neon` | `default` | Built-in palette when `colors` is empty. See [Theme presets](#theme-presets). |
-| `labels` | string[] | `1`…`N` | Per-segment labels. Shorter lists cycle. MDI icons via `mdi:icon-name`. Ignored when `todo_entity` is set. |
-| `weights` | number[] | all equal | Relative segment widths (only the ratio matters). Cycles. |
-| `colors` | string[] | active `theme` | CSS colours (hex / rgb / hsl / `var(--…)` / named). Mapped to **unique labels in first-appearance order**. Overrides `theme`. |
-| `label_colors` | string[] | auto | Label text colours. Same unique-label mapping as `colors`. Empty / unset → auto-picks black or white per segment via WCAG luminance against the segment fill. |
-| `actions` | array of `string` / `ActionConfig` / `null` | none | Action fired on win. `script.foo` shortcuts to `perform-action`; full Lovelace [`ActionConfig`](https://www.home-assistant.io/dashboards/actions/) objects supported. Same unique-label mapping. |
-| `disable_confirm_actions` | boolean | `false` | Skip the "Run … for X?" prompt. Per-action `confirmation: false` opts a single one out. |
-| `wheel_context` | boolean | `false` | Merge the winning segment into every `perform-action` / `call-service` payload as `wheel_index` / `wheel_label` / `wheel_color` / `wheel_color_rgb` / `wheel_label_color` / `wheel_label_color_rgb`. User-supplied `data` keys win on collision. See [Wheel-context example](#wheel-context-pick-a-colour-set-a-light). |
-| `disable_boost` | boolean | `false` | Ignore clicks (and `Space`/`Enter`) while the wheel is spinning. Drag-to-throw unaffected. |
-| `half_circle` | boolean | `false` | Dome layout — only the upper half renders, hub on the cut line, card height shrinks. Spinning physics unchanged. |
-| `selector_mode` | boolean | `false` | Manual picker — no spin, no momentum, hub text hidden. Drag to align a segment, release to commit. |
-| `segment_borders` | boolean | `true` | Thin white separator stroke between adjacent slices. Set `false` for a flatter, edge-to-edge look (e.g. with bold neon / pride palettes). |
-| `pegs` | boolean | `false` | Render small pegs at the rim. Each peg fires a peg-click sound (gated by `sound`) and a small velocity bump as it passes the indicator. The wheel smoothly settles off any peg whose pixel footprint the indicator overlaps on stop; back-roll only fires when the wheel approached but didn't cross the peg (no random snap-back across cleanly-crossed pegs). |
-| `peg_density` | integer 0–4 | `1` | Extra pegs per segment beyond the always-present boundary peg. `0` = boundary pegs only (`segments` total); `1` = boundary + 1 mid (`2 × segments`, default); `4` = densely studded (`5 × segments`). Ignored when `pegs: false`. |
-| `result_entity` | `input_text.*` entity_id | none | Helper to receive the winning label after every spin. Editor's "Create dedicated helper" button auto-provisions one (admin only). |
-| `light_sync_entities` | array of `light.*` entity_ids | none | Lights that automatically match the winning segment's fill colour after every spin (`light.turn_on` with `rgb_color`). Independent of `actions` — no script needed. Only RGB-capable bulbs respond (`supported_color_modes` includes `rgb` / `rgbw` / `rgbww` / `hs` / `xy`); color-temp / brightness / on-off bulbs are skipped silently. Hex, `rgb()`, `hsl()` and named colours all work; a `var(--…)` colour skips silently. |
-| `tts_engine` | `tts.*` entity_id | none | TTS engine used to speak the winning label after every spin. Must be paired with `tts_announce_entities` — engine alone is a no-op. |
-| `tts_announce_entities` | array of `media_player.*` entity_ids | none | Speakers that announce the winning label after every spin, via `tts_engine` (`tts.speak`). Independent of `actions` — no script needed. MDI icon labels are spoken without the `mdi:` prefix and with hyphens read as spaces (`mdi:food-croissant` → "food croissant"). The engine's own language setting governs pronunciation. |
-| `todo_entity` | `todo.*` entity_id | none | Fill segments from this entity's open items (4–24, deduped). `segments`, `labels`, `text_orientation` are ignored while wired. |
-| `text_orientation` | `tangent` / `radial` | `tangent` (`radial` in todo mode) | Tangent wraps text around the rim; radial reads along the spoke. |
-| `label_auto_fit` | boolean | `false` | When `true`, every label measures-and-shrinks to fit its slice down to 7 px (then ellipsis-truncates). When `false`, static labels render at the fixed `label_font_scale` size and char-truncate. Always on for `todo_entity` (arbitrary summaries can't sensibly char-truncate). |
-| `label_font_scale` | integer 70–150 | `100` | Scales the base label font in percent. With `label_auto_fit: true` this is the *starting / max* size — long labels still shrink to fit. Also scales MDI icon labels proportionally. |
-| `label_radius_offset` | integer -20…+20 | `0` | Moves labels inward (negative) or toward the rim (positive), as a percent of wheel radius added to the per-mode default (66 %, or 55 % in todo+radial). Clamped at draw time so labels never overlap the hub or run off the disc. |
-| `label_flip` | boolean | `false` | Reverse the label reading direction. Radial: reads hub→rim instead of rim→hub. Tangent: glyph tops face the wheel centre and chars walk the opposite way — the "text on the bottom of a coin" convention, handy when labels often land at the lower half of the wheel. |
-| `hub_text` | string | localised (`SPIN` / `DREH` / …) | Centre-hub label. Auto-shrinks. Empty hides. |
-| `hub_color` | `theme` / `black` / `white` | `theme` | Hub + indicator fill. `theme` uses HA's `--primary-color` with auto-contrast text. |
-| `sound` | boolean | `true` | Peg-click sound on segment crossings. |
-| `click_sound` | `classic` / `wood` / `flapper` / `pin` / `felt` / `ratchet` | `classic` | How each click sounds. `classic` is a short, light click; `wood` a warm knock with a hint of pitch; `flapper` a rubber flap that springs back on slow crossings; `pin` a bright metal tink; `felt` a muted thud; `ratchet` a crisp, dry tick. |
-| `show_status` | boolean | `true` | Show the line beneath the wheel (`Spinning…` / `Result: X` / idle hint). |
-
-### Friction slider
-
-`friction: 1–10` controls how fast the wheel decays each frame, and (when `pegs: true`) how hard each peg brakes — one slider drives both. Default `5` reproduces the historical `medium` feel.
-
-| Level | @ 60 fps | Stops after a click | With pegs | Per-peg drag |
-| --- | --- | --- | --- | --- |
-| `1` | 0.998 | ~27 s | ~22 s | 0.016 rad/s |
-| `3` | 0.994 (≈ old `low`) | ~9 s | ~7 s | 0.048 rad/s |
-| `5` | 0.990 (= old `medium`) | ~5 s | ~4 s | 0.080 rad/s |
-| `7` | 0.982 (≈ old `high`) | ~3 s | ~2.6 s | 0.112 rad/s |
-| `10` | 0.970 | ~2 s | ~1.7 s | 0.160 rad/s |
-
-The times are for a click of middle strength on 8 segments; with pegs at the default two per segment. A harder throw spins longer, more pegs brake sooner.
-
-Decay is frame-rate independent. Each tick applies viscous damping
-`ω *= friction^(60·dt)` followed by a Coulomb subtraction
-`ω -= c · sign(ω) · dt` where `c` scales with the same slider. The
-viscous term dominates at high ω; Coulomb takes over near rest and
-drives finite-time stop instead of the asymptotic crawl of pure
-exponential decay.
+The times are for a click of middle strength on 8 segments, with pegs at the default two per segment. A harder throw spins longer, and more pegs stop the wheel sooner. The editor shows the time under the slider.
 
 ### Theme presets
 
@@ -134,14 +117,30 @@ exponential decay.
 | --- | --- |
 | `default` | 8-colour rainbow. |
 | `pastel` | 8 soft, low-saturation tones. |
-| `pride` | 10-colour inclusive Pride: 6-stripe rainbow + Helms transgender stripes + bisexual purple. Cycles for `segments > 10`. |
-| `neon` | 8 vivid, fully-saturated tones. |
+| `pride` | 10 inclusive Pride colours: the 6-stripe rainbow, the transgender stripes and bisexual purple. |
+| `neon` | 8 vivid, fully saturated tones. |
 
-A custom `colors` array always overrides `theme`.
+With more distinct labels than colours, the palette repeats. Your own `colors` always take precedence over `theme`.
+
+### Controls
+
+| Input | What happens |
+| --- | --- |
+| Click at rest | Spins the wheel in a random direction. |
+| Click while spinning | Adds speed in the current direction. |
+| Drag | The wheel follows the pointer. Let go to throw it at the speed you dragged. |
+| **Space** or **Enter** (wheel focused) | Same as a click. In pick mode, runs the current segment again. |
+| **←** or **→** (wheel focused, pick mode) | Moves the selection one segment. |
+
+With reduced motion turned on in your system, the wheel skips the spin animation and jumps straight to the result.
+
+### Language
+
+The card follows your Home Assistant language, then your browser's, then English. Region codes such as `de-AT` use the base language. Set `language` to fix one per card.
 
 ## Examples
 
-**Yes / No wheel** — labels cycle:
+**Yes or no**, with the two labels repeating around the wheel:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -150,7 +149,7 @@ colors: ["#06d6a0", "#e63946"]
 hub_text: GO
 ```
 
-**Weighted wheel** — one big slice, three small:
+**Weighted wheel**, one large segment and three small ones:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -159,7 +158,7 @@ weights: [2, 1, 1, 1]
 labels: [Jackpot, Try Again, Try Again, Try Again]
 ```
 
-**Icon wheel** — labels are MDI icons:
+**Icons as labels:**
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -168,14 +167,15 @@ labels: [mdi:pizza, mdi:hamburger, mdi:noodles, mdi:taco, mdi:food-croissant, md
 hub_text: ""
 ```
 
-**Long labels (auto-fit)** — 20 amino acids, radial labels shrink to fit:
+<details>
+<summary>Long labels: 20 amino acids that shrink to fit along the spoke</summary>
 
 ```yaml
 type: custom:spinning-wheel-card
 segments: 20
 text_orientation: radial
 label_auto_fit: true
-label_radius_offset: 10   # push labels closer to the rim for more spoke length
+label_radius_offset: 10   # labels closer to the rim, for more room along the spoke
 labels:
   - Alanine
   - Arginine
@@ -199,7 +199,9 @@ labels:
   - Valine
 ```
 
-**Per-segment actions** — fire a script per winner:
+</details>
+
+**A script per winner:**
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -207,7 +209,7 @@ labels: [Pizza, Burgers, Sushi]
 actions: [script.order_pizza, script.order_burgers, script.order_sushi]
 ```
 
-**Result helper** — push the winning label into an `input_text` so automations can trigger:
+**Result helper**, so an automation can react to the winning label:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -217,16 +219,16 @@ result_entity: input_text.spinning_wheel_result
 
 ```yaml
 - alias: Wheel result router
-  trigger:
-    - platform: state
+  triggers:
+    - trigger: state
       entity_id: input_text.spinning_wheel_result
-  action:
-    - service: scene.turn_on
+  actions:
+    - action: scene.turn_on
       target:
         entity_id: "scene.{{ trigger.to_state.state | lower | replace(' ', '_') }}"
 ```
 
-**Todo-list wheel** — segments from open items:
+**To-do list wheel**, with the open items as segments:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -234,7 +236,7 @@ todo_entity: todo.shopping_list
 hub_text: ""
 ```
 
-**Half-circle dial** — compact dome layout:
+**Half circle:**
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -242,7 +244,7 @@ half_circle: true
 labels: [Easy, Medium, Hard]
 ```
 
-**Selector mode** — manual picker, no spinning:
+**Pick mode**, choosing a room by hand:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -251,19 +253,14 @@ labels: [Living room, Kitchen, Bedroom]
 actions: [script.lights_living, script.lights_kitchen, script.lights_bedroom]
 ```
 
-**Wheel context — one script, every segment:**
-
-`wheel_context: true` merges the winning segment into the action's `data`. One script handles every segment.
+**One script for every segment.** With `wheel_context`, the script receives the winning segment as variables. A single entry in `actions` repeats for every label.
 
 ```yaml
 type: custom:spinning-wheel-card
 labels: [Red, Green, Blue]
 colors: ["#e40303", "#008026", "#004dff"]
 wheel_context: true
-actions:
-  - perform_action: script.set_light_colour
-  - perform_action: script.set_light_colour
-  - perform_action: script.set_light_colour
+actions: [script.set_light_colour]
 ```
 
 ```yaml
@@ -276,9 +273,7 @@ sequence:
       rgb_color: "{{ wheel_color_rgb }}"
 ```
 
-**Light colour sync — same result, zero scripts:**
-
-`light_sync_entities` picks one or more lights and auto-matches them to the winning segment's fill colour after every spin. Equivalent to the wheel-context example above, but configured entirely in the visual editor (no `script.set_light_colour`, no per-segment action, no `wheel_context: true`).
+**The same without a script**, using `light_sync_entities`:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -289,9 +284,7 @@ light_sync_entities:
   - light.bed_strip
 ```
 
-**Spoken result** — announce the winning label on a smart speaker:
-
-`tts_engine` + `tts_announce_entities` speak the winning label after every spin — no `script`, no automation. MDI icon labels are read without the `mdi:` prefix.
+**Spoken result** on a smart speaker:
 
 ```yaml
 type: custom:spinning-wheel-card
@@ -301,55 +294,54 @@ tts_announce_entities:
   - media_player.kitchen_speaker
 ```
 
-**Real-prize-wheel** — densely studded rim, click + brake on every peg:
+**Prize wheel** with a densely studded rim:
 
 ```yaml
 type: custom:spinning-wheel-card
 pegs: true
-peg_density: 3       # 4 pegs per segment (1 boundary + 3 mids)
+peg_density: 3       # 4 pegs per segment: 1 at the boundary, 3 in between
 segment_borders: false
 theme: pride
 labels: [mdi:pizza, mdi:hamburger, mdi:noodles, mdi:taco, mdi:food-croissant, mdi:silverware-fork-knife]
 ```
 
-## Controls
+## Known limitations
 
-| Action | Behaviour |
-| --- | --- |
-| Click at rest | Random impulse spin (random direction). |
-| Click while spinning | **Boost** — adds an impulse in the current direction. |
-| Click + drag (>3 px) | Wheel follows cursor; release flicks at the sampled angular velocity. |
-| `Space` / `Enter` (focused) | Keyboard equivalent of click. In selector mode: re-fires the current selection. |
-| `←` / `→` (focused, selector mode) | Advance the selection by one segment (CCW / CW). Mouse-drag parity for keyboard users. |
+- A spin happens in the browser that started it. Other open dashboards don't see it. Use `result_entity` to share the result.
+- The to-do wheel shows at most 24 open items. Items with the same text become one segment, and fewer than 4 items repeat to fill the wheel.
+- Light sync only changes bulbs that support colour (RGB, RGBW, RGBWW, HS or XY). Lights with only colour temperature or brightness are skipped, and so is a segment whose colour is a `var(--…)` theme variable.
+- The text-to-speech engine pronounces the label in its own configured language, not the card's.
+- The prompt before an action is your browser's own confirmation dialog.
+- Only an admin can create the result helper from the editor.
 
-## Translations
+## Troubleshooting
 
-Active language follows `hass.locale.language` → `hass.language` → `navigator.language` → `en`. BCP-47 region codes (`en-GB`, `de-AT`, …) normalise to the ISO-639-1 base. Switching language in HA re-renders live. Override per-card via `language` (or "Auto" in the editor).
+**The card shows an error instead of the wheel.** The message names the first option with a value the card can't use. Fix that value, and the next one shows if there is another.
 
-Adding a language: drop a `<code>.json` next to `src/localize/languages/*.json`, register it in `src/localize/localize.ts`, `npm run build`. Missing keys fall through to English.
+**After an update, the old card still shows.** Reload the browser without the cache (⌘⇧R on a Mac, Ctrl+Shift+R elsewhere). For a manual install, also delete `spinning-wheel-card.js.gz` next to the card file if there is one: Home Assistant serves that compressed copy in preference to the new file.
 
-## Accessibility
+## Removal
 
-- **Keyboard**: `Tab` to focus, `Space` / `Enter` to spin (or commit in selector mode). In selector mode `←` / `→` advance the selection one segment at a time — keyboard parity with mouse drag. `:focus-visible` ring. `aria-keyshortcuts` announces the active binding (`Space Enter` normally, `Space Enter ArrowLeft ArrowRight` in selector mode).
-- **Screen readers**: canvas carries `role="button"` + a localised `aria-roledescription="prize wheel"` and a static name; a tightly-scoped `aria-live="polite"` region with `aria-busy` announces every state change (`Spinning…` → `Result: foo`) once, without re-announcing the static name or chattering mid-spin. The live region stays in the a11y tree as a visually-hidden announcer even when `show_status: false`.
-- **Reduced motion**: `prefers-reduced-motion: reduce` skips the decay animation; the wheel snaps directly to the result. WCAG 2.3.3.
-- **Contrast (WCAG 1.4.3)**: hub text and segment labels both auto-pick black or white via WCAG relative luminance against their respective fills when the user hasn't set a custom palette — meets AA on every built-in theme.
-- **Forced colors** (Windows High Contrast): focus ring uses `CanvasText`.
+1. Remove the card from your dashboards.
+2. In **Settings → Marketplace**, open **Spinning Wheel Card**, then ⋮ → **Uninstall**.
+3. Reload your browser.
 
-## Browser support
+For a manual install, delete `<config>/www/community/spinning-wheel-card/` and remove its entry under **Settings → Dashboards**, then ⋮ → **Resources**. A helper you created with **Create helper** stays; delete it under **Settings → Devices & services → Helpers** if you no longer need it.
 
-Chrome / Edge / Firefox / Safari current major + previous. Uses Web Audio, ResizeObserver, Pointer Events, ES2022.
+## Attribution
 
-## Build from source
-
-```bash
-npm install
-npm run build       # → dist/spinning-wheel-card.js
-npm run dev         # rebuilds on every save
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+The card bundle includes [Lit](https://lit.dev/), © Google LLC, under the BSD 3-Clause licence.
 
 ## License
 
-[MIT](LICENSE) © Roland Zeiner.
+MIT. See [LICENSE](https://github.com/rolandzeiner/spinning-wheel-card/blob/main/LICENSE).
+
+To build the card or contribute, see [CONTRIBUTING.md](https://github.com/rolandzeiner/spinning-wheel-card/blob/main/CONTRIBUTING.md).
+
+## Disclaimer
+
+This card is provided as is, without warranty of any kind. It is not affiliated with or endorsed by Home Assistant or the Open Home Foundation. Use at your own risk.
+
+---
+
+Diese Karte wird ohne jede Gewährleistung bereitgestellt. Sie steht in keiner Verbindung zu Home Assistant oder der Open Home Foundation und wird von diesen nicht unterstützt. Nutzung auf eigene Verantwortung.
