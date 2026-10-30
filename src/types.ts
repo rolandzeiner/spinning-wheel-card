@@ -207,19 +207,19 @@ export type HASelector =
   | { theme: { include_default?: boolean } }
   | { constant: { value: string | number | boolean; label?: string } };
 
-export interface HaFormBaseSchema {
+interface HaFormBaseSchema {
   name: string;
   required?: boolean;
 }
-export interface HaFormSelectorSchema extends HaFormBaseSchema {
+interface HaFormSelectorSchema extends HaFormBaseSchema {
   selector: HASelector;
 }
-export interface HaFormGridSchema {
+interface HaFormGridSchema {
   type: "grid";
   name: "";
   schema: ReadonlyArray<HaFormSchema>;
 }
-export interface HaFormExpandableSchema {
+interface HaFormExpandableSchema {
   type: "expandable";
   name: string;
   title?: string;
@@ -229,7 +229,7 @@ export interface HaFormExpandableSchema {
   flatten?: boolean;
   schema: ReadonlyArray<HaFormSchema>;
 }
-export type HaFormSchema = HaFormSelectorSchema | HaFormGridSchema | HaFormExpandableSchema;
+type HaFormSchema = HaFormSelectorSchema | HaFormGridSchema | HaFormExpandableSchema;
 
 /** Pre-v1.2 string presets — still accepted in saved YAML, silently
  *  coerced to the new 1–10 integer scale (low → 3, medium → 5,
