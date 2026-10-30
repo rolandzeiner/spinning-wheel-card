@@ -74,6 +74,9 @@ sets nothing for them). Those that need a DOM opt into one with an
   and its segment rows. happy-dom has no `ha-expansion-panel`, so the
   groups are drawn open there; `editor-panels.test.ts` covers the panels
   with a stand-in element.
+- `grid-cell.test.ts` — the card fills its sections-view cell only when
+  HA sets a `layout`, so the add-card picker preview keeps its own
+  height. happy-dom does no layout, so it checks the CSS text.
 - `toolchain.test.ts` — the `vite` override in `package.json` names the
   same version as `vite-plus` (see *Card build*).
 
