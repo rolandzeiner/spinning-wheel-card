@@ -766,7 +766,7 @@ export class SpinningWheelCard extends LitElement {
           "ll-custom",
           Object.fromEntries(Object.entries(cfg).filter(([k]) => k !== "action")),
         );
-        return;
+        break;
     }
   }
 
@@ -1537,7 +1537,9 @@ export class SpinningWheelCard extends LitElement {
           probe.shadowRoot?.querySelector("path")?.getAttribute("d") ??
           null;
         if (!path) {
-          await new Promise<void>((r) => requestAnimationFrame(() => r()));
+          await new Promise<void>((r) => {
+            requestAnimationFrame(() => r());
+          });
         }
       }
       this._iconCache.set(name, path);
