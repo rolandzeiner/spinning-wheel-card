@@ -438,6 +438,40 @@ describe("the segment rows", () => {
     expect(session.saved[session.saved.length - 1]).toEqual({ type: TYPE, labels });
   });
 
+  describe("typing a colour (the native picker does not open everywhere)", () => {
+    const hex = (session: Session, which: 0 | 1): HTMLInputElement =>
+      session.root.querySelectorAll<HTMLInputElement>(".ed-row-body .ed-hex")[which];
+    const type = async (session: Session, which: 0 | 1, value: string): Promise<void> => {
+      const input = hex(session, which);
+      input.value = value;
+      input.dispatchEvent(new Event("change"));
+      await session.settle();
+    };
+
+    it("saves a typed colour as #rrggbb", async () => {
+      const session = await open({ labels });
+      await session.toggleRow(1);
+      await type(session, 0, "#ABC");
+      expect(session.saved[session.saved.length - 1]?.colors).toEqual([null, "#aabbcc", null]);
+    });
+
+    it("clears the slot when the field is emptied", async () => {
+      const session = await open({ labels, colors: [null, "#123456", null] });
+      await session.toggleRow(1);
+      await type(session, 0, "");
+      expect(session.saved[session.saved.length - 1]).toEqual({ type: TYPE, labels });
+    });
+
+    it("puts back what it cannot read and saves nothing", async () => {
+      const session = await open({ labels, colors: [null, "#123456", null] });
+      await session.toggleRow(1);
+      const before = session.saved.length;
+      await type(session, 0, "not a colour");
+      expect(session.saved).toHaveLength(before);
+      expect(hex(session, 0).value).toBe("#123456");
+    });
+  });
+
   it("write a cycled colour list out before changing one entry", async () => {
     const session = await open({ labels, colors: ["#ff0000"] });
     await session.toggleRow(1);

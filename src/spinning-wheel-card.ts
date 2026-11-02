@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import type { TemplateResult, PropertyValues, CSSResultGroup } from "lit";
 import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
@@ -766,7 +766,7 @@ export class SpinningWheelCard extends LitElement {
           "ll-custom",
           Object.fromEntries(Object.entries(cfg).filter(([k]) => k !== "action")),
         );
-        return;
+        break;
     }
   }
 
@@ -1537,7 +1537,9 @@ export class SpinningWheelCard extends LitElement {
           probe.shadowRoot?.querySelector("path")?.getAttribute("d") ??
           null;
         if (!path) {
-          await new Promise<void>((r) => requestAnimationFrame(() => r()));
+          await new Promise<void>((r) => {
+            requestAnimationFrame(() => r());
+          });
         }
       }
       this._iconCache.set(name, path);
@@ -2611,7 +2613,10 @@ export class SpinningWheelCard extends LitElement {
     return html`
       <ha-card .header=${header}>
         <div class="card-content">
-          <div class=${halfMode ? "wheel-wrap wheel-wrap-half" : "wheel-wrap"}>
+          <div
+            class=${halfMode ? "wheel-wrap wheel-wrap-half" : "wheel-wrap"}
+            style=${halfMode ? `--wheel-aspect: 1 / ${HALF_ASPECT}` : nothing}
+          >
             <canvas
               id="wheel"
               class=${classMap({ "wheel-resting": !this._spinning })}
@@ -2718,6 +2723,16 @@ export class SpinningWheelCard extends LitElement {
       min-height: 0;
       min-width: 0;
       width: 100%;
+      /* Same cap as the canvas, so a very wide cell does not reserve
+         height the wheel can never fill. */
+      max-width: ${MAX_SIZE}px;
+      /* Height-derived-from-width when the cell's height is content-
+         driven ("fit to content" / rows: auto). Without it the wrap's
+         height was the canvas's own previous height, so min(w, h) could
+         never grow and a wide cell kept a small wheel. In a fixed-height
+         cell the flex item still shrinks / grows to the cell, so the
+         wheel is min(width, height) there as before. */
+      aspect-ratio: var(--wheel-aspect, 1);
       display: flex;
       align-items: center;
       justify-content: center;

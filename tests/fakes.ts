@@ -15,7 +15,6 @@ export type Op = [name: string, ...args: unknown[]];
 
 /** Everything the tests reach into. Private members are read through this
  *  on purpose: the wheel's state (angle, speed) has no public surface. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Card = HTMLElement & Record<string, any>;
 
 // ---------------------------------------------------------------- canvas

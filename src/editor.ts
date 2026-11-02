@@ -683,6 +683,19 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
     const name = this._t(key === "colors" ? "editor.row.fill" : "editor.row.text");
     const set = (ev: Event): void =>
       this._setColour(slot, slots, key, (ev.target as HTMLInputElement).value, ctx);
+    // The native picker never opens in some browsers inside HA's modal edit
+    // dialog (Firefox on Wayland), so the colour can also be typed. Empty
+    // clears the slot; anything cssToRgb can't read is put back.
+    const setHex = (ev: Event): void => {
+      const input = ev.target as HTMLInputElement;
+      const text = input.value.trim();
+      if (text === "") {
+        this._setColour(slot, slots, key, null, ctx);
+      } else if (cssToRgb(text)) {
+        this._setColour(slot, slots, key, toHex(text), ctx);
+      }
+      input.value = custom ? toHex(custom) : "";
+    };
     return html`<div class="ed-color">
       <label class="swatch">
         <input
@@ -699,6 +712,17 @@ export class SpinningWheelCardEditor extends LitElement implements LovelaceCardE
           </span>
         </span>
       </label>
+      <input
+        type="text"
+        class="ed-hex"
+        spellcheck="false"
+        autocomplete="off"
+        maxlength="25"
+        aria-label=${`${name}: ${title} (hex)`}
+        placeholder=${toHex(shown)}
+        .value=${custom ? toHex(custom) : ""}
+        @change=${setHex}
+      />
       ${
         custom
           ? html`<button
