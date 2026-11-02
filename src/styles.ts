@@ -266,6 +266,25 @@ export const editorStyles = css`
     outline-offset: 2px;
   }
 
+  .ed-hex {
+    box-sizing: border-box;
+    width: 96px;
+    margin-inline-start: 12px;
+    padding: 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--primary-text-color);
+    font: inherit;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ed-hex:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+  }
+
   .ed-color-text {
     display: grid;
     gap: 2px;
@@ -279,7 +298,8 @@ export const editorStyles = css`
   @media (forced-colors: active) {
     .ed-row-main:focus-visible,
     .swatch-reset:focus-visible,
-    .swatch input[type="color"]:focus-visible {
+    .swatch input[type="color"]:focus-visible,
+    .ed-hex:focus-visible {
       outline-color: CanvasText;
     }
   }
