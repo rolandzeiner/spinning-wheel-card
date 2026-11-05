@@ -497,15 +497,6 @@ export const GROUP_ITEMS: Record<GroupId, ReadonlyArray<GroupItem>> = {
   ],
 };
 
-/** Every field the editor can draw, for the guard test and label lookups. */
-export const ALL_FIELDS: ReadonlyArray<EditorField> = [
-  ...TOP_FIELDS,
-  SOURCE_FIELD,
-  COUNT_FIELD,
-  TODO_FIELD,
-  ...Object.values(GROUP_ITEMS).flatMap((items) => items.filter(isField)),
-];
-
 export const fieldSelector = (field: EditorField, ctx: FieldContext): HASelector =>
   typeof field.selector === "function" ? field.selector(ctx) : field.selector;
 

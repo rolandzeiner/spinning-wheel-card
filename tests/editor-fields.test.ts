@@ -10,15 +10,21 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { DEFAULTS, normaliseConfig } from "../src/config";
 import {
-  ALL_FIELDS,
+  COUNT_FIELD,
+  type EditorField,
   expandCycle,
   type FieldContext,
   fieldHelper,
+  GROUP_ITEMS,
   groupSummary,
+  isField,
   remapLists,
   setSlot,
   setWeight,
   slotsOf,
+  SOURCE_FIELD,
+  TODO_FIELD,
+  TOP_FIELDS,
 } from "../src/editor-fields";
 import { localize } from "../src/localize/localize";
 import type { SpinningWheelCardConfig } from "../src/types";
@@ -40,6 +46,16 @@ const ctx = (config: Partial<SpinningWheelCardConfig> = {}, over: Partial<FieldC
     ...over,
   } satisfies FieldContext;
 };
+
+/** Every field the editor can draw: the ones it renders above the groups
+ *  and the fields inside every group. */
+const ALL_FIELDS: ReadonlyArray<EditorField> = [
+  ...TOP_FIELDS,
+  SOURCE_FIELD,
+  COUNT_FIELD,
+  TODO_FIELD,
+  ...Object.values(GROUP_ITEMS).flatMap((items) => items.filter(isField)),
+];
 
 describe("the field table", () => {
   it("has a field for every option with a default", () => {
